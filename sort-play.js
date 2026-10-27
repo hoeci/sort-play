@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "6.10.3";
+  const SORT_PLAY_VERSION = "6.11.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -210,7 +210,7 @@
     STORAGE_KEY_AUTO_HIDE_DISCOGRAPHY_NOTIFICATION, STORAGE_KEY_GENRE_SEPARATOR,
     STORAGE_KEY_RANGE_EXCLUDE_UNLISTENED, STORAGE_KEY_GENRE_FILTER_SOURCES,
     STORAGE_KEY_LOCAL_FILES_HANDLING, STORAGE_KEY_FOLLOWED_RELEASES_CONFIG,
-    STORAGE_KEY_CF_FETCH_POPULARITY, STORAGE_KEY_CF_FETCH_LASTFM,
+    STORAGE_KEY_CF_FETCH_POPULARITY, STORAGE_KEY_CF_FETCH_LASTFM, STORAGE_KEY_COLUMN_LAYOUT,
     STORAGE_KEY_CF_RELEASE_DATE_FORMAT, STORAGE_KEY_CF_MY_SCROBBLES_MODE, STORAGE_KEY_CF_KEY_MODE,
     STORAGE_KEY_PRESERVE_DATE_ADDED, STORAGE_KEY_DEDICATED_OVERRIDES, STORAGE_KEY_BACKUP_UNAVAILABLE_ON_REMOVE,
     STORAGE_KEY_BACKUP_DUPLICATES_ON_REMOVE, STORAGE_KEY_GENRE_BLACKLIST, STORAGE_KEY_GENRE_BLACKLIST_ENABLED,
@@ -3441,6 +3441,7 @@
   const chatDotsIconSvg = `<svg viewBox="0 0 24 24"><path d="M12 7a2 2 0 1 0-.001-4.001A2 2 0 0 0 12 7zm0 2a2 2 0 1 0-.001 3.999A2 2 0 0 0 12 9zm0 6a2 2 0 1 0-.001 3.999A2 2 0 0 0 12 15z"/></svg>`;
   const closeIcon24Svg = `<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>`;
   const historyIconSvg = `<svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M4 12C4 16.4183 7.58172 20 12 20C16.4183 20 20 16.4183 20 12C20 7.58172 16.4183 4 12 4C9.61061 4 7.46589 5.04751 6 6.70835C5.91595 6.80358 5.83413 6.90082 5.75463 7M12 8V12L14.5 14.5M5.75391 4.00391V7.00391H8.75391" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const backupRestoreIconSvg = `<svg width="23" height="23" viewBox="0 0 24 24" fill="none"><path d="M12 3V14M12 14L8.5 10.5M12 14L15.5 10.5M4 15V17C4 18.6569 5.34315 20 7 20H17C18.6569 20 20 18.6569 20 17V15" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   const addPillIconSvg = `<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0a1 1 0 0 1 1 1v6h6a1 1 0 1 1 0 2H9v6a1 1 0 1 1-2 0V9H1a1 1 0 0 1 0-2h6V1a1 1 0 0 1 1-1z"/></svg>`;
   const minimizeIconSvg = `<svg width="25" height="25" viewBox="0 0 24 24" fill="none" style="margin: -2px -2px -3px;"><path d="M6 15L12 9L18 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   const restoreWindowIconSvg = `<svg width="25" height="25" viewBox="0 0 24 24" fill="none" style="margin: -2px -2px -3px;"><path d="M6 9L12 15L18 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
@@ -5209,11 +5210,109 @@
       };
   }
 
+  const BACKUP_CATEGORY_KEYS = {
+    core: [
+      STORAGE_KEY_SHOW_GENRE_TAGS, STORAGE_KEY_SHOW_GENRE_TAGS_NP, STORAGE_KEY_SHOW_GENRE_TAGS_AP,
+      STORAGE_KEY_GENRE_SEPARATOR, STORAGE_KEY_GENRE_SOURCES_NP_SPOTIFY, STORAGE_KEY_GENRE_SOURCES_NP_SPOTIFY_TRACK,
+      STORAGE_KEY_GENRE_SOURCES_NP_LASTFM, STORAGE_KEY_GENRE_SOURCES_NP_DEEZER, STORAGE_KEY_GENRE_SOURCES_AP_SPOTIFY,
+      STORAGE_KEY_GENRE_SOURCES_AP_LASTFM, STORAGE_KEY_GENRE_SOURCES_NP_EVERYNOISE, STORAGE_KEY_GENRE_SOURCES_AP_EVERYNOISE,
+      STORAGE_KEY_USE_GENRE_PLAYLIST_DATABASE, STORAGE_KEY_AUTO_UPDATE_GENRE_MODAL, STORAGE_KEY_CHAT_PANEL_VISIBLE,
+      STORAGE_KEY_SHOW_LASTFM_CONTEXT_MENU, STORAGE_KEY_SHOW_LASTFM_ARTIST_CONTEXT_MENU, STORAGE_KEY_SHOW_GENRES_CONTEXT_MENU,
+      STORAGE_KEY_SHOW_ARTIST_DISCOGRAPHY_CONTEXT_MENU, STORAGE_KEY_SHOW_SHUFFLE_CONTEXT_MENU,
+      STORAGE_KEY_ARTIST_DISCOGRAPHY_SORT_TYPE, STORAGE_KEY_ARTIST_DISCOGRAPHY_SORT_DIRECTION,
+      STORAGE_KEY_ARTIST_DISCOGRAPHY_DEDUP_MODE, STORAGE_KEY_ARTIST_DISCOGRAPHY_SHOW_DUP_MODAL,
+      STORAGE_KEY_GENRE_FILTER_SORT, STORAGE_KEY_GENRE_FILTER_SOURCES, STORAGE_KEY_MATCH_ALL_GENRES,
+      STORAGE_KEY_GROUP_SIMILAR_GENRES, STORAGE_KEY_FILTER_NOISE_GENRES, STORAGE_KEY_ADD_TO_QUEUE,
+      STORAGE_KEY_CREATE_PLAYLIST, STORAGE_KEY_SORT_CURRENT_PLAYLIST, STORAGE_KEY_CREATE_PLAYLIST_PRIVATE,
+      STORAGE_KEY_OPEN_PLAYLIST_AFTER_SORT, STORAGE_KEY_PLACE_PLAYLISTS_IN_FOLDER, STORAGE_KEY_SORT_PLAY_FOLDER_NAME,
+      STORAGE_KEY_CHANGE_TITLE_ON_CREATE, STORAGE_KEY_CHANGE_DESCRIPTION_ON_CREATE, STORAGE_KEY_CHANGE_TITLE_ON_MODIFY,
+      STORAGE_KEY_CHANGE_DESCRIPTION_ON_MODIFY, STORAGE_KEY_OVERWRITE_CUSTOM_DESCRIPTION, STORAGE_KEY_COLOR_SORT_MODE,
+      STORAGE_KEY_TOP_TRACKS_LIMIT, STORAGE_KEY_NEW_RELEASES_LIMIT, STORAGE_KEY_FOLLOWED_RELEASES_LIMIT,
+      STORAGE_KEY_DISCOVERY_PLAYLIST_SIZE, STORAGE_KEY_DISCOVERY_STRICT_ALBUM_EXCLUSION, STORAGE_KEY_SET_DEDICATED_PLAYLIST_COVERS,
+      STORAGE_KEY_DYNAMIC_SORT_TYPE, STORAGE_KEY_DYNAMIC_SCHEDULE, STORAGE_KEY_DYNAMIC_UPDATE_SOURCE,
+      "sort-play-dynamic-sort-direction", STORAGE_KEY_USE_ENERGY_WAVE_SHUFFLE, STORAGE_KEY_ENERGY_WAVE_SHUFFLE_LIMIT,
+      STORAGE_KEY_SHOW_NOW_PLAYING_DATA, STORAGE_KEY_NP_CONFIG, STORAGE_KEY_NOW_PLAYING_DATA_TYPE,
+      STORAGE_KEY_NOW_PLAYING_DATA_POSITION, STORAGE_KEY_NOW_PLAYING_DATA_FORMAT, STORAGE_KEY_NOW_PLAYING_PLAY_COUNT_FORMAT,
+      STORAGE_KEY_NOW_PLAYING_TEMPO_FORMAT, STORAGE_KEY_NOW_PLAYING_ENERGY_FORMAT, STORAGE_KEY_NOW_PLAYING_DANCEABILITY_FORMAT,
+      STORAGE_KEY_NOW_PLAYING_VALENCE_FORMAT, STORAGE_KEY_NOW_PLAYING_KEY_FORMAT, STORAGE_KEY_NOW_PLAYING_POPULARITY_FORMAT,
+      STORAGE_KEY_NOW_PLAYING_SEPARATOR, STORAGE_KEY_NOW_PLAYING_SCROBBLES_FORMAT, STORAGE_KEY_NOW_PLAYING_PERSONAL_SCROBBLES_FORMAT,
+      STORAGE_KEY_LAST_SCROBBLED_FORMAT, STORAGE_KEY_NOW_PLAYING_LAST_SCROBBLED_FORMAT, STORAGE_KEY_SHOW_ADDITIONAL_COLUMN,
+      STORAGE_KEY_SHOW_SECOND_ADDITIONAL_COLUMN, STORAGE_KEY_SHOW_ALBUM_COLUMN, STORAGE_KEY_SHOW_ARTIST_COLUMN,
+      STORAGE_KEY_SELECTED_COLUMN_TYPE, STORAGE_KEY_SELECTED_SECOND_COLUMN_TYPE, STORAGE_KEY_SELECTED_ALBUM_COLUMN_TYPE,
+      STORAGE_KEY_SELECTED_ARTIST_COLUMN_TYPE, STORAGE_KEY_RELEASE_DATE_FORMAT, STORAGE_KEY_REMOVE_DATE_ADDED,
+      STORAGE_KEY_MY_SCROBBLES_DISPLAY_MODE, STORAGE_KEY_KEY_DISPLAY_MODE, STORAGE_KEY_INCLUDE_SONG_STATS,
+      STORAGE_KEY_INCLUDE_LYRICS, STORAGE_KEY_AI_MODEL, STORAGE_KEY_SHOW_LIKE_BUTTON, STORAGE_KEY_LIKE_BUTTON_CONFIG,
+      STORAGE_KEY_LASTFM_AUTOCORRECT, STORAGE_KEY_LFM_COMMENTS_COLLAPSED, STORAGE_KEY_CUSTOM_FILTER_PAGE_SIZE,
+      STORAGE_KEY_ACTIVE_RANGE_FILTER, STORAGE_KEY_FILTER_TITLE, STORAGE_KEY_FILTER_ALBUM, STORAGE_KEY_FILTER_ARTIST,
+      STORAGE_KEY_MATCH_WHOLE_WORD, STORAGE_KEY_CF_FETCH_POPULARITY, STORAGE_KEY_CF_FETCH_LASTFM, STORAGE_KEY_COLUMN_LAYOUT,
+      STORAGE_KEY_CF_RELEASE_DATE_FORMAT, STORAGE_KEY_CF_MY_SCROBBLES_MODE, STORAGE_KEY_CF_KEY_MODE,
+      STORAGE_KEY_AUTO_HIDE_DISCOGRAPHY_NOTIFICATION, STORAGE_KEY_RANGE_EXCLUDE_UNLISTENED, STORAGE_KEY_LOCAL_FILES_HANDLING,
+      STORAGE_KEY_FOLLOWED_RELEASES_CONFIG, STORAGE_KEY_PRESERVE_DATE_ADDED, STORAGE_KEY_BACKUP_UNAVAILABLE_ON_REMOVE,
+      STORAGE_KEY_BACKUP_DUPLICATES_ON_REMOVE, STORAGE_KEY_GENRE_BLACKLIST, STORAGE_KEY_GENRE_BLACKLIST_ENABLED,
+      STORAGE_KEY_GENRE_BLACKLIST_NOTIFY, STORAGE_KEY_GENRE_BLACKLIST_PROTECT_LIKED, STORAGE_KEY_GENRE_BLACKLIST_CONFIG,
+      "sort-play-compact-mode", "sort-play-ignore-extreme-warning", "sort-play-large-playlist-action",
+      "sort-play-massive-playlist-action", "sort-play-last-active-dedicated", "sort-play-last-scrobble-range",
+      "sort-play-library-sort-albums", "sort-play-library-sort-artists", "sort-play-library-sort-folder",
+      "sort-play-library-sort-global", "sort-play-vibe-append-name", "sort-play-vibe-limit-count",
+      "sort-play-vibe-limit-enabled", "sort-play-vibe-strictness", "sort-play-timeline-chart-type",
+      "sort-play-artist-chart-type", "sort-play-album-chart-type", "sort-play-vibe-chart-type"
+    ],
+    presets: [
+      STORAGE_KEY_FILTER_PRESETS, STORAGE_KEY_KEYWORD_GROUPS, STORAGE_KEY_TITLE_ALBUM_KEYWORDS,
+      STORAGE_KEY_ARTIST_KEYWORDS, STORAGE_KEY_AI_PROMPT_PRESETS, STORAGE_KEY_USER_SYSTEM_INSTRUCTION_v2,
+      STORAGE_KEY_LFM_OVERRIDES, STORAGE_KEY_DEDICATED_OVERRIDES
+    ],
+    credentials: [
+      STORAGE_KEY_LASTFM_USERNAME, STORAGE_KEY_GEMINI_API_KEY, STORAGE_KEY_GEMINI_IS_PAID,
+      STORAGE_KEY_CHAT_CUSTOM_NAME, "sp-chat-device-id", "sp-chat-anon-id", "sp-chat-admin-token"
+    ],
+    jobs: [
+      STORAGE_KEY_DYNAMIC_PLAYLIST_JOBS, STORAGE_KEY_DYNAMIC_PLAYLIST_CUSTOM_SCHEDULES,
+      STORAGE_KEY_DEDICATED_PLAYLIST_JOBS, STORAGE_KEY_DEDICATED_PLAYLIST_BEHAVIOR,
+      STORAGE_KEY_DEDICATED_PLAYLIST_MAP, "sort-play-dedicated-playlist-meta",
+      STORAGE_KEY_ARTIST_DISCOGRAPHY_MAP
+    ],
+    history: [
+      STORAGE_KEY_AI_PROMPT_HISTORY, STORAGE_KEY_RANDOM_GENRE_HISTORY
+    ]
+  };
+
+  const INTERNAL_RUNTIME_SETTINGS_KEYS = [
+    STORAGE_KEY_GENRE_WINDOW_POS, STORAGE_KEY_GLOBAL_PLAYLIST_COUNTS,
+    "sort-play-last-version", "sort-play-hardware-limit", "sort-play-history-migrated-v1",
+    "sort-play-lfm-keys", "sort-play-lfm-key-version", "sort-play-gemini-keys", "sort-play-gemini-key-version"
+  ];
+
+  function getBackupCategoryKeys(category) {
+    if (category === "core") {
+      return [
+        ...BACKUP_CATEGORY_KEYS.core,
+        ...Object.keys(sortOrderState).map(sortType => `sort-play-${sortType}-reverse`)
+      ];
+    }
+    return BACKUP_CATEGORY_KEYS[category] || [];
+  }
+
+  function getValidRuntimeSettingsKeysSet() {
+    return new Set([
+      ...getBackupCategoryKeys("core"),
+      ...BACKUP_CATEGORY_KEYS.presets,
+      ...BACKUP_CATEGORY_KEYS.credentials,
+      ...BACKUP_CATEGORY_KEYS.jobs,
+      ...BACKUP_CATEGORY_KEYS.history,
+      ...INTERNAL_RUNTIME_SETTINGS_KEYS
+    ]);
+  }
+
   const memorySettings = {};
+  let isSettingsHydrated = false;
+
+  const isSortPlayManagedKey = (key) => typeof key === "string" && (key.startsWith("sort-play-") || key.startsWith("sp-chat-"));
 
   const localStorage = {
     getItem(key) {
         if (memorySettings[key] !== undefined) return memorySettings[key];
+        if (isSettingsHydrated && isSortPlayManagedKey(key)) return null;
         let spVal = null;
         if (Spicetify.LocalStorage) {
             try { spVal = Spicetify.LocalStorage.get(key); } catch(e) {}
@@ -5223,23 +5322,46 @@
     setItem(key, value) {
         const strVal = String(value);
         memorySettings[key] = strVal;
+        if (!idb.db) {
+            try { window.localStorage.setItem(key, strVal); } catch(e) {}
+        }
         idb.set('settings', key, strVal).catch(e => console.error("IDB Save Error:", e));
     },
     removeItem(key) {
         delete memorySettings[key];
+        try { window.localStorage.removeItem(key); } catch(e) {}
+        if (Spicetify.LocalStorage?.remove) {
+            try { Spicetify.LocalStorage.remove(key); } catch(e) {}
+        }
         idb.del('settings', key).catch(e => console.error("IDB Delete Error:", e));
     }
   };
 
   async function hydrateSettings() {
+      const validKeys = getValidRuntimeSettingsKeysSet();
       const storedSettings = await idb.getAll('settings');
-      Object.assign(memorySettings, storedSettings);
+      const obsoleteIdbKeys = [];
 
-      const migrationPromises = [];
-      let needsMigration = false;
+      for (const [key, val] of Object.entries(storedSettings)) {
+          if (validKeys.has(key)) {
+              memorySettings[key] = val;
+          } else {
+              obsoleteIdbKeys.push(key);
+          }
+      }
+
+      if (obsoleteIdbKeys.length > 0) {
+          await idb.delMany('settings', obsoleteIdbKeys);
+      }
+
+      const migrationEntries = [];
+      const windowKeysToClean = [];
+
       for (let i = 0; i < window.localStorage.length; i++) {
           const key = window.localStorage.key(i);
-          if (key && (key.startsWith('sort-play-') || key.startsWith('sp-'))) {
+          if (!key || (!key.startsWith('sort-play-') && !key.startsWith('sp-chat-'))) continue;
+
+          if (validKeys.has(key)) {
               if (memorySettings[key] === undefined) {
                   let val = window.localStorage.getItem(key);
                   if (val === null && Spicetify.LocalStorage) {
@@ -5247,15 +5369,24 @@
                   }
                   if (val !== null) {
                       memorySettings[key] = val;
-                      migrationPromises.push(idb.set('settings', key, val));
-                      needsMigration = true;
+                      migrationEntries.push({ key, val });
                   }
               }
+              if (idb.db) windowKeysToClean.push(key);
+          } else {
+              windowKeysToClean.push(key);
           }
       }
-      if (needsMigration) {
-          await Promise.all(migrationPromises);
-          console.log("[Sort-Play] Migrated legacy settings to IndexedDB.");
+
+      if (migrationEntries.length > 0) {
+          await idb.setMany('settings', migrationEntries);
+      }
+
+      if (idb.db) {
+          isSettingsHydrated = true;
+          for (let i = 0; i < windowKeysToClean.length; i++) {
+              try { window.localStorage.removeItem(windowKeysToClean[i]); } catch(e) {}
+          }
       }
   }
   
@@ -5367,6 +5498,17 @@
             const tx = idb.db.transaction([store], "readwrite");
             tx.objectStore(store).delete(key);
             tx.oncomplete = () => resolve();
+        });
+    },
+    delMany: (store, keys) => {
+        if (idb.mem[store]) keys.forEach(k => idb.mem[store].delete(k));
+        return new Promise(resolve => {
+            if (!idb.db || !keys || keys.length === 0) return resolve();
+            const tx = idb.db.transaction([store], "readwrite");
+            const os = tx.objectStore(store);
+            keys.forEach(k => os.delete(k));
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => resolve();
         });
     },
     clear: (store) => {
@@ -6120,8 +6262,20 @@
     }
     includeSongStats = localStorage.getItem(STORAGE_KEY_INCLUDE_SONG_STATS) !== "false";
     includeLyrics = localStorage.getItem(STORAGE_KEY_INCLUDE_LYRICS) === "true";
-    selectedAiModel = localStorage.getItem(STORAGE_KEY_AI_MODEL) || DEFAULT_AI_MODEL;
-    userSystemInstruction = localStorage.getItem(STORAGE_KEY_USER_SYSTEM_INSTRUCTION_v2) || DEFAULT_USER_SYSTEM_INSTRUCTION_v2;
+    const storedAiModel = localStorage.getItem(STORAGE_KEY_AI_MODEL);
+    if (storedAiModel && AI_MODELS.some(m => m.id === storedAiModel)) {
+        selectedAiModel = storedAiModel;
+    } else {
+        selectedAiModel = DEFAULT_AI_MODEL;
+        if (storedAiModel) localStorage.removeItem(STORAGE_KEY_AI_MODEL);
+    }
+    const storedSysInstruction = localStorage.getItem(STORAGE_KEY_USER_SYSTEM_INSTRUCTION_v2);
+    if (!storedSysInstruction || storedSysInstruction === "undefined" || storedSysInstruction === "null") {
+        userSystemInstruction = DEFAULT_USER_SYSTEM_INSTRUCTION_v2;
+        if (storedSysInstruction) localStorage.removeItem(STORAGE_KEY_USER_SYSTEM_INSTRUCTION_v2);
+    } else {
+        userSystemInstruction = storedSysInstruction;
+    }
     matchAllGenres = localStorage.getItem(STORAGE_KEY_MATCH_ALL_GENRES) === "true";
     groupSimilarGenres = localStorage.getItem(STORAGE_KEY_GROUP_SIMILAR_GENRES) !== "false";
     filterNoiseGenres = localStorage.getItem(STORAGE_KEY_FILTER_NOISE_GENRES) !== "false";
@@ -6175,6 +6329,7 @@
     setDedicatedPlaylistCovers = setDedicatedCoversStored === null ? true : setDedicatedCoversStored === "true";
     chatPanelVisible = localStorage.getItem(STORAGE_KEY_CHAT_PANEL_VISIBLE) === "true";
     showLikeButton = localStorage.getItem(STORAGE_KEY_SHOW_LIKE_BUTTON) === "true";
+    likeButtonConfig = { trackRows: true, nowPlayingBar: true, nowPlayingView: true, watchFeed: true };
     const storedLikeBtnConfig = localStorage.getItem(STORAGE_KEY_LIKE_BUTTON_CONFIG);
     if (storedLikeBtnConfig) {
         try { 
@@ -6227,6 +6382,7 @@
     autoUpdateGenreModal = localStorage.getItem(STORAGE_KEY_AUTO_UPDATE_GENRE_MODAL) === "true";
     autoHideDiscographyNotification = localStorage.getItem(STORAGE_KEY_AUTO_HIDE_DISCOGRAPHY_NOTIFICATION) !== "false";
     genreSeparator = localStorage.getItem(STORAGE_KEY_GENRE_SEPARATOR) || ',';
+    followedReleasesConfig = { ...DEFAULT_FR_CONFIG, versions: { ...DEFAULT_FR_CONFIG.versions }, selectedArtists: [] };
     const storedFrConfig = localStorage.getItem(STORAGE_KEY_FOLLOWED_RELEASES_CONFIG);
     if (storedFrConfig) {
         try { 
@@ -6255,18 +6411,40 @@
     const storedGblRules = localStorage.getItem(STORAGE_KEY_GENRE_BLACKLIST);
     if (storedGblRules) {
       try { genreBlacklistRules = JSON.parse(storedGblRules); } catch (e) { genreBlacklistRules = []; }
+    } else {
+      genreBlacklistRules = [];
     }
+    const defaultGblConfig = {
+      sources: {
+        spotify_track: true,
+        everynoise_artist: true,
+        lastfm_track: true,
+        lastfm_artist: true,
+        deezer: false
+      },
+      minSpotifyConfidence: 25
+    };
     const storedGblConfig = localStorage.getItem(STORAGE_KEY_GENRE_BLACKLIST_CONFIG);
     if (storedGblConfig) {
-      try { genreBlacklistConfig = { ...genreBlacklistConfig, ...JSON.parse(storedGblConfig) }; } catch (e) {}
+      try {
+        const parsedGbl = JSON.parse(storedGblConfig);
+        genreBlacklistConfig = {
+          ...defaultGblConfig,
+          ...parsedGbl,
+          sources: { ...defaultGblConfig.sources, ...(parsedGbl.sources || {}) }
+        };
+      } catch (e) {
+        genreBlacklistConfig = defaultGblConfig;
+      }
+    } else {
+      genreBlacklistConfig = defaultGblConfig;
     }
 
     for (const sortType in sortOrderState) {
         const storedValue = localStorage.getItem(`sort-play-${sortType}-reverse`);
-        if (storedValue !== null) {
-            sortOrderState[sortType] = storedValue === "true";
-        }
+        sortOrderState[sortType] = storedValue === "true";
     }
+    lfmOverridesCache = null;
     migrateLegacyNpSettings();
     prefetchBlacklistMap.clear();
   }
@@ -6384,10 +6562,28 @@
   }
 
   window.SortPlaySyncUtils = {
-    exportAllSettings: () => {
+    exportAllSettings: async (options = {}) => {
+      const {
+        includePresets = true,
+        includeCredentials = true,
+        includeJobs = true,
+        includeHistory = false,
+        excludeDefaults = true
+      } = options;
+
+      const includedCategories = {
+        core: true,
+        presets: Boolean(includePresets),
+        credentials: Boolean(includeCredentials),
+        jobs: Boolean(includeJobs),
+        history: Boolean(includeHistory)
+      };
+
       const payload = {
-        version: 1,
+        version: 2,
+        appVersion: SORT_PLAY_VERSION,
         timestamp: Date.now(),
+        includedCategories,
         settings: {}
       };
 
@@ -6519,64 +6715,412 @@
           [STORAGE_KEY_GENRE_BLACKLIST_NOTIFY]: "true",
           [STORAGE_KEY_GENRE_BLACKLIST_PROTECT_LIKED]: "true",
           [STORAGE_KEY_GENRE_BLACKLIST]: "[]",
-          [STORAGE_KEY_GENRE_BLACKLIST_CONFIG]: JSON.stringify({ sources: { spotify_track: true, everynoise_artist: true, lastfm_track: true, lastfm_artist: true, deezer: false }, minSpotifyConfidence: 25 })
+          [STORAGE_KEY_GENRE_BLACKLIST_CONFIG]: JSON.stringify({ sources: { spotify_track: true, everynoise_artist: true, lastfm_track: true, lastfm_artist: true, deezer: false }, minSpotifyConfidence: 25 }),
+          "sort-play-dedicated-playlist-meta": "{}"
         };
-    
+
         if (key === STORAGE_KEY_NP_CONFIG) {
-            try {
-                const parsed = JSON.parse(value);
-                if (parsed && !parsed.title?.enabled && !parsed.artist?.enabled && parsed.title?.items?.length === 1 && parsed.title.items[0].type === 'releaseDate') {
-                    return true;
-                }
-            } catch(e) {}
-            return false;
+          try {
+            const parsed = JSON.parse(value);
+            if (parsed && !parsed.title?.enabled && !parsed.artist?.enabled && parsed.title?.items?.length === 1 && parsed.title.items[0].type === "releaseDate" && parsed.title.items[0].format === "YYYY-MM-DD") {
+              return true;
+            }
+          } catch (e) {}
+          return false;
         }
-        
-        if (key.startsWith('sort-play-') && key.endsWith('-reverse')) {
-            return value === "false"; 
+
+        if (key.startsWith("sort-play-") && key.endsWith("-reverse")) {
+          return value === "false";
         }
-    
+
         return value === DEFAULT_SETTINGS[key];
       };
-      
-      SYNCABLE_SETTINGS_KEYS.forEach(key => {
+
+      const keysToExport = [
+        ...getBackupCategoryKeys("core"),
+        ...(includedCategories.presets ? getBackupCategoryKeys("presets") : []),
+        ...(includedCategories.credentials ? getBackupCategoryKeys("credentials") : []),
+        ...(includedCategories.jobs ? getBackupCategoryKeys("jobs") : []),
+        ...(includedCategories.history ? getBackupCategoryKeys("history") : [])
+      ];
+
+      keysToExport.forEach(key => {
         const val = localStorage.getItem(key);
-        if (val !== null && !isDefaultValue(key, val)) payload.settings[key] = val;
+        if (val !== null && val !== "undefined" && (!excludeDefaults || !isDefaultValue(key, val))) {
+          payload.settings[key] = val;
+        }
       });
-      
-      for (const sortType in sortOrderState) {
-        const key = `sort-play-${sortType}-reverse`;
-        const val = localStorage.getItem(key);
-        if (val !== null && !isDefaultValue(key, val)) payload.settings[key] = val;
-      }
-      
-      return payload;
-    },
-    importAllSettings: async (payload) => {
-      if (!payload || typeof payload !== 'object') return;
-      
-      const settingsData = payload.settings || payload.localStorage || payload;
-      
-      for (const [key, value] of Object.entries(settingsData)) {
-        if (SYNCABLE_SETTINGS_KEYS.includes(key) || (key.startsWith('sort-play-') && key.endsWith('-reverse'))) {
-          localStorage.setItem(key, value);
+
+      if (includedCategories.presets) {
+        const allCovers = await idb.getAll("generatedCovers");
+        const customCovers = {};
+        for (const [k, v] of Object.entries(allCovers)) {
+          if (k.startsWith("custom_image_") && v) customCovers[k] = v;
+        }
+        if (Object.keys(customCovers).length > 0) {
+          payload.generatedCovers = customCovers;
         }
       }
-      
+
+      if (includedCategories.history) {
+        const allJobHistory = await idb.getAll("jobHistory");
+        if (Object.keys(allJobHistory).length > 0) {
+          payload.jobHistory = allJobHistory;
+        }
+      }
+
+      return payload;
+    },
+    importAllSettings: async (payload, options = {}) => {
+      if (!payload || typeof payload !== "object") {
+        throw new Error("Invalid backup file format.");
+      }
+
+      const settingsData = payload.settings || payload.localStorage || (!payload.includedCategories ? payload : null);
+      if (!settingsData || typeof settingsData !== "object") {
+        throw new Error("No valid settings found in backup file.");
+      }
+
+      const {
+        includePresets = true,
+        includeCredentials = true,
+        includeJobs = true,
+        includeHistory = false
+      } = options;
+
+      const userSelectedCategories = {
+        core: true,
+        presets: Boolean(includePresets),
+        credentials: Boolean(includeCredentials),
+        jobs: Boolean(includeJobs),
+        history: Boolean(includeHistory)
+      };
+
+      const fileIncludedCategories = payload.includedCategories || null;
+      const categoriesOrder = ["core", "presets", "credentials", "jobs", "history"];
+      let importedKeyCount = 0;
+
+      for (const cat of categoriesOrder) {
+        if (!userSelectedCategories[cat]) continue;
+        if (fileIncludedCategories && fileIncludedCategories[cat] === false) continue;
+
+        const catKeys = getBackupCategoryKeys(cat);
+        const hasAnyKeyInFile = cat === "core" || Boolean(fileIncludedCategories?.[cat]) || catKeys.some(k => Object.prototype.hasOwnProperty.call(settingsData, k));
+        if (!hasAnyKeyInFile) continue;
+
+        for (const key of catKeys) {
+          if (Object.prototype.hasOwnProperty.call(settingsData, key) && settingsData[key] !== null && settingsData[key] !== undefined) {
+            localStorage.setItem(key, String(settingsData[key]));
+            importedKeyCount++;
+          } else if (fileIncludedCategories?.[cat] === true || cat === "core") {
+            localStorage.removeItem(key);
+          }
+        }
+      }
+
+      if (userSelectedCategories.presets && (!fileIncludedCategories || fileIncludedCategories.presets !== false)) {
+        if (payload.generatedCovers && typeof payload.generatedCovers === "object") {
+          const existingCovers = await idb.getAll("generatedCovers");
+          const oldCustomCoverKeys = Object.keys(existingCovers).filter(k => k.startsWith("custom_image_") && !Object.prototype.hasOwnProperty.call(payload.generatedCovers, k));
+          if (oldCustomCoverKeys.length > 0) {
+            await idb.delMany("generatedCovers", oldCustomCoverKeys);
+          }
+          const coverEntries = Object.entries(payload.generatedCovers)
+            .filter(([k, v]) => k.startsWith("custom_image_") && v)
+            .map(([key, val]) => ({ key, val }));
+          if (coverEntries.length > 0) {
+            await idb.setMany("generatedCovers", coverEntries);
+          }
+        }
+
+        try {
+          const overridesRaw = localStorage.getItem(STORAGE_KEY_DEDICATED_OVERRIDES);
+          if (overridesRaw) {
+            const overrides = JSON.parse(overridesRaw);
+            const currentCovers = await idb.getAll("generatedCovers");
+            let overridesModified = false;
+            for (const [cardId, cfg] of Object.entries(overrides)) {
+              if (cfg?.hasCustomImage && !currentCovers[`custom_image_${cardId}`]) {
+                delete cfg.hasCustomImage;
+                if (!cfg.name) delete overrides[cardId];
+                overridesModified = true;
+              }
+            }
+            if (overridesModified) {
+              localStorage.setItem(STORAGE_KEY_DEDICATED_OVERRIDES, JSON.stringify(overrides));
+            }
+          }
+        } catch (e) {}
+      }
+
+      if (userSelectedCategories.history && (!fileIncludedCategories || fileIncludedCategories.history !== false)) {
+        if (payload.jobHistory && typeof payload.jobHistory === "object") {
+          await idb.clear("jobHistory");
+          const historyEntries = Object.entries(payload.jobHistory).map(([key, val]) => ({ key, val }));
+          if (historyEntries.length > 0) {
+            await idb.setMany("jobHistory", historyEntries);
+          }
+        }
+      }
+
       loadSettings();
+      document.querySelectorAll(".submenu").forEach(sm => sm.remove());
+      areSubMenusCreated = false;
+      if (showLikeButton && !likeButton_isFeatureInitialized) {
+        try { initializeLikeButtonFeature(); } catch (e) {}
+      }
+      try { document.dispatchEvent(new CustomEvent("sortPlay_likeButtonConfigChanged")); } catch (e) {}
+      try { updateGenresContextMenu(); } catch (e) {}
+      try { updateLastFmContextMenu(); } catch (e) {}
+      try { updateLastFmArtistContextMenu(); } catch (e) {}
+      try { updateArtistDiscographyContextMenu(); } catch (e) {}
+      try { updateShuffleContextMenu(); } catch (e) {}
+      try { displayNowPlayingData(); } catch (e) {}
+      try { displayGenreTags(); } catch (e) {}
+      try { updateArtistPageGenres(); } catch (e) {}
+      try { onPageChange(); } catch (e) {}
 
       const confirmed = await showConfirmationModal({
-        title: "Settings Synced",
-        description: "Settings have been successfully imported from the cloud. Spicetify needs to reload to apply all interface and behavior changes properly. Reload now?",
+        title: "Settings Restored",
+        description: `Successfully imported ${importedKeyCount} settings. Reload Spotify now to ensure all interface and background changes take full effect?`,
         confirmText: "Reload",
         cancelText: "Later"
       });
 
-      if (confirmed === 'confirm') {
+      if (confirmed === "confirm") {
         location.reload();
+      } else {
+        const existingSettingsOverlay = document.getElementById("sort-play-settings-overlay");
+        if (existingSettingsOverlay) {
+          if (typeof existingSettingsOverlay._closeImmediate === "function") {
+            existingSettingsOverlay._closeImmediate();
+          } else {
+            existingSettingsOverlay.remove();
+          }
+          showSettingsModal();
+        }
       }
     }
   };
+
+  function showBackupRestoreModal() {
+    const existing = document.getElementById("sort-play-backup-restore-overlay");
+    if (existing) existing.remove();
+
+    const overlay = document.createElement("div");
+    overlay.id = "sort-play-backup-restore-overlay";
+    overlay.className = "sort-play-font-scope";
+    overlay.style.cssText = `
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background-color: rgba(0, 0, 0, 0.7); z-index: 2010;
+      display: flex; justify-content: center; align-items: center;
+      backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
+      opacity: 0; transition: opacity 0.2s ease;
+    `;
+
+    const modalContainer = document.createElement("div");
+    modalContainer.className = "sort-play-backup-restore-modal sort-play-modal-container sort-play-font-scope";
+    modalContainer.style.cssText = `
+      box-sizing: border-box !important;
+      position: relative !important;
+      width: min(480px, 92vw) !important;
+      max-width: 480px !important;
+      min-width: 320px !important;
+      max-height: 90vh !important;
+      flex-shrink: 0 !important;
+      border-radius: 30px;
+      overflow: hidden;
+      background-color: #181818 !important;
+      color: var(--spice-text, #ffffff);
+      border: 2px solid #282828;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 16px 48px rgba(0,0,0,0.6);
+    `;
+
+    const shadowRoot = modalContainer.attachShadow({ mode: "open" });
+
+    shadowRoot.innerHTML = `
+      <style>
+        :host { font-family: 'SpotifyMixUI', sans-serif !important; color: #fff; display: flex; flex-direction: column; width: 100%; }
+        *, *::before, *::after { box-sizing: border-box; font-family: 'SpotifyMixUI', sans-serif !important; }
+        .sp-br-header { padding: 26px 32px 16px !important; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #282828; flex-shrink: 0; }
+        .sp-br-title { margin: 0; font-size: 24px; font-weight: 700; color: #ffffff; }
+        .sp-br-close-btn { background: transparent; border: none; color: #b3b3b3; cursor: pointer; padding: 0; display: flex; align-items: center; transition: color 0.2s ease; }
+        .sp-br-close-btn:hover { color: #ffffff; }
+        .sp-br-body { padding: 18px 32px 20px !important; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; scrollbar-width: thin; scrollbar-color: #333333 #181818; }
+        .sp-br-subtitle { color: #b3b3b3; font-size: 13.5px; line-height: 1.45; margin: 0 0 8px 0; }
+        .sp-br-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.06); gap: 16px; }
+        .sp-br-row:last-child { border-bottom: none; }
+        .sp-br-row-info { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+        .sp-br-row-title { color: #ffffff; font-size: 15px; font-weight: 550; display: flex; align-items: center; gap: 8px; }
+        .sp-br-badge { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; padding: 2px 6px; border-radius: 6px; background: rgba(30, 215, 96, 0.15); color: #1ed760; }
+        .sp-br-row-desc { color: #9e9e9e; font-size: 12.5px; line-height: 1.35; }
+        .sp-br-switch { position: relative; display: inline-block; width: 40px; height: 24px; flex-shrink: 0; }
+        .sp-br-switch input { opacity: 0; width: 0; height: 0; }
+        .sp-br-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #484848; border-radius: 24px; transition: 0.2s; }
+        .sp-br-slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: 0.2s; }
+        .sp-br-switch input:checked + .sp-br-slider { background-color: #1DB954; }
+        .sp-br-switch input:checked + .sp-br-slider:before { transform: translateX(16px); }
+        .sp-br-switch input:disabled + .sp-br-slider { opacity: 0.55; cursor: not-allowed; }
+        .sp-br-footer { padding: 16px 32px 22px !important; border-top: 1px solid #282828; display: flex; justify-content: flex-end; align-items: center; gap: 10px; flex-shrink: 0; background: #181818; }
+        .sp-br-btn { padding: 9px 18px; border-radius: 20px; border: none; cursor: pointer; font-weight: 600; font-size: 13px; text-transform: uppercase; display: inline-flex; align-items: center; gap: 8px; transition: background-color 0.2s ease, transform 0.1s ease, opacity 0.2s ease; }
+        .sp-br-btn:active { transform: scale(0.97); }
+        .sp-br-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .sp-br-btn svg { width: 16px; height: 16px; flex-shrink: 0; }
+        .sp-br-btn-secondary { background-color: #333333; color: #ffffff; }
+        .sp-br-btn-secondary:hover:not(:disabled) { background-color: #444444; }
+        .sp-br-btn-primary { background-color: #1ED760; color: #000000; }
+        .sp-br-btn-primary:hover:not(:disabled) { background-color: #3BE377; }
+        .sp-br-btn-primary svg path { fill: #000000; }
+      </style>
+      <div class="sp-br-header">
+        <h2 class="sp-br-title">Backup &amp; Restore</h2>
+        <button class="sp-br-close-btn" id="sp-br-close" aria-label="Close">${closeModalIcon20Svg}</button>
+      </div>
+      <div class="sp-br-body">
+        <p class="sp-br-subtitle">Select which categories to include when exporting to a backup file or restoring from one.</p>
+        <div class="sp-br-row">
+          <div class="sp-br-row-info">
+            <div class="sp-br-row-title">Core Settings &amp; Preferences <span class="sp-br-badge">Always On</span></div>
+            <div class="sp-br-row-desc">Sorting behaviors, extra columns, UI toggles, context menus, filter settings, and Genre Blacklist rules.</div>
+          </div>
+          <label class="sp-br-switch">
+            <input type="checkbox" checked disabled>
+            <span class="sp-br-slider"></span>
+          </label>
+        </div>
+        <div class="sp-br-row">
+          <div class="sp-br-row-info">
+            <div class="sp-br-row-title">Presets, Overrides &amp; Appearance</div>
+            <div class="sp-br-row-desc">Custom Filter presets, keyword groups, Last.fm track overrides, Dedicated card appearance &amp; covers, and AI presets.</div>
+          </div>
+          <label class="sp-br-switch">
+            <input type="checkbox" id="sp-br-presets" checked>
+            <span class="sp-br-slider"></span>
+          </label>
+        </div>
+        <div class="sp-br-row">
+          <div class="sp-br-row-info">
+            <div class="sp-br-row-title">Credentials &amp; Chat Identity</div>
+            <div class="sp-br-row-desc">Last.fm username, Gemini API key and Live Chat identity. Uncheck if sharing your file publicly.</div>
+          </div>
+          <label class="sp-br-switch">
+            <input type="checkbox" id="sp-br-credentials" checked>
+            <span class="sp-br-slider"></span>
+          </label>
+        </div>
+        <div class="sp-br-row">
+          <div class="sp-br-row-info">
+            <div class="sp-br-row-title">Dynamic Jobs &amp; Playlist Links</div>
+            <div class="sp-br-row-desc">Dynamic Playlist jobs &amp; schedules, Dedicated Playlist links, and Artist Discography playlist mappings.</div>
+          </div>
+          <label class="sp-br-switch">
+            <input type="checkbox" id="sp-br-jobs" checked>
+            <span class="sp-br-slider"></span>
+          </label>
+        </div>
+        <div class="sp-br-row">
+          <div class="sp-br-row-info">
+            <div class="sp-br-row-title">Recent Activity &amp; Rolling History</div>
+            <div class="sp-br-row-desc">Dynamic Playlist anti-repeat track history, Random Genre Explorer history, and recent AI prompts.</div>
+          </div>
+          <label class="sp-br-switch">
+            <input type="checkbox" id="sp-br-history">
+            <span class="sp-br-slider"></span>
+          </label>
+        </div>
+      </div>
+      <div class="sp-br-footer">
+        <input type="file" id="sp-br-file-input" accept=".json,application/json" style="display: none;">
+        <button id="sp-br-import-btn" class="sp-br-btn sp-br-btn-secondary">
+          ${loadIconSVG}
+          <span>Import Backup</span>
+        </button>
+        <button id="sp-br-export-btn" class="sp-br-btn sp-br-btn-primary">
+          ${saveIconSVG}
+          <span>Export Backup</span>
+        </button>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+    overlay.appendChild(modalContainer);
+
+    requestAnimationFrame(() => {
+      overlay.style.opacity = "1";
+    });
+
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        closeModal();
+      }
+    };
+
+    const closeModal = () => {
+      document.removeEventListener("keydown", onKeyDown, true);
+      overlay.style.opacity = "0";
+      overlay.style.pointerEvents = "none";
+      setTimeout(() => overlay.remove(), 200);
+    };
+
+    document.addEventListener("keydown", onKeyDown, true);
+    shadowRoot.getElementById("sp-br-close").addEventListener("click", closeModal);
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) closeModal();
+    });
+
+    const getSelectedOptions = () => ({
+      includePresets: shadowRoot.getElementById("sp-br-presets").checked,
+      includeCredentials: shadowRoot.getElementById("sp-br-credentials").checked,
+      includeJobs: shadowRoot.getElementById("sp-br-jobs").checked,
+      includeHistory: shadowRoot.getElementById("sp-br-history").checked
+    });
+
+    const exportBtn = shadowRoot.getElementById("sp-br-export-btn");
+    const importBtn = shadowRoot.getElementById("sp-br-import-btn");
+    const fileInput = shadowRoot.getElementById("sp-br-file-input");
+
+    exportBtn.addEventListener("click", async () => {
+      exportBtn.disabled = true;
+      try {
+        const payload = await window.SortPlaySyncUtils.exportAllSettings(getSelectedOptions());
+        const dateStr = new Date().toISOString().slice(0, 10);
+        await exportJsonFile(payload, `sort-play-settings-${dateStr}.json`, "Settings backup exported successfully!");
+      } catch (err) {
+        console.error("[Sort-Play] Export settings failed:", err);
+        showNotification("Failed to export settings backup.", true);
+      } finally {
+        exportBtn.disabled = false;
+      }
+    });
+
+    importBtn.addEventListener("click", () => {
+      fileInput.value = "";
+      fileInput.click();
+    });
+
+    fileInput.addEventListener("change", async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      importBtn.disabled = true;
+      exportBtn.disabled = true;
+      try {
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+        const opts = getSelectedOptions();
+        closeModal();
+        await window.SortPlaySyncUtils.importAllSettings(parsed, opts);
+      } catch (err) {
+        console.error("[Sort-Play] Import settings failed:", err);
+        showNotification(err.message || "Invalid settings backup file.", true);
+      } finally {
+        importBtn.disabled = false;
+        exportBtn.disabled = false;
+      }
+    });
+  }
 
   function migrateLegacyNpSettings() {
     const storedConfig = localStorage.getItem(STORAGE_KEY_NP_CONFIG);
@@ -9181,6 +9725,17 @@
         }, 200);
     };
 
+    overlay._closeImmediate = () => {
+        abortController.abort();
+        clearTimeout(notifHoverTimeout);
+        const chatPanel = document.getElementById('sort-play-chat-panel');
+        if (chatPanel) {
+            if (typeof chatPanel.cleanup === 'function') chatPanel.cleanup();
+            chatPanel.remove();
+        }
+        overlay.remove();
+    };
+
     overlay.addEventListener("click", (e) => {
         if (e.target === overlay) {
             const chatInput = document.getElementById('sp-chat-input');
@@ -9207,6 +9762,9 @@
               </span>
           </h1>
           <div style="display: flex; align-items: center; position: relative; gap: 14px;">
+              <button id="backupRestoreSettingsBtn" title="Backup & Restore Settings" style="background: transparent; border: 0; padding: 0; color: #b3b3b3; cursor: pointer; display: flex; align-items: center; transition: color 0.2s ease;">
+                  ${backupRestoreIconSvg}
+              </button>
               <button id="notificationHistoryBtn" title="Notification History" style="background: transparent; border: 0; padding: 0; color: #b3b3b3; cursor: pointer; display: flex; align-items: center; transition: color 0.2s ease;">
                   ${historyIconSvg}
               </button>
@@ -9405,7 +9963,7 @@
       .sp-notif-time { font-size: 11px; color: #888; }
       .sp-notif-text { font-size: 13px; color: #e0e0e0; line-height: 1.4; word-wrap: break-word; }
       .sp-notif-empty { padding: 20px; text-align: center; color: #888; font-size: 13px; font-style: italic; }
-      #notificationHistoryBtn:hover, #notificationHistoryBtn.active { color: #ffffff !important; }
+      #notificationHistoryBtn:hover, #notificationHistoryBtn.active, #backupRestoreSettingsBtn:hover { color: #ffffff !important; }
     </style>
     ${headerHtml}
     <div class="sp-settings-main-section">
@@ -10057,6 +10615,9 @@
     preventDragCloseModal(abortController.signal);
 
     modalContainer.querySelector("#closeSettingsModal").addEventListener("click", closeModal);
+    modalContainer.querySelector("#backupRestoreSettingsBtn")?.addEventListener("click", () => {
+        showBackupRestoreModal();
+    });
     const versionTagBtn = modalContainer.querySelector("#sortPlayVersionTag");
     if (versionTagBtn) {
         versionTagBtn.addEventListener("click", () => {
@@ -32613,7 +33174,50 @@ shadowRoot.innerHTML = `
         });
     }
 
-    if (scrobbleFilterMode !== 'all' || filters.minScrobbles || filters.maxScrobbles) {
+    const hasNotScrobbledWithin = filters.notScrobbledWithinDays !== undefined && filters.notScrobbledWithinDays !== null && filters.notScrobbledWithinDays !== '';
+    const hasScrobbledWithin = filters.scrobbledWithinDays !== undefined && filters.scrobbledWithinDays !== null && filters.scrobbledWithinDays !== '';
+
+    if (hasNotScrobbledWithin || hasScrobbledWithin) {
+        if (!isHeadless) mainButton.innerText = "Filtering Last Scrobbled...";
+        const lastFmUsername = loadLastFmUsername();
+        if (lastFmUsername) {
+            const getCutoffSec = (daysVal) => {
+                const days = parseInt(daysVal, 10);
+                if (isNaN(days) || days < 0) return null;
+                if (days === 0) {
+                    const startOfToday = new Date();
+                    startOfToday.setHours(0, 0, 0, 0);
+                    return Math.floor(startOfToday.getTime() / 1000);
+                }
+                return Math.floor((Date.now() - (days * 86400000)) / 1000);
+            };
+
+            const excludeCutoffSec = hasNotScrobbledWithin ? getCutoffSec(filters.notScrobbledWithinDays) : null;
+            const includeCutoffSec = hasScrobbledWithin ? getCutoffSec(filters.scrobbledWithinDays) : null;
+
+            if (excludeCutoffSec !== null || includeCutoffSec !== null) {
+                const { excludeKeys, includeKeys } = await fetchLfmScrobbledWindows(
+                    lastFmUsername,
+                    excludeCutoffSec,
+                    includeCutoffSec,
+                    (p) => { if (!isHeadless) mainButton.innerText = `LFM Window ${p}%`; }
+                );
+
+                filteredTracks = filteredTracks.filter(t => {
+                    if (excludeKeys && isTrackInLfmWindow(t, excludeKeys)) return false;
+                    if (includeKeys && !isTrackInLfmWindow(t, includeKeys)) return false;
+                    return true;
+                });
+            }
+        } else {
+            console.warn("[Sort-Play Dynamic Filter] Cannot filter by last scrobbled. Last.fm username not set.");
+            if (!isHeadless) showNotification("Last.fm username not set, skipping last scrobbled filter.", 'warning');
+        }
+    }
+
+    const isOnlyPlayedSatisfiedByWindow = scrobbleFilterMode === 'require' && hasScrobbledWithin && !isNaN(parseInt(filters.scrobbledWithinDays, 10)) && parseInt(filters.scrobbledWithinDays, 10) >= 0 && !filters.minScrobbles && !filters.maxScrobbles && Boolean(loadLastFmUsername());
+
+    if ((scrobbleFilterMode !== 'all' && !isOnlyPlayedSatisfiedByWindow) || filters.minScrobbles || filters.maxScrobbles) {
         if (!isHeadless) mainButton.innerText = "Filtering History...";
         const lastFmUsername = loadLastFmUsername();
         if (lastFmUsername) {
@@ -33044,6 +33648,24 @@ shadowRoot.innerHTML = `
             }
             break;
         }
+        case "lastScrobbled": {
+            const scrobblesMap = await fetchRecentScrobblesMap((p) => { if (!isHeadless) mainButton.innerText = `Last Scrobbled ${p}%`; });
+            const tracksWithTs = uniqueTracks.map((track, idx) => {
+                const lfmInfo = getLfmInfo(track);
+                const ts = lfmInfo ? (scrobblesMap.get(lfmInfo.key) || 0) : 0;
+                return { ...track, _origIndex: track._origIndex ?? idx, _lastScrobbledTs: ts };
+            });
+            const scrobbled = tracksWithTs.filter(t => t._lastScrobbledTs > 0);
+            const unscrobbled = tracksWithTs.filter(t => t._lastScrobbledTs === 0);
+            scrobbled.sort((a, b) => {
+                if (a._lastScrobbledTs !== b._lastScrobbledTs) {
+                    return isAscending ? a._lastScrobbledTs - b._lastScrobbledTs : b._lastScrobbledTs - a._lastScrobbledTs;
+                }
+                return a._origIndex - b._origIndex;
+            });
+            sortedTracks = [...scrobbled, ...unscrobbled];
+            break;
+        }
         case 'tempo':
         case 'energy':
         case 'danceability':
@@ -33359,7 +33981,7 @@ shadowRoot.innerHTML = `
                     }
                 }
             } else {
-                const sourcesForUpdate = job.updateFromSource ? job.sources : [{ uri: job.targetPlaylistUri, totalTracks: 0 }];
+                const sourcesForUpdate = (job.updateFromSource || !job.lastRun) ? job.sources : [{ uri: job.targetPlaylistUri, totalTracks: 0 }];
                 const updateResult = await executeSortOperation({ ...job, sources: sourcesForUpdate, isHeadless: true });
                 finalTrackUris = updateResult.trackUris;
                 for (const [sourceUri, newHistory] of Object.entries(updateResult.newUsedUrisBySource)) {
@@ -33712,7 +34334,7 @@ shadowRoot.innerHTML = `
     }
   }
 
-  async function showChangeSourceModal(title, libraryItemsPromise, onSourceChanged, isMultiSelect = true, descriptionText = "Search for source, paste a link, or select from your library.", onCancel = null, isDynamic = false) {
+  async function showChangeSourceModal(title, libraryItemsPromise, onSourceChanged, isMultiSelect = true, descriptionText = "Search for source, paste a link, or select from your library.", onCancel = null, isDynamic = false, validateSelection = null) {
     const abortController = new AbortController();
     const overlay = document.createElement("div");
     overlay.id = "sort-play-change-source-modal";
@@ -34511,7 +35133,8 @@ shadowRoot.innerHTML = `
         let rawInput = searchInput.value.trim();
         if (!rawInput) return;
 
-        const urls = rawInput.split(',').map(u => u.trim()).filter(Boolean);
+        const rawUrls = rawInput.split(',').map(u => u.trim()).filter(Boolean);
+        const urls = isMultiSelect ? rawUrls : rawUrls.slice(0, 1);
         
         addButton.disabled = true;
         const originalText = addButton.innerHTML;
@@ -34544,6 +35167,12 @@ shadowRoot.innerHTML = `
                 
                 if (!data || !data.name) {
                     throw new Error("Could not fetch valid source details.");
+                }
+
+                if (!isMultiSelect) {
+                    selectedSources.clear();
+                    manuallyAddedUris.clear();
+                    modalContainer.querySelectorAll('.selected').forEach(el => el.classList.remove('selected'));
                 }
 
                 selectedSources.add(uri);
@@ -34605,12 +35234,19 @@ shadowRoot.innerHTML = `
 
     modalContainer.querySelector('#confirm-change-source').addEventListener('click', async (e) => {
         const confirmButton = e.currentTarget;
-        const url = searchInput.value.trim();
+        let url = searchInput.value.trim();
         
-        if (url) {
+        if (url && (url.includes('spotify.com') || url.startsWith('spotify:'))) {
+            if (!url.startsWith('http') && !url.startsWith('spotify:') && url.includes('spotify.com')) {
+                url = 'https://' + url;
+            }
             try {
                 const uriObj = Spicetify.URI.fromString(url);
-                selectedSources.add(uriObj.toURI());
+                const parsedUri = uriObj.toURI();
+                if (!isMultiSelect) {
+                    selectedSources.clear();
+                }
+                selectedSources.add(parsedUri);
             } catch (err) {}
         }
 
@@ -34624,6 +35260,9 @@ shadowRoot.innerHTML = `
 
         try {
             const sourcesData = await Promise.all(Array.from(selectedSources).map(uri => processUri(uri)));
+            if (typeof validateSelection === 'function') {
+                await validateSelection(sourcesData);
+            }
             onSourceChanged(sourcesData);
             closeModal(true);
         } catch (error) {
@@ -35710,9 +36349,9 @@ shadowRoot.innerHTML = `
           <style>
             :host { font-family: 'SpotifyMixUI', sans-serif !important; color: #fff; display: flex; flex-direction: column; width: 100%; }
             *, *::before, *::after { box-sizing: border-box; font-family: 'SpotifyMixUI', sans-serif !important; }
-            .sp-filter-header { display: flex; justify-content: space-between; align-items: center; padding: 24px 32px 12px; border-bottom: 1px solid #282828; flex-shrink: 0; }
+            .sp-filter-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 32px 12px; border-bottom: 1px solid #282828; flex-shrink: 0; }
             .sp-filter-title { margin: 0; }
-            .sp-filter-main-section { padding: 20px 32px !important; overflow-y: auto; flex: 1; min-height: 0; scrollbar-width: thin; scrollbar-color: #535353 transparent; }
+            .sp-filter-main-section { padding: 16px 32px !important; overflow-y: auto; flex: 1; min-height: 0; scrollbar-width: thin; scrollbar-color: #535353 transparent; }
             .sp-filter-main-section::-webkit-scrollbar { width: 8px; }
             .sp-filter-main-section::-webkit-scrollbar-track { background: transparent; }
             .sp-filter-main-section::-webkit-scrollbar-thumb { background-color: #535353; border-radius: 4px; }
@@ -35753,16 +36392,19 @@ shadowRoot.innerHTML = `
             .keyword-tag { display: inline-flex; align-items: center; background: #383838; border-radius: 12px; padding: 2px 8px; color: white; font-size: 12px; white-space: nowrap; flex-shrink: 0; height: 24px; }
             .keyword-tag-remove { margin-left: 4px; cursor: pointer; color: #ccc; font-size: 14px; }
             .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; }
+            .numeric-filters-wrapper .setting-row { padding: 4px 0; }
             .setting-row .description { color: #c1c1c1; }
             .setting-row.disabled .description { color: rgba(193, 193, 193, 0.5); }
             .setting-row.disabled .description svg { opacity: 0.4 !important; }
             .range-input-group { display: flex; align-items: center; gap: 6px; }
-            .range-input { width: 100px; padding: 6px; border-radius: 4px; border: 1px solid #444; background: #282828; color: white; text-align: center; font-size: 13px; }
+            .range-input { width: 100px; height: 28px; padding: 4px 6px; border-radius: 4px; border: 1px solid #444; background: #282828; color: white; text-align: center; font-size: 13px; }
             .range-input:focus { outline: none; border-color: #1ED760; }
             .tooltip-container { position: relative; display: inline-block; vertical-align: middle; }
-            .custom-tooltip { visibility: hidden; position: absolute; z-index: 2008; background-color: #373737; color: white; padding: 8px 12px; border-radius: 4px; font-size: 14px; max-width: 280px; width: max-content; bottom: 100%; left: -10px; margin-bottom: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); line-height: 1.4; word-wrap: break-word; text-align: left; }
-            .custom-tooltip::after { content: ""; position: absolute; top: 100%; left: 17px; border-width: 5px; border-style: solid; border-color: #373737 transparent transparent transparent; }
-            .tooltip-container:hover .custom-tooltip { visibility: visible; }
+            .custom-tooltip { display: none; visibility: hidden; position: absolute; z-index: 2008; background-color: #373737; color: white; padding: 8px 12px; border-radius: 4px; font-size: 13px; max-width: 270px; width: max-content; bottom: 100%; left: -10px; margin-bottom: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.4); line-height: 1.4; word-wrap: break-word; text-align: left; pointer-events: none; }
+            .custom-tooltip::after { content: ""; position: absolute; top: 100%; left: var(--arrow-left, 17px); transform: translateX(-50%); border-width: 5px; border-style: solid; border-color: #373737 transparent transparent transparent; }
+            .custom-tooltip.tooltip-bottom { margin-bottom: 0; margin-top: 6px; }
+            .custom-tooltip.tooltip-bottom::after { top: auto; bottom: 100%; border-color: transparent transparent #373737 transparent; }
+            .tooltip-container:hover .custom-tooltip { display: block; visibility: visible; }
             .switch { position: relative; display: inline-block; width: 40px; height: 24px; flex-shrink: 0; }
             .switch input { opacity: 0; width: 0; height: 0; }
             .sliderx { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #484848; border-radius: 24px; transition: .2s; }
@@ -35781,7 +36423,7 @@ shadowRoot.innerHTML = `
             .segment-btn.active { background-color: #555; color: white; font-weight: 700; }
             .segment-btn.active[data-value="require"], .segment-btn.active[data-value="exclude"] { background-color: #1ED760; color: black; }
             .setting-row.disabled .segmented-control, .setting-row.disabled .range-input-group { opacity: 0.5; pointer-events: none; }
-            .numeric-filters-wrapper { overflow-y: auto; max-height: calc(99vh - 290px); scrollbar-width: thin; scrollbar-color: #535353 transparent; }
+            .numeric-filters-wrapper { padding: 16px 20px; overflow-y: auto; overflow-x: hidden; max-height: calc(92vh - 180px); scrollbar-width: thin; scrollbar-color: #535353 transparent; }
             .numeric-filters-wrapper::-webkit-scrollbar { width: 6px; }
             .numeric-filters-wrapper::-webkit-scrollbar-thumb { background-color: #535353; border-radius: 4px; }
             .numeric-filters-wrapper::-webkit-scrollbar-track { background: transparent; margin: 10px 0; }
@@ -35938,6 +36580,32 @@ shadowRoot.innerHTML = `
                           </div>
                       </div>
 
+                      <div class="setting-row ${isExcludeListenedDisabled ? 'disabled' : ''}">
+                          <span class="description">
+                              Not scrobbled in last X days
+                              <span class="tooltip-container">
+                                  ${infoIconSvg}
+                                  <span class="custom-tooltip">Leaves out tracks you've played in the last X days (keeps older and unplayed tracks). Enter 0 to exclude tracks played today.${isExcludeListenedDisabled ? ' (Set Last.fm username in settings)' : ''}</span>
+                              </span>
+                          </span>
+                          <div class="range-input-group" style="justify-content: flex-end;">
+                              <input type="number" id="filter-not-scrobbled-within" class="range-input" placeholder="Days" min="0" ${isExcludeListenedDisabled ? 'disabled' : ''}>
+                          </div>
+                      </div>
+
+                      <div class="setting-row ${isExcludeListenedDisabled ? 'disabled' : ''}">
+                          <span class="description">
+                              Scrobbled in last X days
+                              <span class="tooltip-container">
+                                  ${infoIconSvg}
+                                  <span class="custom-tooltip">Only keeps tracks you've played in the last X days. Can be combined with the option above (e.g. played in last 60 days, but not in last 7 days). Enter 0 for today.${isExcludeListenedDisabled ? ' (Set Last.fm username in settings)' : ''}</span>
+                              </span>
+                          </span>
+                          <div class="range-input-group" style="justify-content: flex-end;">
+                              <input type="number" id="filter-scrobbled-within" class="range-input" placeholder="Days" min="0" ${isExcludeListenedDisabled ? 'disabled' : ''}>
+                          </div>
+                      </div>
+                      
                       <div class="setting-row">
                           <span class="description">Track Duration (Seconds)</span>
                           <div class="range-input-group">
@@ -35974,7 +36642,7 @@ shadowRoot.innerHTML = `
                               Released in last X days
                               <span class="tooltip-container">
                                   ${infoIconSvg}
-                                  <span class="custom-tooltip">Only keep tracks released within this many days from today. Enter 0 for tracks released today.</span>
+                                  <span class="custom-tooltip">Only keeps tracks released in the last X days. Enter 0 for tracks released today.</span>
                               </span>
                           </span>
                           <div class="range-input-group" style="justify-content: flex-end;">
@@ -36010,7 +36678,7 @@ shadowRoot.innerHTML = `
                               Added in last X days
                               <span class="tooltip-container">
                                   ${infoIconSvg}
-                                  <span class="custom-tooltip">Only keep tracks added to the source within this many days from today. Enter 0 for tracks added today.</span>
+                                  <span class="custom-tooltip">Only keeps tracks added to the source in the last X days. Enter 0 for tracks added today.</span>
                               </span>
                           </span>
                           <div class="range-input-group" style="justify-content: flex-end;">
@@ -36084,10 +36752,61 @@ shadowRoot.innerHTML = `
             }, 200);
         };
 
-        setupDatePicker(modalContainer, 'filter-min-year', 'min-date-picker', 'min-date-btn');
-        setupDatePicker(modalContainer, 'filter-max-year', 'max-date-picker', 'max-date-btn');
-        setupDatePicker(modalContainer, 'filter-min-addedAt', 'min-added-date-picker', 'min-added-date-btn');
-        setupDatePicker(modalContainer, 'filter-max-addedAt', 'max-added-date-picker', 'max-added-date-btn');
+        modalContainer.querySelectorAll('.tooltip-container').forEach(container => {
+            const tooltip = container.querySelector('.custom-tooltip');
+            if (!tooltip) return;
+
+            container.addEventListener('mouseenter', () => {
+                const wrapper = container.closest('.numeric-filters-wrapper') || container.closest('.settings-wrapper') || modalContainer;
+                if (!wrapper) return;
+
+                const containerRect = container.getBoundingClientRect();
+                const wrapperRect = wrapper.getBoundingClientRect();
+
+                tooltip.style.visibility = 'hidden';
+                tooltip.style.display = 'block';
+
+                const minLeft = wrapperRect.left + 10;
+                const maxRight = wrapperRect.left + wrapper.clientLeft + wrapper.clientWidth - 10;
+                const availableWidth = Math.max(160, maxRight - minLeft);
+
+                tooltip.style.maxWidth = `${Math.min(270, availableWidth)}px`;
+
+                const tooltipWidth = tooltip.offsetWidth || 260;
+                const tooltipHeight = tooltip.offsetHeight || 40;
+
+                const iconCenterX = containerRect.left + (containerRect.width / 2);
+                let targetLeft = iconCenterX - (tooltipWidth / 2);
+
+                if (targetLeft + tooltipWidth > maxRight) {
+                    targetLeft = maxRight - tooltipWidth;
+                }
+                if (targetLeft < minLeft) {
+                    targetLeft = minLeft;
+                }
+
+                const relativeLeft = targetLeft - containerRect.left;
+                tooltip.style.left = `${Math.round(relativeLeft)}px`;
+
+                const arrowX = iconCenterX - targetLeft;
+                const clampedArrow = Math.max(12, Math.min(tooltipWidth - 12, arrowX));
+                tooltip.style.setProperty('--arrow-left', `${Math.round(clampedArrow)}px`);
+
+                const spaceAbove = containerRect.top - wrapperRect.top;
+                if (spaceAbove < tooltipHeight + 8) {
+                    tooltip.style.bottom = 'auto';
+                    tooltip.style.top = 'calc(100% + 6px)';
+                    tooltip.classList.add('tooltip-bottom');
+                } else {
+                    tooltip.style.bottom = '100%';
+                    tooltip.style.top = 'auto';
+                    tooltip.classList.remove('tooltip-bottom');
+                }
+
+                tooltip.style.visibility = '';
+                tooltip.style.display = '';
+            });
+        });
 
         const keywordFilterWrapper = modalContainer.querySelectorAll('.settings-wrapper')[1];
         const keywordFilterToggle = modalContainer.querySelector("#keywordFilterToggle");
@@ -36146,6 +36865,8 @@ shadowRoot.innerHTML = `
                             artistKeywords: Array.from(artistKeywords),
                             releasedWithinDays: getVal('filter-released-within'),
                             addedWithinDays: getVal('filter-added-within'),
+                            notScrobbledWithinDays: getVal('filter-not-scrobbled-within'),
+                            scrobbledWithinDays: getVal('filter-scrobbled-within'),
                         };
                         rangeConfigs.forEach(cfg => {
                             state[`min${cfg.base}`] = getVal(`filter-min-${cfg.id}`);
@@ -36229,6 +36950,8 @@ shadowRoot.innerHTML = `
                     });
                     setVal('filter-released-within', state.releasedWithinDays);
                     setVal('filter-added-within', state.addedWithinDays);
+                    setVal('filter-not-scrobbled-within', state.notScrobbledWithinDays);
+                    setVal('filter-scrobbled-within', state.scrobbledWithinDays);
 
                     const kwToggle = modalContainer.querySelector('#keywordFilterToggle');
                     if (kwToggle) {
@@ -36357,6 +37080,18 @@ shadowRoot.innerHTML = `
                 badges.push({ text, clear: () => setVal('filter-added-within', '') });
             }
 
+            const notScrobbledDaysWithin = getVal('filter-not-scrobbled-within');
+            if (notScrobbledDaysWithin) {
+                const text = notScrobbledDaysWithin === "0" ? "Not Scrobbled Today" : `Not scrobbled in last ${notScrobbledDaysWithin} day(s)`;
+                badges.push({ text, clear: () => setVal('filter-not-scrobbled-within', '') });
+            }
+
+            const scrobbledDaysWithin = getVal('filter-scrobbled-within');
+            if (scrobbledDaysWithin) {
+                const text = scrobbledDaysWithin === "0" ? "Scrobbled Today" : `Scrobbled in last ${scrobbledDaysWithin} day(s)`;
+                badges.push({ text, clear: () => setVal('filter-scrobbled-within', '') });
+            }
+            
             const keywordFilterEnabled = modalContainer.querySelector('#keywordFilterToggle').checked;
             if (keywordFilterEnabled) {
                 const mode = keepMatchingMode ? 'Keep' : 'Exclude';
@@ -36427,9 +37162,13 @@ shadowRoot.innerHTML = `
             if (maxEl) maxEl.value = currentFilters[`max${cfg.base}`] || '';
         });
         const relWithinEl = modalContainer.querySelector('#filter-released-within');
-        if (relWithinEl) relWithinEl.value = currentFilters.releasedWithinDays || '';
+        if (relWithinEl) relWithinEl.value = currentFilters.releasedWithinDays ?? '';
         const addWithinEl = modalContainer.querySelector('#filter-added-within');
-        if (addWithinEl) addWithinEl.value = currentFilters.addedWithinDays || '';
+        if (addWithinEl) addWithinEl.value = currentFilters.addedWithinDays ?? '';
+        const notScrobbledWithinEl = modalContainer.querySelector('#filter-not-scrobbled-within');
+        if (notScrobbledWithinEl) notScrobbledWithinEl.value = currentFilters.notScrobbledWithinDays ?? '';
+        const scrobbledWithinEl = modalContainer.querySelector('#filter-scrobbled-within');
+        if (scrobbledWithinEl) scrobbledWithinEl.value = currentFilters.scrobbledWithinDays ?? '';
 
         keywordFilterToggle.checked = currentFilters.keywordFilterEnabled || false;
         keywordFilterWrapper.classList.toggle('disabled', !keywordFilterToggle.checked);
@@ -36547,6 +37286,29 @@ shadowRoot.innerHTML = `
         ];
         rangeKeys.forEach(key => enforceRangeLogic(`filter-min-${key}`, `filter-max-${key}`));
 
+        if (notScrobbledWithinEl && scrobbledWithinEl) {
+            const validateScrobbleWindow = (e) => {
+                if (e.target.value !== '') {
+                    const intVal = Math.floor(parseFloat(e.target.value));
+                    e.target.value = (!isNaN(intVal) && intVal >= 0) ? intVal : '';
+                }
+                const notVal = parseInt(notScrobbledWithinEl.value, 10);
+                const incVal = parseInt(scrobbledWithinEl.value, 10);
+                if (!isNaN(notVal) && !isNaN(incVal) && notVal >= incVal) {
+                    if (e.target === notScrobbledWithinEl) {
+                        scrobbledWithinEl.value = notVal + 1;
+                    } else if (incVal > 0) {
+                        notScrobbledWithinEl.value = incVal - 1;
+                    } else {
+                        notScrobbledWithinEl.value = '';
+                    }
+                }
+                updateSummary();
+            };
+            notScrobbledWithinEl.addEventListener('change', validateScrobbleWindow);
+            scrobbledWithinEl.addEventListener('change', validateScrobbleWindow);
+        }
+
         updateSummary();
         
         modalContainer.querySelector('#save-filters').addEventListener('click', () => {
@@ -36572,6 +37334,8 @@ shadowRoot.innerHTML = `
                 artistKeywords: Array.from(artistKeywords),
                 releasedWithinDays: getVal('filter-released-within'),
                 addedWithinDays: getVal('filter-added-within'),
+                notScrobbledWithinDays: getVal('filter-not-scrobbled-within'),
+                scrobbledWithinDays: getVal('filter-scrobbled-within'),
             };
             rangeConfigs.forEach(cfg => {
                 newFilters[`min${cfg.base}`] = getVal(`filter-min-${cfg.id}`);
@@ -36595,6 +37359,58 @@ shadowRoot.innerHTML = `
     if (existingModal) existingModal.remove();
 
     let userLibraryPromise = null;
+
+    const getTargetPlaylistsLibraryPromise = async () => {
+        if (!userLibraryPromise) {
+            userLibraryPromise = fetchUserLibrary();
+        }
+        const items = await userLibraryPromise;
+        const filterPlaylistsOnly = (list) => {
+            const out = [];
+            for (const item of (list || [])) {
+                if (item.type === 'folder') {
+                    const children = filterPlaylistsOnly(item.children || []);
+                    if (children.length > 0) {
+                        out.push({ ...item, children });
+                    }
+                } else if (item.type === 'playlist' && item.uri && URI.isPlaylistV1OrV2(item.uri)) {
+                    out.push(item);
+                }
+            }
+            return out;
+        };
+        return filterPlaylistsOnly(items);
+    };
+
+    const validateTargetPlaylist = async (selectedItems, currentJobId = null) => {
+        if (!selectedItems || selectedItems.length === 0) {
+            throw new Error("Please select a target playlist.");
+        }
+        const target = selectedItems[0];
+        if (!target?.uri || !URI.isPlaylistV1OrV2(target.uri)) {
+            throw new Error("Only Spotify playlists can be selected as a target playlist.");
+        }
+        const conflictingJob = getJobs().find(j => j.id !== currentJobId && j.targetPlaylistUri === target.uri);
+        if (conflictingJob) {
+            throw new Error(`"${target.name || 'This playlist'}" is already managed by another Dynamic Playlist job.`);
+        }
+        const [user, meta] = await Promise.all([
+            Spicetify.Platform.UserAPI.getUser(),
+            Spicetify.Platform.PlaylistAPI.getMetadata(target.uri)
+        ]);
+        const userId = user?.username || user?.id;
+        const ownerUri = meta?.owner?.uri || "";
+        const ownerUsername = meta?.owner?.username || meta?.owner?.id || ownerUri.split(':')?.[2];
+        const isOwner = Boolean(userId && (ownerUsername === userId || ownerUri.includes(userId)));
+        const canEdit = isOwner || Boolean(meta?.collaborative) || Boolean(meta?.canEdit) || Boolean(meta?.canModify);
+        if (!canEdit) {
+            throw new Error("You can only select a playlist that you own or have permission to edit.");
+        }
+        if (meta?.name) target.name = meta.name;
+        if (meta?.images?.length) {
+            target.coverUrl = (meta.images[meta.images.length - 1] || meta.images[0]).url;
+        }
+    };
 
     const overlay = document.createElement("div");
     overlay.id = "sort-play-dynamic-playlist-modal";
@@ -36801,33 +37617,71 @@ shadowRoot.innerHTML = `
         modalContainer.querySelectorAll('.job-run-btn').forEach(btn => {
             btn.addEventListener('click', async (e) => {
                 const jobId = e.currentTarget.dataset.jobId;
-                const job = jobs.find(j => j.id === jobId);
+                const job = getJobs().find(j => j.id === jobId);
                 if (!job) return;
-        
-                runningJobIds.add(job.id);
-                closeModal();
-        
-                const stickyNotification = showNotification(`Updating Dynamic Playlist: ${job.targetPlaylistName}...`, 'sticky');
-        
-                try {
-                    const shouldUpdateSchedule = isJobDue(job, Date.now());
-                    const updatedJob = await runJob(job, false, shouldUpdateSchedule);
-                    updateJob(updatedJob);
-                    stickyNotification.remove();
-                    showNotification(`Dynamic playlist "${job.targetPlaylistName}" was updated.`);
-                } catch (error) {
-                    stickyNotification.remove();
-                    showDetailedError(error, `Failed to manually run dynamic playlist job for "${job.targetPlaylistName}"`);
-                } finally {
-                    runningJobIds.delete(job.id);
+
+                const executeJobRun = async (targetJob, isInitial = false) => {
+                    runningJobIds.add(targetJob.id);
+                    closeModal();
+                    const stickyNotification = showNotification(`${isInitial ? 'Creating' : 'Updating'} Dynamic Playlist: ${targetJob.targetPlaylistName}...`, 'sticky');
+                    try {
+                        const shouldUpdateSchedule = isInitial ? true : isJobDue(targetJob, Date.now());
+                        const updatedJob = await runJob(targetJob, isInitial, shouldUpdateSchedule);
+                        updatedJob.isDeleted = false;
+                        updateJob(updatedJob);
+                        stickyNotification.remove();
+                        showNotification(`Dynamic playlist "${updatedJob.targetPlaylistName}" was ${isInitial ? 'created and ' : ''}updated.`);
+                    } catch (error) {
+                        stickyNotification.remove();
+                        showDetailedError(error, `Failed to manually run dynamic playlist job for "${targetJob.targetPlaylistName}"`);
+                    } finally {
+                        runningJobIds.delete(targetJob.id);
+                    }
+                };
+
+                if (job.isDeleted || !job.targetPlaylistUri) {
+                    const recoveryChoice = await showConfirmationModal({
+                        title: "Target Playlist Not Found",
+                        description: `"${job.targetPlaylistName || job.sourceName || 'This playlist'}" is not in your library. Would you like to link this job to an existing playlist or create a new playlist using these rules?`,
+                        confirmText: "Link Existing",
+                        neutralText: "Create New",
+                        cancelText: "Cancel"
+                    });
+
+                    if (recoveryChoice === 'confirm') {
+                        showChangeSourceModal(
+                            "Select Target Playlist",
+                            getTargetPlaylistsLibraryPromise(),
+                            (selectedData) => {
+                                const picked = selectedData?.[0];
+                                if (!picked) return;
+                                job.targetPlaylistUri = picked.uri;
+                                job.targetPlaylistName = picked.name || job.targetPlaylistName;
+                                job.coverUrl = picked.coverUrl || job.coverUrl;
+                                job.isDeleted = false;
+                                updateJob(job);
+                                executeJobRun(job, false);
+                            },
+                            false,
+                            "Select an existing playlist you own or paste its link.",
+                            null,
+                            false,
+                            (selectedData) => validateTargetPlaylist(selectedData, job.id)
+                        );
+                    } else if (recoveryChoice === 'neutral') {
+                        await executeJobRun(job, true);
+                    }
+                    return;
                 }
+
+                await executeJobRun(job, false);
             });
         });
 
         modalContainer.querySelectorAll('.job-edit-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const jobId = e.currentTarget.dataset.jobId;
-                const jobToEdit = jobs.find(j => j.id === jobId);
+                const jobToEdit = getJobs().find(j => j.id === jobId);
                 if (jobToEdit) {
                     const content = modalContainer.shadowRoot.querySelector('.dynamic-playlist-modal');
                     if (content) {
@@ -36844,13 +37698,13 @@ shadowRoot.innerHTML = `
         modalContainer.querySelectorAll('.job-delete-btn').forEach(btn => {
             btn.addEventListener('click', async (e) => {
                 const jobId = e.currentTarget.dataset.jobId;
-                const job = jobs.find(j => j.id === jobId);
+                const job = getJobs().find(j => j.id === jobId);
                 if (!job) return;
 
                 const confirmed = await showConfirmationModal({
-                    title: "Delete Dynamic Playlist?",
-                    description: `This will stop future updates for "${job.targetPlaylistName || job.sourceName}" but will NOT delete the created playlist. Are you sure?`,
-                    confirmText: "Delete",
+                    title: "Remove Dynamic Playlist Job?",
+                    description: `This will stop Sort-Play from managing "${job.targetPlaylistName || job.sourceName}", but will NOT delete the playlist from Spotify. Are you sure?`,
+                    confirmText: "Remove",
                     cancelText: "Cancel",
                 });
 
@@ -36969,6 +37823,14 @@ shadowRoot.innerHTML = `
         const isEditing = !!jobToEdit;
         let jobFilters = isEditing ? (jobToEdit.filters || {}) : {};
         let sources = isEditing ? [...jobToEdit.sources] : [];
+        let targetMode = isEditing ? 'existing' : 'new';
+        let linkedTargetPlaylist = (isEditing && jobToEdit.targetPlaylistUri) ? {
+            uri: jobToEdit.targetPlaylistUri,
+            name: jobToEdit.targetPlaylistName || jobToEdit.sourceName || "Linked Playlist",
+            coverUrl: jobToEdit.coverUrl || null,
+            isDeleted: Boolean(jobToEdit.isDeleted)
+        } : null;
+        let hasUserEditedName = isEditing;
 
         let currentDeduplicate = isEditing ? jobToEdit.deduplicate : false;
         let currentUpdateFromSource = isEditing ? jobToEdit.updateFromSource : (localStorage.getItem(STORAGE_KEY_DYNAMIC_UPDATE_SOURCE) === null ? true : localStorage.getItem(STORAGE_KEY_DYNAMIC_UPDATE_SOURCE) === 'true');
@@ -37079,6 +37941,16 @@ shadowRoot.innerHTML = `
             .job-form-modal .source-limit-toggle-btn { background-color: #444; border: 1px solid #555; color: #b3b3b3; padding: 0 10px; height: 24px; border-radius: 4px; font-size: 11px; font-weight: 700; cursor: pointer; margin-right: 5px; transition: all 0.2s; }
             .job-form-modal .source-limit-toggle-btn:hover { background-color: #555; color: white; }
             .job-form-modal .source-limit-toggle-btn.active { background-color: #fff; color: black; }
+            .job-form-modal .target-mode-segmented { display: grid; grid-template-columns: 1fr 1fr; background-color: #181818; border: 1px solid #444; border-radius: 16px; padding: 2px; gap: 2px; }
+            .job-form-modal .target-mode-btn { background: transparent; border: none; color: #b3b3b3; padding: 4px 10px; font-size: 12px; font-weight: 600; border-radius: 14px; cursor: pointer; transition: background-color 0.15s ease, color 0.15s ease; white-space: nowrap; }
+            .job-form-modal .target-mode-btn:hover { color: #ffffff; }
+            .job-form-modal .target-mode-btn.active { background-color: #1ED760; color: #000000; }
+            .job-form-modal .target-linked-card { display: flex; align-items: center; gap: 10px; background-color: #353535; border: 1px solid #4a4a4a; padding: 8px 10px; border-radius: 6px; margin-bottom: 12px; }
+            .job-form-modal .target-linked-card.deleted { background-color: #431919; border-color: #7a2e2e; }
+            .job-form-modal .target-change-btn { background-color: rgba(255,255,255,0.12); border: 1px solid #666; color: #ffffff; border-radius: 14px; padding: 4px 10px; font-size: 12px; font-weight: 500; cursor: pointer; flex-shrink: 0; transition: background-color 0.15s ease; }
+            .job-form-modal .target-change-btn:hover { background-color: rgba(255,255,255,0.22); }
+            .job-form-modal .target-select-empty-btn { width: 100%; background-color: rgba(255,255,255,0.06); border: 1px dashed #666; color: #e0e0e0; border-radius: 6px; padding: 10px; font-size: 13px; font-weight: 500; cursor: pointer; margin-bottom: 12px; transition: background-color 0.15s ease, border-color 0.15s ease; }
+            .job-form-modal .target-select-empty-btn:hover { background-color: rgba(255,255,255,0.12); border-color: #1ED760; color: #ffffff; }
             @keyframes fadeIn { from { opacity: 0; transform: scale(0.99); } to { opacity: 1; transform: scale(1); } }
             .job-form-modal { animation: fadeIn 0.2s ease; }
           </style>
@@ -37111,8 +37983,23 @@ shadowRoot.innerHTML = `
                                     </span>
                                     <label class="switch"><input type="checkbox" id="limit-tracks-toggle" ${isEditing && jobToEdit.limitEnabled ? 'checked' : ''}><span class="sliderx"></span></label>
                                 </div>
-                                <div style="margin-top: 16px;">
-                                    <label for="playlist-name-input" style="display: block; color: #b3b3b3; font-size: 14px; margin-bottom: 8px;">New Playlist Name</label>
+                                <div style="border-top: 1px solid #3e3e3e; margin: 16px 0 12px;"></div>
+                                <div class="setting-row" style="margin-top: 0; margin-bottom: 12px;">
+                                    <span class="description">
+                                        Target Playlist
+                                        <span class="tooltip-container">
+                                            ${infoIconSvg}
+                                            <span class="custom-tooltip">Create a brand-new playlist, or link to an existing playlist you own to update it in-place without changing its Spotify URL.</span>
+                                        </span>
+                                    </span>
+                                    <div class="target-mode-segmented" id="target-mode-control">
+                                        <button type="button" class="target-mode-btn ${targetMode === 'new' ? 'active' : ''}" data-mode="new">Create New</button>
+                                        <button type="button" class="target-mode-btn ${targetMode === 'existing' ? 'active' : ''}" data-mode="existing">Modify Existing</button>
+                                    </div>
+                                </div>
+                                <div id="target-existing-container" style="display: ${targetMode === 'existing' ? 'block' : 'none'};"></div>
+                                <div>
+                                    <label id="playlist-name-label" for="playlist-name-input" style="display: block; color: #b3b3b3; font-size: 14px; margin-bottom: 8px;">${targetMode === 'existing' ? 'Target Playlist Name' : 'New Playlist Name'}</label>
                                     <input type="text" id="playlist-name-input" value="" style="width: 100%; background-color: #3e3e3e; border: 1px solid #3e3e3e; border-radius: 4px; padding: 8px 12px; color: white; box-sizing: border-box;">
                                 </div>
                             </div>
@@ -37288,19 +38175,147 @@ shadowRoot.innerHTML = `
             currentUpdateFromSource = e.target.checked;
         });
 
-        const updateFormState = () => {
-            if (!isEditing) {
-                if (sources.length === 0) {
-                    playlistNameInput.value = "Dynamic Playlist";
-                } else if (sources.length === 1) {
-                    playlistNameInput.value = `${sources[0].name} (Dynamic)`;
-                } else {
-                    playlistNameInput.value = "Combined Dynamic Playlist";
-                }
-            } else {
-                playlistNameInput.value = jobToEdit.targetPlaylistName;
+        const playlistNameLabel = modalContainer.querySelector('#playlist-name-label');
+        const targetExistingContainer = modalContainer.querySelector('#target-existing-container');
+        const targetModeControl = modalContainer.querySelector('#target-mode-control');
+        const saveJobBtnEl = modalContainer.querySelector('#save-job-btn');
+
+        playlistNameInput.addEventListener('input', () => {
+            hasUserEditedName = true;
+        });
+
+        const getDefaultNewPlaylistName = () => {
+            if (sources.length === 0) return "Dynamic Playlist";
+            if (sources.length === 1) return `${sources[0].name} (Dynamic)`;
+            return "Combined Dynamic Playlist";
+        };
+
+        const openTargetPlaylistPicker = () => {
+            showChangeSourceModal(
+                "Select Target Playlist",
+                getTargetPlaylistsLibraryPromise(),
+                (selectedData) => {
+                    const picked = selectedData?.[0];
+                    if (!picked) return;
+                    linkedTargetPlaylist = {
+                        uri: picked.uri,
+                        name: picked.name,
+                        coverUrl: picked.coverUrl || null,
+                        isDeleted: false
+                    };
+                    playlistNameInput.value = picked.name || "";
+                    hasUserEditedName = true;
+                    renderTargetPlaylistSection();
+                },
+                false,
+                "Select an existing playlist you own to update in-place, or paste its link.",
+                null,
+                false,
+                (selectedData) => validateTargetPlaylist(selectedData, isEditing ? jobToEdit.id : null)
+            );
+        };
+
+        const renderTargetPlaylistSection = () => {
+            if (!targetExistingContainer) return;
+            targetModeControl?.querySelectorAll('.target-mode-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.mode === targetMode);
+            });
+
+            if (playlistNameLabel) {
+                playlistNameLabel.textContent = targetMode === 'existing' ? 'Target Playlist Name' : 'New Playlist Name';
             }
-        
+
+            if (saveJobBtnEl) {
+                if (targetMode === 'new') {
+                    saveJobBtnEl.textContent = 'Save & Create';
+                } else {
+                    saveJobBtnEl.textContent = isEditing ? 'Save Changes' : 'Save & Run';
+                }
+            }
+
+            if (targetMode !== 'existing') {
+                targetExistingContainer.style.display = 'none';
+                targetExistingContainer.innerHTML = '';
+                return;
+            }
+
+            targetExistingContainer.style.display = 'block';
+            if (linkedTargetPlaylist && linkedTargetPlaylist.uri) {
+                const statusText = linkedTargetPlaylist.isDeleted
+                    ? '<span style="color: #ff8a8a; font-weight: 500;">Not in library • Click Change to relink</span>'
+                    : 'Updates this playlist in-place';
+                targetExistingContainer.innerHTML = `
+                    <div class="target-linked-card ${linkedTargetPlaylist.isDeleted ? 'deleted' : ''}">
+                        <img src="${linkedTargetPlaylist.coverUrl || FALLBACK_COVER_URI}" class="source-cover-art-small" onerror="this.src='${FALLBACK_COVER_URI}'">
+                        <div class="source-text-info">
+                            <div class="source-name" title="${escapeHtml(linkedTargetPlaylist.name, "")}">${escapeHtml(linkedTargetPlaylist.name, "")}</div>
+                            <div class="source-info">${statusText}</div>
+                        </div>
+                        <button type="button" class="target-change-btn" id="change-target-playlist-btn">Change</button>
+                    </div>
+                `;
+                targetExistingContainer.querySelector('#change-target-playlist-btn')?.addEventListener('click', openTargetPlaylistPicker);
+            } else {
+                targetExistingContainer.innerHTML = `
+                    <button type="button" class="target-select-empty-btn" id="select-target-playlist-btn">+ Select Existing Playlist...</button>
+                `;
+                targetExistingContainer.querySelector('#select-target-playlist-btn')?.addEventListener('click', openTargetPlaylistPicker);
+            }
+        };
+
+        targetModeControl?.querySelectorAll('.target-mode-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const newMode = btn.dataset.mode;
+                if (newMode === targetMode) return;
+                targetMode = newMode;
+
+                if (targetMode === 'existing') {
+                    if (!linkedTargetPlaylist && sources.length === 1 && sources[0]?.uri && URI.isPlaylistV1OrV2(sources[0].uri)) {
+                        try {
+                            const candidate = { ...sources[0] };
+                            await validateTargetPlaylist([candidate], isEditing ? jobToEdit.id : null);
+                            linkedTargetPlaylist = {
+                                uri: candidate.uri,
+                                name: candidate.name,
+                                coverUrl: candidate.coverUrl || null,
+                                isDeleted: false
+                            };
+                            playlistNameInput.value = candidate.name || "";
+                            hasUserEditedName = true;
+                        } catch (_) {
+                            openTargetPlaylistPicker();
+                        }
+                    } else if (linkedTargetPlaylist?.name) {
+                        playlistNameInput.value = linkedTargetPlaylist.name;
+                    } else {
+                        openTargetPlaylistPicker();
+                    }
+                } else {
+                    if (isEditing && jobToEdit?.targetPlaylistName) {
+                        playlistNameInput.value = jobToEdit.targetPlaylistName;
+                        hasUserEditedName = true;
+                    } else {
+                        hasUserEditedName = false;
+                        playlistNameInput.value = getDefaultNewPlaylistName();
+                    }
+                }
+
+                renderTargetPlaylistSection();
+            });
+        });
+
+        const updateFormState = () => {
+            if (targetMode === 'existing') {
+                if (linkedTargetPlaylist && !hasUserEditedName) {
+                    playlistNameInput.value = linkedTargetPlaylist.name;
+                } else if (isEditing && !playlistNameInput.value) {
+                    playlistNameInput.value = jobToEdit.targetPlaylistName || "";
+                }
+            } else if (!hasUserEditedName) {
+                playlistNameInput.value = getDefaultNewPlaylistName();
+            }
+
+            renderTargetPlaylistSection();
             updateSourceRow.classList.toggle('disabled', false);
             updateSourceToggle.checked = currentUpdateFromSource;
         };
@@ -37681,13 +38696,37 @@ shadowRoot.innerHTML = `
         modalContainer.querySelector('#closeDynamicPlaylistModal').addEventListener('click', transitionToList);
         modalContainer.querySelector('#cancel-job-btn').addEventListener('click', transitionToList);
         
-        modalContainer.querySelector('#save-job-btn').addEventListener('click', (e) => {
+        modalContainer.querySelector('#save-job-btn').addEventListener('click', async () => {
             if (sources.length === 0) {
                 showNotification("Please add at least one source.", true);
                 return;
             }
 
+            if (targetMode === 'existing' && (!linkedTargetPlaylist || !linkedTargetPlaylist.uri)) {
+                showNotification("Please select an existing target playlist to modify.", true);
+                return;
+            }
+
             const limitEnabled = modalContainer.querySelector('#limit-tracks-toggle').checked;
+            const selectedUpdateMode = modalContainer.querySelector('#update-mode-select').value;
+
+            if (targetMode === 'existing' && linkedTargetPlaylist?.uri) {
+                const isSelfOnlySource = sources.length === 1 && sources[0].uri === linkedTargetPlaylist.uri;
+                if (isSelfOnlySource && selectedUpdateMode === 'append') {
+                    showNotification("Cannot use 'Add New Tracks to Top' when a playlist is its own only source. Choose 'Replace All Tracks' instead.", true);
+                    return;
+                }
+                if (isSelfOnlySource && limitEnabled) {
+                    const confirmTruncate = await showConfirmationModal({
+                        title: "Warning: Limit Tracks on Self-Source",
+                        description: `"${linkedTargetPlaylist.name}" is set as both the only source and the target playlist. Enabling "Limit tracks per source" will permanently remove all other tracks from this playlist when it updates. Continue anyway?`,
+                        confirmText: "Continue",
+                        cancelText: "Cancel"
+                    });
+                    if (confirmTruncate !== 'confirm') return;
+                }
+            }
+
             if (limitEnabled) {
                 modalContainer.querySelectorAll('.source-limit-input').forEach(input => {
                     const index = parseInt(input.dataset.index, 10);
@@ -37709,11 +38748,14 @@ shadowRoot.innerHTML = `
             }
 
             const scheduleValue = modalContainer.querySelector('#schedule-select').value;
+            const enteredName = modalContainer.querySelector('#playlist-name-input').value.trim();
+            const finalTargetName = enteredName || (targetMode === 'existing' && linkedTargetPlaylist?.name ? linkedTargetPlaylist.name : getDefaultNewPlaylistName());
+
             const jobData = {
                 sources: sources,
                 limitEnabled: limitEnabled,
-                targetPlaylistName: modalContainer.querySelector('#playlist-name-input').value.trim(),
-                updateMode: modalContainer.querySelector('#update-mode-select').value,
+                targetPlaylistName: finalTargetName,
+                updateMode: selectedUpdateMode,
                 sortType: modalContainer.querySelector('#sort-type-select').value,
                 sortDirection: sortDirectionSelectUI.value,
                 deduplicate: currentDeduplicate,
@@ -37721,11 +38763,74 @@ shadowRoot.innerHTML = `
                 schedule: isNaN(parseInt(scheduleValue)) ? scheduleValue : parseInt(scheduleValue),
                 filters: jobFilters,
             };
-            
-            if (isEditing) {
-                const updatedJob = { ...jobToEdit, ...jobData };
+
+            if (targetMode === 'existing' && linkedTargetPlaylist?.uri && !linkedTargetPlaylist.isDeleted && finalTargetName !== linkedTargetPlaylist.name) {
+                Spicetify.Platform.PlaylistAPI.setAttributes(linkedTargetPlaylist.uri, { name: finalTargetName }).catch(() => {});
+            }
+
+            if (isEditing && targetMode === 'existing') {
+                const targetChanged = linkedTargetPlaylist.uri !== jobToEdit.targetPlaylistUri;
+                const updatedJob = {
+                    ...jobToEdit,
+                    ...jobData,
+                    targetPlaylistUri: linkedTargetPlaylist.uri,
+                    coverUrl: targetChanged ? (linkedTargetPlaylist.coverUrl || null) : (linkedTargetPlaylist.coverUrl || jobToEdit.coverUrl),
+                    isDeleted: targetChanged ? false : Boolean(linkedTargetPlaylist.isDeleted)
+                };
                 updateJob(updatedJob);
                 transitionToList();
+            } else if (!isEditing && targetMode === 'existing') {
+                const newJob = {
+                    ...jobData,
+                    id: crypto.randomUUID(),
+                    targetPlaylistUri: linkedTargetPlaylist.uri,
+                    coverUrl: linkedTargetPlaylist.coverUrl || null,
+                    isDeleted: false,
+                    createdAt: Date.now(),
+                    lastRun: null,
+                };
+                addJob(newJob);
+                runningJobIds.add(newJob.id);
+                closeModal();
+
+                const stickyNotification = showNotification(`Updating Dynamic Playlist: ${newJob.targetPlaylistName}...`, 'sticky');
+                runJob(newJob, false, true)
+                .then(completedJob => {
+                    updateJob(completedJob);
+                    stickyNotification.remove();
+                    showNotification(`Dynamic playlist "${completedJob.targetPlaylistName}" linked and updated successfully!`);
+                })
+                .catch(error => {
+                    stickyNotification.remove();
+                    showDetailedError(error, `Error updating dynamic playlist "${newJob.targetPlaylistName}"`);
+                })
+                .finally(() => {
+                    runningJobIds.delete(newJob.id);
+                });
+            } else if (isEditing && targetMode === 'new') {
+                const jobToRecreate = {
+                    ...jobToEdit,
+                    ...jobData,
+                    isDeleted: false,
+                };
+                runningJobIds.add(jobToRecreate.id);
+                closeModal();
+
+                const stickyNotification = showNotification(`Creating Dynamic Playlist: ${jobToRecreate.targetPlaylistName}...`, 'sticky');
+                runJob(jobToRecreate, true)
+                .then(completedJob => {
+                    completedJob.isDeleted = false;
+                    updateJob(completedJob);
+                    stickyNotification.remove();
+                    showNotification(`Dynamic playlist "${completedJob.targetPlaylistName}" created and linked!`);
+                })
+                .catch(error => {
+                    stickyNotification.remove();
+                    showDetailedError(error, `Error creating dynamic playlist "${jobToRecreate.targetPlaylistName}"`);
+                })
+                .finally(() => {
+                    runningJobIds.delete(jobToRecreate.id);
+                });
             } else {
                 const newJob = {
                     ...jobData,
@@ -37734,9 +38839,8 @@ shadowRoot.innerHTML = `
                     lastRun: null,
                 };
                 closeModal();
-                
+
                 const stickyNotification = showNotification(`Creating Dynamic Playlist: ${newJob.targetPlaylistName}...`, 'sticky');
-                
                 runJob(newJob, true)
                 .then(completedJob => {
                     addJob(completedJob);
@@ -60069,13 +61173,15 @@ shadowRoot.innerHTML = `
       const rawTracks = data?.recenttracks?.track;
       const tracks = Array.isArray(rawTracks) ? rawTracks : (rawTracks ? [rawTracks] : []);
       for (const track of tracks) {
-        if (!track?.date?.uts) continue;
-        const artist = (track.artist?.['#text'] || track.artist?.name || '').toLowerCase();
-        const name = (track.name || '').toLowerCase();
+        const isNowPlaying = track?.['@attr']?.nowplaying === 'true';
+        const tsMs = isNowPlaying ? Date.now() : (track?.date?.uts ? parseInt(track.date.uts, 10) * 1000 : 0);
+        if (!tsMs || isNaN(tsMs)) continue;
+        const artist = (track.artist?.['#text'] || track.artist?.name || '').toLowerCase().trim();
+        const name = (track.name || '').toLowerCase().trim();
         if (!artist || !name) continue;
         const key = `${artist}|-|${name}`;
         if (!scrobblesMap.has(key)) {
-          scrobblesMap.set(key, parseInt(track.date.uts, 10) * 1000);
+          scrobblesMap.set(key, tsMs);
         }
       }
     };
@@ -60128,7 +61234,183 @@ shadowRoot.innerHTML = `
     return scrobblesMap;
   }
 
-  async function fetchLfmScrobblesInRange(username, fromTs, toTs) {
+  function addLfmIdentityKeysToSet(artistRaw, trackRaw, targetSet) {
+      const artist = (artistRaw || '').toLowerCase().trim();
+      const name = (trackRaw || '').toLowerCase().trim();
+      if (!artist || !name) return;
+
+      targetSet.add(`${artist}|-|${name}`);
+  }
+
+  function isTrackInLfmWindow(track, windowKeysSet) {
+      if (!track || !windowKeysSet || windowKeysSet.size === 0) return false;
+
+      const lfmInfo = getLfmInfo(track);
+      if (lfmInfo && windowKeysSet.has(lfmInfo.key)) {
+          return true;
+      }
+
+      if (track._originalLocalUri) {
+          const localOverride = getLfmOverrides()[track._originalLocalUri];
+          if (localOverride) {
+              const localKey = `${localOverride.artist.toLowerCase().trim()}|-|${localOverride.track.toLowerCase().trim()}`;
+              if (windowKeysSet.has(localKey)) return true;
+          }
+      }
+
+      const nativeArtist = (getPrimaryArtistName(track) || track.metadata?.artist_name || '').toLowerCase().trim();
+      const nativeTrack = (track.name || track.songTitle || track.metadata?.title || '').toLowerCase().trim();
+      if (nativeArtist && nativeTrack && windowKeysSet.has(`${nativeArtist}|-|${nativeTrack}`)) {
+          return true;
+      }
+
+      return false;
+  }
+
+  async function fetchLfmScrobbledWindows(username, excludeFromSec, includeFromSec, updateProgress = () => {}) {
+      if (!username) throw new Error("Last.fm username is not set.");
+
+      const excludeKeys = excludeFromSec !== null ? new Set() : null;
+      const includeKeys = includeFromSec !== null ? new Set() : null;
+      if (!excludeKeys && !includeKeys) return { excludeKeys: null, includeKeys: null };
+
+      const outerFromSec = (excludeFromSec !== null && includeFromSec !== null)
+          ? Math.min(excludeFromSec, includeFromSec)
+          : (excludeFromSec ?? includeFromSec);
+
+      const limit = 200;
+      const maxRecentPages = 25;
+      const nowSec = Math.floor(Date.now() / 1000);
+
+      updateProgress(0);
+
+      const fetchRecentPage = async (pageNum, fromTs) => {
+          const params = new URLSearchParams({
+              method: 'user.getrecenttracks',
+              user: username,
+              from: Math.floor(fromTs).toString(),
+              limit: limit.toString(),
+              page: pageNum.toString(),
+              format: 'json'
+          });
+          const response = await fetchLfmWithGateway(params);
+          const text = await response.text();
+          let data = null;
+          if (text) {
+              try { data = JSON.parse(text); } catch (_) {}
+          }
+
+          if (data?.error) {
+              if (data.error === 17) {
+                  throw new Error("Last.fm profile is private. Please make your listening history public.");
+              }
+              throw new Error(data.message || "Last.fm API Error");
+          }
+
+          if (!response.ok || !data?.recenttracks) {
+              throw new Error(`Failed to fetch recent scrobbles from Last.fm (page ${pageNum})`);
+          }
+
+          return data;
+      };
+
+      const extractRecentTracks = (data) => {
+          const rawTracks = data?.recenttracks?.track;
+          const tracks = Array.isArray(rawTracks) ? rawTracks : (rawTracks ? [rawTracks] : []);
+          for (const track of tracks) {
+              const isNowPlaying = track?.['@attr']?.nowplaying === 'true';
+              const uts = isNowPlaying ? nowSec : parseInt(track?.date?.uts, 10);
+              if (!uts || isNaN(uts) || uts < outerFromSec) continue;
+              const artist = track.artist?.['#text'] || track.artist?.name || '';
+              const name = track.name || '';
+              if (excludeKeys && uts >= excludeFromSec) {
+                  addLfmIdentityKeysToSet(artist, name, excludeKeys);
+              }
+              if (includeKeys && uts >= includeFromSec) {
+                  addLfmIdentityKeysToSet(artist, name, includeKeys);
+              }
+          }
+      };
+
+      const firstPageData = await fetchRecentPage(1, outerFromSec);
+      extractRecentTracks(firstPageData);
+
+      const rawTotalPages = parseInt(firstPageData?.recenttracks?.['@attr']?.totalPages, 10) || 1;
+      if (rawTotalPages <= 1) {
+          updateProgress(100);
+          return { excludeKeys, includeKeys };
+      }
+
+      if (rawTotalPages <= maxRecentPages) {
+          let completedPages = 1;
+          updateProgress(Math.floor((completedPages / rawTotalPages) * 100));
+
+          const remainingPages = Array.from({ length: rawTotalPages - 1 }, (_, i) => i + 2);
+          const validKeys = Math.max(1, L_F_M_Key_Pool.length - revokedLfmKeys.size);
+          const concurrency = Math.min(remainingPages.length, Math.max(4, validKeys * 3));
+          let pageIdx = 0;
+
+          const workers = Array.from({ length: concurrency }, async () => {
+              while (pageIdx < remainingPages.length) {
+                  const pageNum = remainingPages[pageIdx++];
+                  const data = await fetchRecentPage(pageNum, outerFromSec);
+                  extractRecentTracks(data);
+                  completedPages++;
+                  updateProgress(Math.floor((completedPages / rawTotalPages) * 100));
+              }
+          });
+
+          await Promise.all(workers);
+          updateProgress(100);
+          return { excludeKeys, includeKeys };
+      }
+
+      const tailPagesToFetch = Math.min(3, rawTotalPages);
+      if (tailPagesToFetch > 1) {
+          const extraTailPages = Array.from({ length: tailPagesToFetch - 1 }, (_, i) => i + 2);
+          const extraData = await Promise.all(extraTailPages.map(p => fetchRecentPage(p, outerFromSec)));
+          extraData.forEach(extractRecentTracks);
+      }
+
+      updateProgress(30);
+
+      const populateFromRangeChart = async (fromSec, targetSet) => {
+          const rangeMap = await fetchLfmScrobblesInRange(username, fromSec, nowSec, true);
+          for (const [key, count] of rangeMap.entries()) {
+              if (count > 0) {
+                  const sepIdx = key.indexOf('|-|');
+                  if (sepIdx !== -1) {
+                      addLfmIdentityKeysToSet(key.slice(0, sepIdx), key.slice(sepIdx + 3), targetSet);
+                  } else {
+                      targetSet.add(key);
+                  }
+              }
+          }
+      };
+
+      const rangePromises = [];
+      if (excludeKeys) {
+          const exPage1 = excludeFromSec === outerFromSec ? firstPageData : await fetchRecentPage(1, excludeFromSec);
+          const exTotalPages = parseInt(exPage1?.recenttracks?.['@attr']?.totalPages, 10) || 1;
+          if (exTotalPages <= maxRecentPages) {
+              if (excludeFromSec !== outerFromSec) extractRecentTracks(exPage1);
+              const rem = Array.from({ length: exTotalPages - 1 }, (_, i) => i + 2);
+              rangePromises.push(Promise.all(rem.map(p => fetchRecentPage(p, excludeFromSec))).then(list => list.forEach(extractRecentTracks)));
+          } else {
+              rangePromises.push(populateFromRangeChart(excludeFromSec, excludeKeys));
+          }
+      }
+
+      if (includeKeys) {
+          rangePromises.push(populateFromRangeChart(includeFromSec, includeKeys));
+      }
+
+      await Promise.all(rangePromises);
+      updateProgress(100);
+      return { excludeKeys, includeKeys };
+  }
+
+  async function fetchLfmScrobblesInRange(username, fromTs, toTs, strict = false) {
       const params = new URLSearchParams({
           method: 'user.getweeklytrackchart',
           user: username,
@@ -60141,17 +61423,30 @@ shadowRoot.innerHTML = `
       try {
           response = await fetchLfmWithGateway(params);
       } catch (e) {
+          if (strict) throw e;
           console.warn(`LFM fetch failed for range ${fromTs}-${toTs}`, e);
           return new Map();
       }
 
-      if (!response.ok) return new Map();
-      
-      let data;
-      try { data = await response.json(); } catch(e) { return new Map(); }
+      let data = null;
+      try { data = await response.json(); } catch (e) {
+          if (strict) throw new Error("Invalid response from Last.fm range chart.");
+          return new Map();
+      }
 
-      if (data.error) {
+      if (data?.error) {
+          if (strict) {
+              if (data.error === 17) {
+                  throw new Error("Last.fm profile is private. Please make your listening history public.");
+              }
+              throw new Error(data.message || "Last.fm API Error");
+          }
           console.warn(`LFM API Error: ${data.message}`);
+          return new Map();
+      }
+
+      if (!response.ok) {
+          if (strict) throw new Error(`Last.fm range request failed with status ${response.status}`);
           return new Map();
       }
 
@@ -60161,8 +61456,8 @@ shadowRoot.innerHTML = `
       if (trackArray.length >= 1000 && (toTs - fromTs) > 86400) {
           const midTs = Math.floor((fromTs + toTs) / 2);
           const [leftMap, rightMap] = await Promise.all([
-              fetchLfmScrobblesInRange(username, fromTs, midTs),
-              fetchLfmScrobblesInRange(username, midTs + 1, toTs)
+              fetchLfmScrobblesInRange(username, fromTs, midTs, strict),
+              fetchLfmScrobblesInRange(username, midTs + 1, toTs, strict)
           ]);
 
           const merged = new Map(leftMap);
