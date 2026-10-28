@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "6.11.0";
+  const SORT_PLAY_VERSION = "6.11.1";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -66666,7 +66666,7 @@ shadowRoot.innerHTML = `
             candidateArtistIds = (Spicetify.Player.data?.item?.artists || []).map(a => a.uri?.split(':')[2] || a.id).filter(Boolean);
         }
         if (!candidateArtistIds.length && anchorEl) {
-            const row = anchorEl.closest?.('.main-trackList-trackListRow, div[role="row"]');
+            const row = anchorEl.closest?.('.main-trackList-trackListRow, div[role="row"], [data-testid="watch-feed-view"]');
             if (row) {
                 const domArtistLinks = row.querySelectorAll('a[href*="/artist/"], a[href*=":artist:"]');
                 domArtistLinks.forEach(a => {
@@ -67077,17 +67077,17 @@ shadowRoot.innerHTML = `
             menu.appendChild(createDivider());
 
             let resolvedArtist = currentAlbumInfo?.artistName || null;
-            let resolvedTitle = null;
+            let resolvedTitle = currentAlbumInfo?.trackName || null;
 
             if (!resolvedArtist || !resolvedTitle) {
                 if (trackId === Spicetify.Player.data?.item?.uri?.split(':')[2] || uri === Spicetify.Player.data?.item?.uri) {
                     resolvedArtist = resolvedArtist || Spicetify.Player.data?.item?.artists?.[0]?.name || Spicetify.Player.data?.item?.metadata?.artist_name;
                     resolvedTitle = resolvedTitle || Spicetify.Player.data?.item?.name || Spicetify.Player.data?.item?.metadata?.title;
                 }
-                const row = anchorEl.closest?.('.main-trackList-trackListRow, div[role="row"]');
+                const row = anchorEl.closest?.('.main-trackList-trackListRow, div[role="row"], [data-testid="watch-feed-view"]');
                 if (row) {
-                    resolvedArtist = resolvedArtist || row.querySelector('a[href^="/artist/"]')?.textContent?.trim();
-                    resolvedTitle = resolvedTitle || row.querySelector('.main-trackList-rowTitle, [data-testid="tracklist-row-title"]')?.textContent?.trim();
+                    resolvedArtist = resolvedArtist || row.querySelector('a[href*="/artist/"]')?.textContent?.trim();
+                    resolvedTitle = resolvedTitle || row.querySelector('.main-trackList-rowTitle, [data-testid="tracklist-row-title"], a[href*="/track/"], [data-flip-id^="wf-title-"]')?.textContent?.trim();
                 }
                 if (isLocal && !resolvedTitle) {
                     const parts = uri.split(':');
@@ -67152,41 +67152,61 @@ shadowRoot.innerHTML = `
         document.body.appendChild(menu);
         updatePosition();
 
-        if (!isLocal && (!resolvedIsrc || !resolvedCurrentAlbum.id || !resolvedCurrentAlbum.name)) {
+        if (!isLocal && (!resolvedIsrc || !resolvedCurrentAlbum.id || !resolvedCurrentAlbum.name || !candidateArtistIds.length)) {
             (async () => {
                 let updated = false;
-                if (!resolvedIsrc) {
-                    const cachedMeta = await idb.get('trackMetadata', trackId);
-                    if (cachedMeta?.external_ids?.isrc) {
-                        resolvedIsrc = cachedMeta.external_ids.isrc;
+                const cached = await idb.get('trackMetadata', trackId);
+                if (cached) {
+                    if (!resolvedIsrc && cached.external_ids?.isrc) {
+                        resolvedIsrc = cached.external_ids.isrc;
                         updated = true;
-                    } else if (!trackId.startsWith("spotify:local:")) {
-                        try {
-                            const meta = await fetchCoreMetadataBatch([uri]);
-                            const core = meta.get(uri);
-                            if (core?.isrc) {
-                                resolvedIsrc = core.isrc;
-                                updated = true;
-                            }
-                        } catch (e) {}
                     }
-                }
-                if (!resolvedCurrentAlbum.id || !resolvedCurrentAlbum.name) {
-                    const cached = await idb.get('trackMetadata', trackId);
-                    if (cached?.album?.id) {
+                    if ((!resolvedCurrentAlbum.id || !resolvedCurrentAlbum.name) && cached.album?.id) {
                         resolvedCurrentAlbum.id = resolvedCurrentAlbum.id || cached.album.id;
                         resolvedCurrentAlbum.name = resolvedCurrentAlbum.name || cached.album.name;
                         updated = true;
-                    } else if (!trackId.startsWith("spotify:local:")) {
-                        try {
-                            const meta = await fetchInternalTrackMetadata(trackId);
-                            if (meta?.album?.id) {
-                                resolvedCurrentAlbum.id = resolvedCurrentAlbum.id || meta.album.id;
-                                resolvedCurrentAlbum.name = resolvedCurrentAlbum.name || meta.album.name;
+                    }
+                    if (!candidateArtistIds.length && cached.artists?.length) {
+                        candidateArtistIds = cached.artists.map(a => a.id || a.uri?.split(':')[2]).filter(Boolean);
+                        updated = true;
+                    }
+                }
+                if ((!resolvedIsrc || !resolvedCurrentAlbum.id || !resolvedCurrentAlbum.name || !candidateArtistIds.length) && !trackId.startsWith("spotify:local:")) {
+                    try {
+                        const meta = await fetchInternalTrackMetadata(trackId);
+                        if (meta) {
+                            const formatted = formatTrackCacheData(meta);
+                            if (cached) {
+                                if (cached.external_ids) formatted.external_ids = { ...cached.external_ids, ...formatted.external_ids };
+                                if (cached.album) formatted.album = { ...cached.album, ...formatted.album };
+                                if (cached.albumType) formatted.albumType = cached.albumType;
+                            }
+                            idb.set('trackMetadata', trackId, formatted);
+                            if (!resolvedIsrc && formatted.external_ids?.isrc) {
+                                resolvedIsrc = formatted.external_ids.isrc;
                                 updated = true;
                             }
-                        } catch (e) {}
-                    }
+                            if (formatted.album?.id) {
+                                resolvedCurrentAlbum.id = resolvedCurrentAlbum.id || formatted.album.id;
+                                resolvedCurrentAlbum.name = resolvedCurrentAlbum.name || formatted.album.name;
+                                updated = true;
+                            }
+                            if (!candidateArtistIds.length && formatted.artists?.length) {
+                                candidateArtistIds = formatted.artists.map(a => a.id || a.uri?.split(':')[2]).filter(Boolean);
+                                updated = true;
+                            }
+                        }
+                    } catch (e) {}
+                }
+                if (!resolvedIsrc && !trackId.startsWith("spotify:local:")) {
+                    try {
+                        const meta = await fetchCoreMetadataBatch([uri]);
+                        const core = meta.get(uri);
+                        if (core?.isrc) {
+                            resolvedIsrc = core.isrc;
+                            updated = true;
+                        }
+                    } catch (e) {}
                 }
                 if (updated && likeButton_activeMenu === menu) {
                     renderMenuContent();
@@ -67227,19 +67247,15 @@ shadowRoot.innerHTML = `
 
     const LikeButton = Spicetify.React.memo(function LikeButton({ uri, classList, size = 16.3, dynamicSizeSelector = null, buttonStyle = { marginRight: "12px" }, currentAlbum = null, artistIds = [] }) {
         const trackId = uri.startsWith("spotify:local:") ? uri : uri.replace("spotify:track:", "");
+        const artistIdsKey = (artistIds || []).filter(Boolean).join(",");
         const [currentSize, setCurrentSize] = Spicetify.React.useState(size);
         const [isrc, setISRC] = Spicetify.React.useState(null);
-        const [effectiveArtistIds, setEffectiveArtistIds] = Spicetify.React.useState(artistIds);
+        const [effectiveArtistIds, setEffectiveArtistIds] = Spicetify.React.useState(() => artistIdsKey ? artistIdsKey.split(",") : []);
         const [isLiked, setIsLiked] = Spicetify.React.useState(likeButton_likedTracksById.has(trackId));
         const [savedCount, setSavedCount] = Spicetify.React.useState(0);
         const [isHovered, setIsHovered] = Spicetify.React.useState(false);
         const buttonRef = Spicetify.React.useRef(null);
-
-        Spicetify.React.useEffect(() => {
-            setIsLiked(likeButton_likedTracksById.has(trackId));
-            setSavedCount(0);
-            setISRC(null);
-        }, [trackId]);
+        const prevTrackIdRef = Spicetify.React.useRef(trackId);
 
         const hasISRCLiked = savedCount > 0 && !isLiked;
 
@@ -67282,36 +67298,59 @@ shadowRoot.innerHTML = `
         }, [dynamicSizeSelector]);
 
         Spicetify.React.useEffect(() => {
-            setEffectiveArtistIds(artistIds);
-        }, [artistIds]);
+            let cancelled = false;
+            const initialArtistIds = artistIdsKey ? artistIdsKey.split(",") : [];
+            if (prevTrackIdRef.current !== trackId) {
+                prevTrackIdRef.current = trackId;
+                setISRC(null);
+                setSavedCount(0);
+            }
+            setIsLiked(likeButton_likedTracksById.has(trackId));
+            setEffectiveArtistIds(initialArtistIds);
 
-        Spicetify.React.useEffect(() => {
             async function initISRC() {
                 try {
-                    if (trackId.startsWith("spotify:local:")) return;
-                    let currentIsrc = likeButton_likedTracksById.get(trackId)?.isrc || null;
-                    let resolvedIds = [...effectiveArtistIds];
+                    if (trackId.startsWith("spotify:local:")) {
+                        setISRC(null);
+                        setSavedCount(0);
+                        return;
+                    }
+                    const likedEntry = likeButton_likedTracksById.get(trackId);
+                    let currentIsrc = likedEntry?.isrc || null;
+                    let resolvedIds = initialArtistIds.length > 0 ? [...initialArtistIds] : (likedEntry?.artistIds?.length ? [...likedEntry.artistIds] : []);
 
                     if (!currentIsrc || resolvedIds.length === 0) {
                         const meta = await idb.get('trackMetadata', trackId);
+                        if (cancelled) return;
                         if (meta) {
                             if (!currentIsrc && meta.external_ids?.isrc) currentIsrc = meta.external_ids.isrc;
-                            if (resolvedIds.length === 0 && meta.artists) {
+                            if (resolvedIds.length === 0 && meta.artists?.length) {
                                 resolvedIds = meta.artists.map(a => a.id || a.uri?.split(':')[2]).filter(Boolean);
                             }
-                        } else if (trackId && !trackId.startsWith("spotify:local:")) {
+                        }
+                        const needsArtistVerification = resolvedIds.length === 0 && Boolean(currentIsrc && likeButton_likedTracksByIsrc.has(currentIsrc));
+                        if ((!currentIsrc || needsArtistVerification) && trackId && !trackId.startsWith("spotify:local:")) {
                             const track = await fetchInternalTrackMetadata(trackId);
+                            if (cancelled) return;
                             if (track) {
                                 if (!currentIsrc && track.external_ids?.isrc) currentIsrc = track.external_ids.isrc;
-                                if (resolvedIds.length === 0 && track.artists) {
+                                if (resolvedIds.length === 0 && track.artists?.length) {
                                     resolvedIds = track.artists.map(a => a.id || a.uri?.split(':')[2]).filter(Boolean);
                                 }
-                                idb.set('trackMetadata', trackId, formatTrackCacheData(track));
+                                const formatted = formatTrackCacheData(track);
+                                if (meta) {
+                                    if (meta.external_ids) formatted.external_ids = { ...meta.external_ids, ...formatted.external_ids };
+                                    if (meta.album) formatted.album = { ...meta.album, ...formatted.album };
+                                    if (meta.albumType) formatted.albumType = meta.albumType;
+                                }
+                                idb.set('trackMetadata', trackId, formatted);
                             }
                         }
                     }
 
-                    if (resolvedIds.length > 0 && resolvedIds.length !== effectiveArtistIds.length) {
+                    if (cancelled) return;
+
+                    if (resolvedIds.length > 0 && resolvedIds.join(",") !== initialArtistIds.join(",")) {
                         setEffectiveArtistIds(resolvedIds);
                     }
 
@@ -67319,29 +67358,59 @@ shadowRoot.innerHTML = `
                         setISRC(currentIsrc);
                         if (likeButton_likedTracksById.has(trackId)) {
                             const entry = likeButton_likedTracksById.get(trackId);
-                            if (!entry.isrc) {
-                                entry.isrc = currentIsrc;
+                            if (entry && (!entry.isrc || (!entry.artistIds?.length && resolvedIds.length > 0))) {
+                                if (!entry.isrc) entry.isrc = currentIsrc;
+                                if (!entry.artistIds?.length && resolvedIds.length > 0) entry.artistIds = resolvedIds;
                                 likeButton_addLikedTrack(entry);
                             }
                         }
                         const count = likeButton_getMatchingSavedTracks(currentIsrc, resolvedIds).length;
                         setSavedCount(count);
+                    } else {
+                        setISRC(null);
+                        setSavedCount(0);
                     }
                 } catch (error) {}
             }
             initISRC();
-        }, [trackId, effectiveArtistIds]);
+            return () => { cancelled = true; };
+        }, [trackId, artistIdsKey]);
 
         Spicetify.React.useEffect(() => {
-            const handleLikedTracksChange = () => {
+            let cancelled = false;
+            const handleLikedTracksChange = async () => {
                 setIsLiked(likeButton_likedTracksById.has(trackId));
-                if (isrc) {
-                    setSavedCount(likeButton_getMatchingSavedTracks(isrc, effectiveArtistIds).length);
+                const currentIsrc = isrc || likeButton_likedTracksById.get(trackId)?.isrc;
+                if (!currentIsrc) return;
+                if (!isrc) setISRC(currentIsrc);
+                let ids = effectiveArtistIds;
+                if (ids.length === 0 && likeButton_likedTracksByIsrc.has(currentIsrc) && !trackId.startsWith("spotify:local:")) {
+                    const meta = await idb.get('trackMetadata', trackId);
+                    if (cancelled) return;
+                    if (meta?.artists?.length) {
+                        ids = meta.artists.map(a => a.id || a.uri?.split(':')[2]).filter(Boolean);
+                    } else {
+                        const track = await fetchInternalTrackMetadata(trackId);
+                        if (cancelled) return;
+                        if (track?.artists?.length) {
+                            ids = track.artists.map(a => a.id || a.uri?.split(':')[2]).filter(Boolean);
+                            const formatted = formatTrackCacheData(track);
+                            if (meta) {
+                                if (meta.external_ids) formatted.external_ids = { ...meta.external_ids, ...formatted.external_ids };
+                                if (meta.album) formatted.album = { ...meta.album, ...formatted.album };
+                                if (meta.albumType) formatted.albumType = meta.albumType;
+                            }
+                            idb.set('trackMetadata', trackId, formatted);
+                        }
+                    }
+                    if (ids.length > 0) setEffectiveArtistIds(ids);
                 }
+                setSavedCount(likeButton_getMatchingSavedTracks(currentIsrc, ids).length);
             };
 
             document.addEventListener('likeButton_likedTracksChange', handleLikedTracksChange);
             return () => {
+                cancelled = true;
                 document.removeEventListener('likeButton_likedTracksChange', handleLikedTracksChange);
             };
         }, [trackId, isrc, effectiveArtistIds]);
@@ -67374,14 +67443,20 @@ shadowRoot.innerHTML = `
                     } catch (_) {}
                     let currentAlbumId = currentAlbum?.id;
                     let currentAlbumName = currentAlbum?.name;
-                    let trackTitle = null;
+                    let trackTitle = currentAlbum?.trackName || null;
                     let currentArtistIds = effectiveArtistIds?.length ? [...effectiveArtistIds] : [...artistIds];
                     if (trackId === Spicetify.Player.data?.item?.uri?.split(':')[2] || uri === Spicetify.Player.data?.item?.uri) {
                         currentAlbumId = currentAlbumId || Spicetify.Player.data?.item?.album?.uri?.split(':')[2];
                         currentAlbumName = currentAlbumName || Spicetify.Player.data?.item?.album?.name;
-                        trackTitle = Spicetify.Player.data?.item?.name;
+                        trackTitle = trackTitle || Spicetify.Player.data?.item?.name;
                         if (!currentArtistIds.length) {
                             currentArtistIds = (Spicetify.Player.data?.item?.artists || []).map(a => a.uri?.split(':')[2] || a.id).filter(Boolean);
+                        }
+                    }
+                    if (!trackTitle && buttonRef.current) {
+                        const row = buttonRef.current.closest?.('.main-trackList-trackListRow, div[role="row"], [data-testid="watch-feed-view"]');
+                        if (row) {
+                            trackTitle = row.querySelector('.main-trackList-rowTitle, [data-testid="tracklist-row-title"], a[href*="/track/"], [data-flip-id^="wf-title-"]')?.textContent?.trim() || null;
                         }
                     }
                     if (!trackTitle && trackId.startsWith("spotify:local:")) {
@@ -67389,16 +67464,31 @@ shadowRoot.innerHTML = `
                         if (parts.length >= 5) trackTitle = decodeURIComponent(parts[4].replace(/\+/g, ' '));
                         if (!currentAlbumName && parts.length >= 4) currentAlbumName = decodeURIComponent(parts[3].replace(/\+/g, ' '));
                     }
-                    if (!trackTitle && !trackId.startsWith("spotify:local:")) {
-                        const cached = await idb.get('trackMetadata', trackId);
-                        trackTitle = cached?.name;
+                    let resolvedIsrc = isrc;
+                    if ((!trackTitle || !currentAlbumId || !currentAlbumName || !currentArtistIds.length || !resolvedIsrc) && !trackId.startsWith("spotify:local:")) {
+                        let cached = await idb.get('trackMetadata', trackId);
+                        if (!cached?.name || !cached?.album?.id || !cached?.artists?.length) {
+                            const fetched = await fetchInternalTrackMetadata(trackId);
+                            if (fetched) {
+                                const formatted = formatTrackCacheData(fetched);
+                                if (cached) {
+                                    if (cached.external_ids) formatted.external_ids = { ...cached.external_ids, ...formatted.external_ids };
+                                    if (cached.album) formatted.album = { ...cached.album, ...formatted.album };
+                                    if (cached.albumType) formatted.albumType = cached.albumType;
+                                }
+                                cached = formatted;
+                                idb.set('trackMetadata', trackId, cached);
+                            }
+                        }
+                        trackTitle = trackTitle || cached?.name;
                         currentAlbumId = currentAlbumId || cached?.album?.id;
                         currentAlbumName = currentAlbumName || cached?.album?.name;
+                        resolvedIsrc = resolvedIsrc || cached?.external_ids?.isrc || null;
                         if (!currentArtistIds.length && cached?.artists) {
                             currentArtistIds = cached.artists.map(a => a.id || a.uri?.split(':')[2]).filter(Boolean);
                         }
                     }
-                    likeButton_addLikedTrack({ trackId, uri, name: trackTitle || "Track", albumId: currentAlbumId, albumName: currentAlbumName || "Album", isrc, artistIds: currentArtistIds }, true);
+                    likeButton_addLikedTrack({ trackId, uri, name: trackTitle || "Track", albumId: currentAlbumId, albumName: currentAlbumName || "Album", isrc: resolvedIsrc, artistIds: currentArtistIds }, true);
                     document.dispatchEvent(likeButton_likedTracksChangeEvent);
                 } catch (error) {
                     showNotification("Failed to like song.", true);
@@ -67778,144 +67868,228 @@ shadowRoot.innerHTML = `
         } catch (error) {}
     }
     
-    async function mountLikeButtonWatchFeed(targetUri = null) {
-        const MAX_RETRIES = 15;
-        let retryDelay = 200;
-    
-        const watchFeedView = document.querySelector('[data-testid="watch-feed-view"]');
-        if (likeButtonConfig.watchFeed === false || !watchFeedView) {
+    let mountLikeButtonWf_retryTimer = null;
+
+    function mountLikeButtonWatchFeed() {
+        if (mountLikeButtonWf_retryTimer) {
+            clearTimeout(mountLikeButtonWf_retryTimer);
+            mountLikeButtonWf_retryTimer = null;
+        }
+
+        const watchFeedViews = Array.from(document.querySelectorAll('[data-testid="watch-feed-view"]'));
+        if (likeButtonConfig.watchFeed === false || watchFeedViews.length === 0) {
             document.querySelectorAll(".likeControl-wrapper-wf").forEach(el => {
                 Spicetify.ReactDOM.unmountComponentAtNode(el);
                 el.remove();
             });
             return;
         }
-    
-        for (let i = 0; i < MAX_RETRIES; i++) {
-            const currentWatchFeedView = document.querySelector('[data-testid="watch-feed-view"]');
-            if (!currentWatchFeedView) {
-                await new Promise(resolve => setTimeout(resolve, retryDelay));
-                retryDelay = Math.min(retryDelay * 1.5, 1000);
-                continue;
-            }
 
-            let uri = null;
-            const trackLink = currentWatchFeedView.querySelector('a[href^="/track/"]');
-            const titleNode = currentWatchFeedView.querySelector('[data-flip-id^="wf-title-spotify:track:"]');
-            
-            if (trackLink) {
-                const href = trackLink.getAttribute('href');
-                const trackId = href.split('?')[0].split('/track/')[1];
-                if (trackId) uri = `spotify:track:${trackId}`;
-            } else if (titleNode) {
-                uri = titleNode.getAttribute('data-flip-id').replace('wf-title-', '');
-            }
-
-            const queueBtn = currentWatchFeedView.querySelector('button[data-testid="add-button"]');
-            const shareBtn = currentWatchFeedView.querySelector('.main-watchFeed-shareButton');
-            const actionContainer = queueBtn ? queueBtn.parentElement : (shareBtn ? shareBtn.parentElement : null);
-
-            if (!uri && actionContainer) {
-                let curr = actionContainer;
-                const findUri = (obj, maxDepth = 15, visited = new Set()) => {
-                    if (!obj || typeof obj !== 'object' || maxDepth <= 0 || visited.has(obj)) return null;
-                    visited.add(obj);
-                    if (obj.uri && typeof obj.uri === 'string' && obj.uri.startsWith('spotify:track:')) return obj.uri;
-                    if (obj.trackUri && typeof obj.trackUri === 'string' && obj.trackUri.startsWith('spotify:track:')) return obj.trackUri;
-                    for (const k in obj) {
-                        if (['children', 'props', 'value', 'item', 'track', 'onAction', 'onClick'].includes(k) || !isNaN(k)) {
-                            const res = findUri(obj[k], maxDepth - 1, visited);
-                            if (res) return res;
-                        }
-                    }
-                    return null;
-                };
-
-                while (curr && !uri && curr !== document.body) {
-                    const reactPropsKey = Object.keys(curr).find(key => key.startsWith("__reactProps$"));
-                    if (reactPropsKey) {
-                        uri = findUri(curr[reactPropsKey]);
-                    }
-                    curr = curr.parentElement;
+        const findUriInProps = (obj, maxDepth = 5, visited = new Set()) => {
+            if (!obj || typeof obj !== 'object' || maxDepth <= 0 || visited.has(obj)) return null;
+            visited.add(obj);
+            if (typeof obj.uri === 'string' && obj.uri.startsWith('spotify:track:')) return obj.uri;
+            if (typeof obj.trackUri === 'string' && obj.trackUri.startsWith('spotify:track:')) return obj.trackUri;
+            for (const k in obj) {
+                if (['children', 'props', 'memoizedProps', 'pendingProps', 'value', 'item', 'track', 'data', 'entity', 'onAction', 'onClick'].includes(k) || !isNaN(k)) {
+                    const res = findUriInProps(obj[k], maxDepth - 1, visited);
+                    if (res) return res;
                 }
             }
+            return null;
+        };
 
-            if (!uri || !actionContainer) {
-                await new Promise(resolve => setTimeout(resolve, retryDelay));
-                retryDelay = Math.min(retryDelay * 1.5, 1000);
-                continue;
-            }
+        let attempt = 0;
+        const MAX_RETRIES = 15;
 
-            const playlistBtn = actionContainer.querySelector('button[aria-label="Add to playlist"]') || 
-                                actionContainer.querySelector('button[aria-label="Add to Liked Songs"]') ||
-                                actionContainer.querySelector('button[aria-checked="true"]') ||
-                                actionContainer.querySelector('button[aria-checked="false"]');
-            
-            const templateButton = playlistBtn || queueBtn || shareBtn || actionContainer.querySelector('button');
+        const processViews = () => {
+            mountLikeButtonWf_retryTimer = null;
+            const currentViews = Array.from(document.querySelectorAll('[data-testid="watch-feed-view"]'));
+            if (likeButtonConfig.watchFeed === false || currentViews.length === 0) return;
 
-            if (!templateButton) {
-                await new Promise(resolve => setTimeout(resolve, retryDelay));
-                retryDelay = Math.min(retryDelay * 1.5, 1000);
-                continue;
-            }
+            let needsRetry = false;
 
-            let wrapper = actionContainer.querySelector(".likeControl-wrapper-wf");
-            if (!wrapper) {
-                wrapper = document.createElement("div");
-                wrapper.className = "likeControl-wrapper-wf";
-                wrapper.style.display = "contents";
-                try {
-                    if (playlistBtn) {
-                        playlistBtn.insertAdjacentElement('beforebegin', wrapper);
-                    } else if (queueBtn) {
-                        queueBtn.insertAdjacentElement('afterend', wrapper);
-                    } else {
-                        actionContainer.appendChild(wrapper);
+            for (const currentWatchFeedView of currentViews) {
+                let uri = null;
+                const trackLink = currentWatchFeedView.querySelector('a[href^="/track/"], a[href*="/track/"]');
+                const titleNode = currentWatchFeedView.querySelector('[data-flip-id^="wf-title-spotify:track:"]');
+
+                if (trackLink) {
+                    const href = trackLink.getAttribute('href') || '';
+                    const match = href.match(/\/track\/([a-zA-Z0-9]+)/);
+                    if (match) uri = `spotify:track:${match[1]}`;
+                } else if (titleNode) {
+                    uri = titleNode.getAttribute('data-flip-id').replace('wf-title-', '');
+                }
+
+                const queueBtn = currentWatchFeedView.querySelector('button[data-testid="add-button"]');
+                const shareBtn = currentWatchFeedView.querySelector('.main-watchFeed-shareButton, button[aria-label="Copy link to Song"], button[aria-label*="link" i]');
+                const actionContainer = queueBtn ? queueBtn.parentElement : (shareBtn ? shareBtn.parentElement : null);
+
+                if (!uri && actionContainer) {
+                    let curr = queueBtn || shareBtn || actionContainer;
+                    while (curr && !uri && curr !== document.body) {
+                        const propsKey = Object.keys(curr).find(k => k.startsWith("__reactProps$"));
+                        if (propsKey) {
+                            uri = findUriInProps(curr[propsKey], 6);
+                        }
+                        if (!uri) {
+                            const fiberKey = Object.keys(curr).find(k => k.startsWith("__reactFiber$"));
+                            let fiber = fiberKey ? curr[fiberKey] : null;
+                            let fDepth = 0;
+                            while (fiber && !uri && fDepth < 10) {
+                                if (fiber.stateNode instanceof Element && !currentWatchFeedView.contains(fiber.stateNode)) break;
+                                uri = findUriInProps(fiber.pendingProps || fiber.memoizedProps, 4);
+                                fiber = fiber.return;
+                                fDepth++;
+                            }
+                        }
+                        if (curr === currentWatchFeedView) break;
+                        curr = curr.parentElement;
                     }
-                } catch (error) {
-                    await new Promise(resolve => setTimeout(resolve, retryDelay));
-                    retryDelay = Math.min(retryDelay * 1.5, 1000);
+                }
+
+                if (!uri || !actionContainer) {
+                    needsRetry = true;
                     continue;
                 }
-            }
-    
-            if (wrapper.dataset.renderedUri === uri && wrapper.firstChild) {
-                return;
-            }
-    
-            try {
-                let cleanClassList = templateButton.className
-                    .replace(/encore-internal-color-text-bright-accent/g, '')
-                    .replace(/encore-internal-color-text-subdued/g, '')
-                    .replace(/boFkCF4QGEeMQzn5/g, '')
-                    .trim();
 
-                const curAlbumId = Spicetify.Player.data?.item?.album?.uri?.split(':')[2] || Spicetify.Player.data?.item?.metadata?.album_uri?.split(':')[2] || null;
-                const curAlbumName = Spicetify.Player.data?.item?.album?.name || Spicetify.Player.data?.item?.metadata?.album_title || null;
-                const curArtistIds = (Spicetify.Player.data?.item?.artists || []).map(a => a.uri?.split(':')[2] || a.id).filter(Boolean);
-                Spicetify.ReactDOM.render(
-                    Spicetify.React.createElement(LikeButton, {
-                        uri: uri,
-                        key: uri,
-                        classList: cleanClassList,
-                        size: 30,
-                        dynamicSizeSelector: null,
-                        buttonStyle: { marginRight: "0px", marginTop: "1px", display: "flex", alignItems: "center", justifyContent: "center" },
-                        currentAlbum: { id: curAlbumId, name: curAlbumName },
-                        artistIds: curArtistIds
-                    }),
-                    wrapper
-                );
-                
-                wrapper.dataset.renderedUri = uri;
-                return;
-                
-            } catch (error) {
-                console.error(`[Sort-Play Like Button WF] React render error`, error);
-                await new Promise(resolve => setTimeout(resolve, retryDelay));
-                retryDelay = Math.min(retryDelay * 1.5, 1000);
+                const playlistBtn = actionContainer.querySelector('button[aria-label="Add to playlist"]:not(.sort-play-like-button)') ||
+                                    actionContainer.querySelector('button[aria-label="Add to Liked Songs"]:not(.sort-play-like-button)') ||
+                                    actionContainer.querySelector('button[aria-checked="true"]:not(.sort-play-like-button)') ||
+                                    actionContainer.querySelector('button[aria-checked="false"]:not(.sort-play-like-button)');
+
+                const templateButton = playlistBtn || queueBtn || shareBtn || actionContainer.querySelector('button:not(.sort-play-like-button)');
+                if (!templateButton) {
+                    needsRetry = true;
+                    continue;
+                }
+
+                const curArtistIds = [];
+                let curArtistName = null;
+                currentWatchFeedView.querySelectorAll('a[href*="/artist/"], a[href*=":artist:"]').forEach(a => {
+                    const href = a.getAttribute('href') || '';
+                    const match = href.match(/artist[/:]([a-zA-Z0-9]+)/);
+                    if (match && !curArtistIds.includes(match[1])) curArtistIds.push(match[1]);
+                    if (!curArtistName) curArtistName = a.textContent?.trim() || null;
+                });
+
+                let curAlbumId = null;
+                let curAlbumName = null;
+                const albumLink = currentWatchFeedView.querySelector('a[href*="/album/"], a[href*=":album:"]');
+                if (albumLink) {
+                    const albHref = albumLink.getAttribute('href') || '';
+                    const albMatch = albHref.match(/album[/:]([a-zA-Z0-9]+)/);
+                    if (albMatch) curAlbumId = albMatch[1];
+                    curAlbumName = albumLink.textContent?.trim() || null;
+                }
+
+                let curTrackName = trackLink?.textContent?.trim() || titleNode?.textContent?.trim() || null;
+
+                const playerItem = (Spicetify.Player.data?.item?.uri === uri) ? Spicetify.Player.data.item : null;
+                if (playerItem) {
+                    curAlbumId = curAlbumId || playerItem.album?.uri?.split(':')[2] || playerItem.metadata?.album_uri?.split(':')[2] || null;
+                    curAlbumName = curAlbumName || playerItem.album?.name || playerItem.metadata?.album_title || null;
+                    curTrackName = curTrackName || playerItem.name || playerItem.metadata?.title || null;
+                    curArtistName = curArtistName || playerItem.artists?.[0]?.name || playerItem.metadata?.artist_name || null;
+                    (playerItem.artists || []).forEach(a => {
+                        const id = a.uri?.split(':')[2] || a.id;
+                        if (id && !curArtistIds.includes(id)) curArtistIds.push(id);
+                    });
+                    if (!curArtistIds.length && playerItem.metadata?.artist_uri) {
+                        const id = playerItem.metadata.artist_uri.split(':')[2];
+                        if (id) curArtistIds.push(id);
+                    }
+                }
+
+                const existingWrappers = actionContainer.querySelectorAll(".likeControl-wrapper-wf");
+                if (existingWrappers.length > 1) {
+                    existingWrappers.forEach((el, idx) => {
+                        if (idx > 0) {
+                            Spicetify.ReactDOM.unmountComponentAtNode(el);
+                            el.remove();
+                        }
+                    });
+                }
+                let wrapper = existingWrappers[0] || null;
+                if (!wrapper) {
+                    wrapper = document.createElement("div");
+                    wrapper.className = "likeControl-wrapper-wf";
+                    wrapper.style.display = "contents";
+                    const stopSecondary = (e) => {
+                        if (e.button === 2) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                        }
+                    };
+                    wrapper.addEventListener('contextmenu', (e) => { e.preventDefault(); e.stopPropagation(); });
+                    wrapper.addEventListener('mousedown', stopSecondary);
+                    wrapper.addEventListener('pointerdown', stopSecondary);
+                    wrapper.addEventListener('mouseup', stopSecondary);
+                    wrapper.addEventListener('pointerup', stopSecondary);
+                    try {
+                        if (playlistBtn) {
+                            playlistBtn.insertAdjacentElement('beforebegin', wrapper);
+                        } else if (queueBtn) {
+                            queueBtn.insertAdjacentElement('afterend', wrapper);
+                        } else {
+                            actionContainer.appendChild(wrapper);
+                        }
+                    } catch (error) {
+                        needsRetry = true;
+                        continue;
+                    }
+                }
+
+                if (playlistBtn && wrapper.nextElementSibling !== playlistBtn) {
+                    try {
+                        playlistBtn.insertAdjacentElement('beforebegin', wrapper);
+                    } catch (_) {}
+                }
+
+                const artistsKey = curArtistIds.join(",");
+                if (wrapper.dataset.renderedUri === uri && wrapper.dataset.renderedArtists === artistsKey && wrapper.firstChild) {
+                    continue;
+                }
+
+                try {
+                    const cleanClassList = templateButton.className
+                        .replace(/\bsort-play-like-button\b/g, '')
+                        .replace(/\bencore-internal-color-text-bright-accent\b/g, '')
+                        .replace(/\bencore-internal-color-text-subdued\b/g, '')
+                        .replace(/\bboFkCF4QGEeMQzn5\b/g, '')
+                        .trim();
+
+                    Spicetify.ReactDOM.render(
+                        Spicetify.React.createElement(LikeButton, {
+                            uri: uri,
+                            key: uri,
+                            classList: cleanClassList,
+                            size: 30,
+                            dynamicSizeSelector: null,
+                            buttonStyle: { marginRight: "0px", marginTop: "1px", display: "flex", alignItems: "center", justifyContent: "center" },
+                            currentAlbum: { id: curAlbumId, name: curAlbumName, artistName: curArtistName, trackName: curTrackName },
+                            artistIds: curArtistIds
+                        }),
+                        wrapper
+                    );
+
+                    wrapper.dataset.renderedUri = uri;
+                    wrapper.dataset.renderedArtists = artistsKey;
+                } catch (error) {
+                    console.error(`[Sort-Play Like Button WF] React render error`, error);
+                    needsRetry = true;
+                }
             }
-        }
+
+            if (needsRetry && attempt < MAX_RETRIES) {
+                attempt++;
+                const delayMs = Math.min(200 * Math.pow(1.4, attempt - 1), 1000);
+                mountLikeButtonWf_retryTimer = setTimeout(processViews, delayMs);
+            }
+        };
+
+        processViews();
     }
 
     (async function initialize() {
@@ -68119,6 +68293,19 @@ shadowRoot.innerHTML = `
             const match = href.match(/artist[/:]([a-zA-Z0-9]+)/);
             if (match && !artistIds.includes(match[1])) artistIds.push(match[1]);
         });
+        if (artistIds.length === 0) {
+            const pageUri = getCurrentUri();
+            if (pageUri && Spicetify.URI.isArtist(pageUri)) {
+                const pageArtistId = pageUri.split(':')[2];
+                if (pageArtistId) artistIds.push(pageArtistId);
+            } else if (pageUri && Spicetify.URI.isAlbum(pageUri)) {
+                document.querySelectorAll('[data-testid="creator-link"][href*="/artist/"], .main-entityHeader-headerText a[href*="/artist/"], [data-testid="entity-header"] a[href*="/artist/"]').forEach(a => {
+                    const href = a.getAttribute('href') || '';
+                    const match = href.match(/artist[/:]([a-zA-Z0-9]+)/);
+                    if (match && !artistIds.includes(match[1])) artistIds.push(match[1]);
+                });
+            }
+        }
         
         targetRow.classList.add("sort-play-like-button-injected");
         
@@ -68208,44 +68395,33 @@ shadowRoot.innerHTML = `
         mountLikeButtonNowPlayingView();
         mountLikeButtonWatchFeed();
     
-        likeButton_tracklistObserver = new MutationObserver((mutations) => {
-            const currentUri = Spicetify.Player.data?.item?.uri;
-            if (currentUri && (currentUri.startsWith("spotify:track:") || currentUri.startsWith("spotify:local:"))) {
-                const npBar = document.querySelector('.main-nowPlayingWidget-nowPlaying .likeControl-wrapper, [data-testid^="now-playing-widget"] .likeControl-wrapper, .main-nowPlayingBar-left .likeControl-wrapper');
-                if (likeButtonConfig.nowPlayingBar && (!npBar || npBar.dataset.renderedUri !== currentUri)) {
-                    mountLikeButton(currentUri);
-                }
-                
-                const rightSidebar = document.querySelector('.main-nowPlayingView-contextItemInfo, [data-testid="NPV_Panel_OpenDiv"], .Root__right-sidebar, aside:not(.main-nowPlayingBar-container)');
-                if (likeButtonConfig.nowPlayingView && rightSidebar) {
-                    const trackScope = document.querySelector('.main-nowPlayingView-contextItemInfo, [data-testid="NPV_Panel_OpenDiv"]');
-                    const npvContainer = document.querySelector('.likeControl-wrapper-npv');
-                    if (!npvContainer || (trackScope && !trackScope.contains(npvContainer)) || npvContainer.dataset.renderedUri !== currentUri) {
-                        mountLikeButtonNowPlayingView(currentUri);
-                    }
-                }
-            }
+        const INTERNAL_LIKE_SELECTOR = '.likeControl-wrapper, .likeControl-wrapper-npv, .likeControl-wrapper-wf, .like-button-tooltip, .sort-play-custom-tooltip, .sort-play-like-menu-root';
+        const isInternalLikeElement = (el) => Boolean(
+            el?.classList && (
+                el.classList.contains('likeControl-wrapper') ||
+                el.classList.contains('likeControl-wrapper-npv') ||
+                el.classList.contains('likeControl-wrapper-wf') ||
+                el.classList.contains('like-button-tooltip') ||
+                el.classList.contains('sort-play-custom-tooltip') ||
+                el.classList.contains('sort-play-like-menu-root')
+            )
+        );
 
-            const watchFeedView = document.querySelector('[data-testid="watch-feed-view"]');
-            if (watchFeedView) {
-                mountLikeButtonWatchFeed();
-            }
-    
+        likeButton_tracklistObserver = new MutationObserver((mutations) => {
+            let hasExternalMutation = false;
             const rowsToProcess = new Set();
 
             for (const mutation of mutations) {
-                if (mutation.target.closest && (mutation.target.closest('.likeControl-wrapper-npv') || mutation.target.closest('.likeControl-wrapper-wf') || mutation.target.closest('.likeControl-wrapper'))) {
+                const target = mutation.target;
+                if (!target || target.nodeType !== Node.ELEMENT_NODE) continue;
+                if (isInternalLikeElement(target) || target.closest?.(INTERNAL_LIKE_SELECTOR)) {
                     continue;
                 }
 
-                const parentRow = mutation.target.closest?.('.main-trackList-trackListRow, div[role="row"]:not([aria-rowindex="1"])');
-                if (parentRow) rowsToProcess.add(parentRow);
-                
+                let addedOrRemovedExternal = mutation.type === 'attributes';
                 for (const node of mutation.addedNodes) {
-                    if (node.nodeType === Node.ELEMENT_NODE) {
-                        if (node.classList && (node.classList.contains('likeControl-wrapper-npv') || node.classList.contains('likeControl-wrapper-wf') || node.classList.contains('likeControl-wrapper'))) {
-                            continue;
-                        }
+                    if (node.nodeType === Node.ELEMENT_NODE && !isInternalLikeElement(node)) {
+                        addedOrRemovedExternal = true;
                         if (node.getAttribute?.('role') === 'row' || node.classList?.contains('main-trackList-trackListRow')) {
                             rowsToProcess.add(node);
                         } else if (node.querySelectorAll) {
@@ -68253,14 +68429,53 @@ shadowRoot.innerHTML = `
                         }
                     }
                 }
+                if (!addedOrRemovedExternal) {
+                    for (const node of mutation.removedNodes) {
+                        if (node.nodeType === Node.ELEMENT_NODE && !isInternalLikeElement(node)) {
+                            addedOrRemovedExternal = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (!addedOrRemovedExternal) continue;
+                hasExternalMutation = true;
+
+                const parentRow = target.closest?.('.main-trackList-trackListRow, div[role="row"]:not([aria-rowindex="1"])');
+                if (parentRow) rowsToProcess.add(parentRow);
             }
 
+          if (!hasExternalMutation) return;
+
+          const currentUri = Spicetify.Player.data?.item?.uri;
+          if (currentUri && (currentUri.startsWith("spotify:track:") || currentUri.startsWith("spotify:local:"))) {
+              const npBar = document.querySelector('.main-nowPlayingWidget-nowPlaying .likeControl-wrapper, [data-testid^="now-playing-widget"] .likeControl-wrapper, .main-nowPlayingBar-left .likeControl-wrapper');
+              if (likeButtonConfig.nowPlayingBar && (!npBar || npBar.dataset.renderedUri !== currentUri)) {
+                  mountLikeButton(currentUri);
+              }
+              
+              const rightSidebar = document.querySelector('.main-nowPlayingView-contextItemInfo, [data-testid="NPV_Panel_OpenDiv"], .Root__right-sidebar, aside:not(.main-nowPlayingBar-container)');
+              if (likeButtonConfig.nowPlayingView && rightSidebar) {
+                  const trackScope = document.querySelector('.main-nowPlayingView-contextItemInfo, [data-testid="NPV_Panel_OpenDiv"]');
+                  const npvContainer = document.querySelector('.likeControl-wrapper-npv');
+                  if (!npvContainer || (trackScope && !trackScope.contains(npvContainer)) || npvContainer.dataset.renderedUri !== currentUri) {
+                      mountLikeButtonNowPlayingView(currentUri);
+                  }
+              }
+          }
+
+          const watchFeedView = document.querySelector('[data-testid="watch-feed-view"]');
+          if (watchFeedView) {
+              mountLikeButtonWatchFeed();
+          }
             rowsToProcess.forEach(likeButton_addLikeButtonToRow);
         });
     
         likeButton_tracklistObserver.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['aria-rowindex'] });
         likeButton_observerInitialized = true;
     };
+
+    likeButton_connectObserver();
 
     document.addEventListener('sortPlay_likeButtonConfigChanged', () => {
         if (!likeButtonConfig.trackRows) {
@@ -68291,11 +68506,13 @@ shadowRoot.innerHTML = `
     const path = Spicetify.Platform.History.location?.pathname;
     const isSearchPage = path && path.startsWith('/search');
 
+    if (showLikeButton) {
+        likeButton_connectObserver();
+    }
+
     if (!currentUri && !isSearchPage) {
         return;
     }
-
-    likeButton_connectObserver();
 
     const mainView = document.querySelector("main");
 
