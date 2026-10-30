@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "6.11.1";
+  const SORT_PLAY_VERSION = "6.12.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -1160,8 +1160,9 @@
     "ai music": ["ai music"],
     "alternative": ["alternative"],
     "alternative hip hop": ["alternative hip hop","alt hip hop","indie hip hop","indie pop rap","experimental hip hop","experimental rap","hipster rap","industrial hip hop","industrial rap","psychedelic hip hop","abstract beats","chill abstract hip hop","drumless","drumless hip hop","art rap","escape room","nerdcore","lgbtq+ hip hop","hip-hop experimental","rap geek","rap anime","battle rap","spiritual hip hop","outer hip hop","czech alternative rap","nephop","chip hop","flick hop","proto-rap","bboy","indie rap","abstract rap","folk rap","chap hop","chill rap","bedroom rap"],
-    "alternative metal": ["alternative metal","funk metal","nu metal","rap metal","modern metal","heavy alternative","hard alternative","rap metal espanol","aggro chileno","neo metal","comic metal","dub metal","metal alternativo","avant-garde metal","experimental metal","christian nu metal"],
-    "alternative rock": ["alternative rock","britpop","britpop revival","post-britpop","modern alternative rock","modern rock","permanent wave","alternative pop rock","british alternative rock","australian alternative rock","australian rock","australian pub rock","canadian rock","scottish rock","irish rock","welsh rock","kiwi rock","nz alternative rock","finnish alternative rock","swedish alternative rock","danish alternative rock","norwegian alternative rock","dutch rock","belgian rock","swiss alternative rock","french rock","rock alternatif francais","italian alternative","italian rock","polish alternative rock","polish rock","czech rock","slovak rock","hungarian rock","romanian rock","bulgarian rock","croatian rock","serbian alternative rock","slovenian rock","greek rock","ukrainian rock","israeli rock","south african rock","south african alternative","pakistani rock","indian rock","baggy","madchester","grebo","alternative dance","dance rock","dark rock","action rock","detroit rock","boston rock","pittsburgh rock","austin rock","suomi rock","icelandic rock","danish rock","norwegian rock","varmland rock","deep swedish rock","rock quebecois","portuguese rock","swiss rock","belarusian rock","estonian rock","lithuanian rock","latvian rock","faroese rock","macedonian rock","african rock","cambodian rock","rock independant francais","polish alternative","magyar alternative","mongolian alternative","georgian alternative","azeri alternative","cuban alternative","electronic rock","future rock","geek rock","wrock","trash rock","punta rock","rhythm rock","deep active rock","synth rock","occult rock","fuzz rock","heavy rock","depressive rock"],
+    "alternative metal": ["alternative metal","funk metal","rap metal","modern metal","heavy alternative","hard alternative","rap metal espanol","aggro chileno","neo metal","comic metal","dub metal","metal alternativo","avant-garde metal","experimental metal"],
+    "alternative r&b": ["alternative r&b","trap soul"],
+    "alternative rock": ["alternative rock","modern alternative rock","modern rock","permanent wave","alternative pop rock","british alternative rock","australian alternative rock","australian rock","australian pub rock","canadian rock","scottish rock","irish rock","welsh rock","kiwi rock","nz alternative rock","finnish alternative rock","swedish alternative rock","danish alternative rock","norwegian alternative rock","dutch rock","belgian rock","swiss alternative rock","french rock","rock alternatif francais","italian alternative","italian rock","polish alternative rock","polish rock","czech rock","slovak rock","hungarian rock","romanian rock","bulgarian rock","croatian rock","serbian alternative rock","slovenian rock","greek rock","ukrainian rock","israeli rock","south african rock","south african alternative","pakistani rock","indian rock","baggy","madchester","grebo","alternative dance","dance rock","dark rock","action rock","detroit rock","boston rock","pittsburgh rock","austin rock","suomi rock","icelandic rock","danish rock","norwegian rock","varmland rock","deep swedish rock","rock quebecois","portuguese rock","swiss rock","belarusian rock","estonian rock","lithuanian rock","latvian rock","faroese rock","macedonian rock","african rock","cambodian rock","rock independant francais","polish alternative","magyar alternative","mongolian alternative","georgian alternative","azeri alternative","cuban alternative","electronic rock","future rock","geek rock","wrock","trash rock","punta rock","rhythm rock","deep active rock","synth rock","occult rock","fuzz rock","heavy rock","depressive rock"],
     "amapiano": ["amapiano","sgija","deep amapiano","private school amapiano","underground amapiano","gospel amapiano","bacardi"],
     "ambient": ["ambient","space ambient","warm drone","lowercase","ambient pop","compositional ambient","ambient guitar","ambient piano","ambient synth","ambient folk","ambient house","ambient trance","ambient worship","ambient lo-fi","ambient psychill","ambient fusion","organic ambient","experimental ambient","space music","soundscape","soundscapes","fourth world","kankyo ongaku","j-ambient","nordic ambient","argentine ambient","indian ambient","light ambient","deep ambient","pop ambient","australian ambient","polish ambient","future ambient","ambeat","weightless","noise ambient","fantasy ambient","tribal ambient","progressive ambient","power ambient"],
     "americana": ["americana","alternative country","country rock","roots rock","southern gothic","stomp and holler","roots americana","southern americana","midwest americana","new england americana","western americana","austin americana","nashville americana","canadian americana","uk americana","australian americana","swedish americana","norwegian americana","dutch americana","memphis americana","new orleans americana","deep new americana","alternative americana","black americana","alternative roots rock","countrygaze","cosmic american","gothic country","dark country","death country","deathgrass","new americana","new weird america","american primitive","scottish americana","kentucky roots","north carolina roots","wyoming roots","ny roots","montana roots","ambient country","murder ballad"],
@@ -1176,6 +1177,7 @@
     "bass house": ["bass house","brazilian bass","g-house","wobble house","uk bass","uk bassline","fidget","basshall","uk bass house","night bass","italian bass","bassline house"],
     "bebop": ["bebop","bop","post-bop","contemporary post-bop","straight-ahead jazz"],
     "big band": ["big band","modern big band"],
+    "big room": ["big room","deep big room","future rave"],
     "black metal": ["black metal","atmospheric black metal","blackgaze","cascadian black metal","melodic black metal","metal noir quebecois","pagan black metal","raw black metal","symphonic black metal","viking metal","viking black metal","norwegian black metal","depressive suicidal black metal","autonomous black metal","avant-garde black metal","black 'n' roll","blackthrash","black thrash","blackened thrash metal","blackened crust","blackened hardcore","blackened screamo","chaotic black metal","cosmic black metal","cryptic black metal","dark black metal","emotional black metal","epic black metal","experimental black metal","folk black metal","forest black metal","gothic black metal","industrial black metal","instrumental black metal","medieval black metal","nsbm","occult black metal","orthodox black metal","post-black metal","progressive black metal","rabm","red and anarchist black metal","technical black metal","true black metal","usbm","american black metal","appalachian black metal","austrian black metal","baltic black metal","belarusian black metal","belgian black metal","british black metal","canadian black metal","chilean black metal","chinese black metal","colombian black metal","czsk black metal","danish black metal","dutch black metal","finnish black metal","french black metal","german black metal","greek black metal","hellenic black metal","hungarian black metal","icelandic black metal","indonesian black metal","irish black metal","italian black metal","mexican black metal","native american black metal","polish black metal","portuguese black metal","romanian black metal","russian black metal","spanish black metal","swedish black metal","swiss black metal","turkish black metal","ukrainian black metal","war metal","bestial black metal","ambient black metal","deep symphonic black metal","australian black metal","black metal argentino","celtic black metal","psychedelic black metal","war black metal","religious black metal","christian black metal","satanic black metal","anarchist black metal","transcendental black metal","space black metal","iberian black metal","lusitanian black metal","old school black metal"],
     "bluegrass": ["bluegrass","jamgrass","old-time","progressive bluegrass","neo-traditional bluegrass","instrumental bluegrass","bluegrass gospel","bluegrass fiddle","newgrass","banjo","clawhammer banjo","old-time fiddle","mandolin","string band","modern old-time","vintage old-time","jug band","washboard"],
     "blues": ["blues","classic blues","jazz blues","modern blues","traditional blues","acoustic blues","delta blues","deep delta blues","chicago blues","texas blues","memphis blues","new orleans blues","piedmont blues","hill country blues","swamp blues","jump blues","boogie-woogie","piano blues","barrelhouse piano","harmonica blues","blues harmonica","pre-war blues","classic female blues","soul blues","rebel blues","garage punk blues","australian blues","canadian blues","dutch blues","finnish blues","german blues","italian blues","japanese blues","norwegian blues","polish blues","spanish blues","swedish blues","brazilian blues","blues mexicano","blues latinoamericano","malian blues","belgian blues","blues band","modern electric blues","whiskey blues","dirty blues","doom blues","folk blues","blues harp"],
@@ -1190,6 +1192,7 @@
     "brazilian rock": ["brazilian rock","pop rock brasileiro","hard rock brasileiro","rock alternativo brasileiro","rock gaucho","rock brasiliense","rock mineiro","rock baiano","rock curitibano","rock piauiense","rock campineiro","rock cearense","rock paraibano","rock goiano","rock alagoano","rock pernambucano","rock catarinense","rock potiguar","rock sergipano","rock abc paulista","rock sul-mato-grossense","rock paraense","rock nacional feminino","novo rock gaucho","post-punk brasileiro","brazilian punk","brazilian punk rock","brazilian hardcore","brazilian emo","brazilian post-hardcore","shoegaze brasileiro","grunge brasileiro","psicodelia brasileira","neo-psicodelia brasileira","gotico brasileiro","brazilian lo-fi rock","brazilian stoner rock","brazilian post-rock","brazilian surf rock","brazilian rockabilly","brazilian indie","brazilian indie rock","indie brasileiro","indie nacional","manguebeat","mangue beat","musica gaucha","musica gaucha tradicionalista","musica juiz-forana","musica feirense","musica campista","musica blumenauense","musica campineira","musica rondoniense","musica londrinense","musica caririense","musica roraimense","musica ponta-grossense","musica mogiana","musica maringaense","indie paraense"],
     "breakbeat": ["breakbeat","big beat","breaks","funky breaks","nu skool breaks","nuskool breaks","nu-breaks","acid breaks","progressive breaks","psybreaks","hardcore breaks","florida breaks","electro breaks","booty breaks","rave","old school rave","broken beat","nu electro","classic breakbeat"],
     "breakcore": ["breakcore","lolicore","mashcore","chill breakcore","deep breakcore","raggacore","vocaloid breakcore","maidcore","splittercore","speedcore","extratone","flashcore","digital hardcore","depressive breakcore","atmospheric breakcore","intelligent breakcore"],
+    "britpop": ["britpop","britpop revival","post-britpop"],
     "c-pop": ["c-pop","cantopop","hk-pop","classic cantopop","mandopop","classic mandopop","taiwan pop","taiwan singer-songwriter","taiwan indie","taiwanese indie","taiwan idol pop","taiwan campus folk","vintage taiwan pop","taiwanese pop","hong kong indie","singaporean mandopop","singaporean pop","singaporean singer-songwriter","malaysian mandopop","chinese viral pop","chinese singer-songwriter","chinese idol pop","chinese drama ost","chinese electropop","chinese r&b","chinese indie","chinese indie pop","chinese indie rock","chinese post-punk","chinese minyao","chinese manyao","zhongguo feng","gufeng","chinese hip hop","chinese melodic rap","taiwan hip hop","hong kong hip hop","sichuanese hip hop","chinese rock","taiwan rock","taiwan punk","hong kong rock","chinese metal","taiwan metal","xinyao","vintage chinese pop","vintage cantonese pop","c-pop girl group","chinese audiophile","taiwan instrumental","taiwan graduation song","macau pop","tibetan pop","tibetan hip hop","uyghur pop","hmong pop","southern china indie","northwest china indie","shanghai indie","wuhan indie"],
     "canadian hip hop": ["canadian hip hop","toronto rap","canadian trap","canadian underground hip hop","canadian old school hip hop","bc underground hip hop","ottawa rap","winnipeg hip hop","alberta hip hop","atlantic canada hip hop","canadian indigenous hip hop"],
     "celtic": ["celtic","celtic punk","celtic rock","irish folk","scottish folk","canadian celtic","japanese celtic","celtic harp","scottish gaelic folk","irish gaelic folk","scottish fiddle","irish fiddle","irish flute","irish banjo","irish accordion","uilleann pipes","bagpipe","bagpipes","scottish smallpipe","pibroch","pipe and drum","bagpipe marching band","ceilidh","bothy ballad","irish pub song","irish rebel song","irish ballad","irish neo-traditional","cornish folk","welsh folk","manx","breton folk","galician folk","musica folk asturiana","trikiti","balfolk","jig and reel","sean-nos singing","puirt-a-beul","traditional irish singing","northumbrian folk","cymraeg","metis fiddle"],
@@ -1203,7 +1206,8 @@
     "christian rock": ["christian rock","christian alternative rock","christian indie","deep christian rock","christian punk","christian hardcore","jesus movement","rock gospel brasileiro","rock cristao fluminense"],
     "christmas": ["christmas","christmas pop","carols","christmas instrumental","christmas product","villancicos","koledy","noel quebecois"],
     "city pop": ["city pop","classic city pop","japanese funk","japanese soul","shibuya-kei","korean city pop","indonesian city pop","pinoy city pop"],
-    "classic rock": ["classic rock","album rock","aor","melodic rock","soft rock","mellow gold","southern rock","modern southern rock","british invasion","merseybeat","bossbeat","classic canadian rock","swamp rock","heartland rock","jam band","yacht rock","beatlesque","bosstown sound","classic greek rock","classic finnish rock","classic hungarian rock","classic danish rock","deep soft rock","trop rock","flute rock","rock drums","rock keyboard"],
+    "classic rock": ["classic rock","album rock","aor","melodic rock","british invasion","merseybeat","bossbeat","classic canadian rock","heartland rock","jam band","beatlesque","bosstown sound","classic greek rock","classic finnish rock","classic hungarian rock","classic danish rock","trop rock","flute rock","rock drums","rock keyboard"],
+    "cloud rap": ["cloud rap","sad rap"],
     "classical": ["classical","orchestra","orchestral","baroque","minimalism","symphonic","symphonies","symphony","early modern classical","classical era","galante era","early romantic era","late romantic era","post-romantic era","impressionism","serialism","totalism","neoclassicism","neo-classical","neoclassical","post-classical","cinematic classical","contemporary classical","american contemporary classical","american modern classical","american romanticism","british contemporary classical","british modern classical","canadian contemporary classical","australian classical","new zealand classical","french contemporary classical","french romanticism","french baroque","german contemporary classical","german romanticism","german baroque","austrian contemporary classical","austro-german modernism","swiss contemporary classical","italian contemporary classical","italian romanticism","italian baroque","spanish contemporary classical","spanish baroque","portuguese contemporary classical","portuguese classical","dutch contemporary classical","dutch baroque","belgian contemporary classical","nordic contemporary classical","swedish contemporary classical","swedish classical","norwegian classical","danish contemporary classical","danish classical","finnish contemporary classical","finnish classical","icelandic classical","baltic classical","polish contemporary classical","polish classical","czech contemporary classical","czech classical","hungarian contemporary classical","romanian contemporary classical","greek contemporary classical","russian contemporary classical","russian modern classical","russian romanticism","ukrainian contemporary classical","ukrainian classical","caucasian classical","israeli classical","japanese contemporary classical","japanese classical","korean contemporary classical","chinese classical","latin classical","brazilian contemporary classical","brazilian classical","mexican classical","african-american classical","orchestral performance","historic orchestral performance","british orchestra","american orchestra","german orchestra","french orchestra","italian orchestra","russian orchestra","nordic orchestra","japanese orchestra","chamber orchestra","string orchestra","symfonicky orchestr","orkiestra symfoniczna","pops orchestra","radio symphony","wind symphony","concert band","japanese concert band","brass ensemble","brass quintet","wind quintet","wind ensemble","clarinet ensemble","string quartet","modern string quartet","historic string quartet","quartetto d'archi","quatuor a cordes","streichquartett","classical string trio","string quintet","string duo","modern chamber music","chamber music","baroque ensemble","italian baroque ensemble","historically informed performance","classical performance","historic classical performance","chinese classical performance","taiwan classical performance","korean classical performance","japanese classical performance","hungarian classical performance","violin","baroque violin","italian violin","viola","viola da gamba","cello","classical cello","baroque cello","modern cello","cello ensemble","contrabass","classical bass","classical flute","classical oboe","classical clarinet","classical bassoon","classical horn","classical trumpet","classical trombone","classical tuba","euphonium","classical saxophone","classical saxophone quartet","baroque brass","baroque woodwind","classical harp","classical guitar","classical guitar duo","classical guitar quartet","italian classical guitar","guitarra clasica","violao classico","classical mandolin","italian mandolin","lute","harpsichord","historical keyboard","classical organ","pipe organ","classical accordion","classical percussion","canadian classical","spanish classical","irish classical","irish contemporary classical","american 21st century classical","oriental classical","andalusian classical","synthetic classical","english baroque","bohemian baroque","latin american baroque","barockinterpreten","austrian orchestra","fictitious orchestra","youth orchestra","musica sinfonica","art song","pastoral","ballet class","school ensemble","trombone ensemble","british brass band","brass band","marching band","college marching band","street band","military band","musique militaire","banda militar","musikkorps","staff band","police band","cornetas y tambores","fife and drum","fanfare","harp","sacred harp","handbells","bells","mallet","recorder","theremin","chapman stick","glass","modern performance"],
     "club": ["club","baltimore club","jersey club","philly club","deconstructed club","dark clubbing","ballroom","vogue","raptor house","guaracha","tribal guarachero","trival","ghettotech","bmore","atlanta bass","bounce","techengue","latincore","italo beats","new orleans bounce","tropical bass"],
     "comedy": ["comedy","comedy rock","parody","stand-up comedy","comedy rap","comedy metal","comedy punk","clean comedy","new comedy","deep comedy","black comedy","british comedy","canadian comedy","australian comedy","latino comedy","dansk comedy","humour francais","chanson humoristique","chanson paillarde","kabarett","dutch cabaret","vlaamse cabaret","magyar kabare","komedi","comedia","piada","music hall","vaudeville","novelty","meme","meme rap","soundclown","mashup","comedienne","comic","rakugo","geinin song","rock demenziale"],
@@ -1219,7 +1223,7 @@
     "dark ambient": ["dark ambient","ritual ambient","isolationism","new isolationism","drone ambient","ambient industrial","cryo chamber"],
     "dark cabaret": ["dark cabaret","cabaret","circus","circus rock","steampunk","punk cabaret"],
     "dark wave": ["dark wave","coldwave","gothic","gothic americana","neoclassical darkwave","modern darkwave","minimal wave","grave wave","ethereal gothic","neue deutsche todeskunst","sovietwave","solo wave","zimna fala","polish cold wave","italian darkwave","turkish darkwave"],
-    "death metal": ["death metal","brutal death metal","cavernous death metal","death 'n' roll","deathgrind","florida death metal","gothenburg metal","melodic death metal","swedish melodeath","technical death metal","slam death metal","swedish death metal","old school death metal","death-doom","blackened death metal","american melodeath","finnish melodeath","german melodeath","technical melodic death metal","symphonic melodic death metal","symphonic death metal","progressive death metal","progressive technical death metal","dissonant death metal","cosmic death metal","grisly death metal","grim death metal","instrumental death metal","technical brutal death metal","charred death","black death","deathrash","new wave of osdm","osdm","british death metal","canadian death metal","quebec death metal","danish death metal","dutch death metal","finnish death metal","french death metal","german death metal","indonesian death metal","irish death metal","italian death metal","mexican death metal","norwegian death metal","peruvian death metal","polish death metal","portuguese death metal","russian death metal","spanish death metal","texas death metal","turkish death metal","colombian death metal","new york death metal","deep melodic death metal","australian death metal","belgian death metal","atmospheric death metal","guttural brutal death metal","slamming guttural brutal death metal","blasting brutal death metal","brutal technical death metal","brutal slamming death metal","progressive melodic death metal","melodic death-thrash metal","industrial death metal","modern melodic death metal","new wave of old school death metal","melodic black death metal"],
+    "death metal": ["death metal","brutal death metal","cavernous death metal","death 'n' roll","deathgrind","florida death metal","technical death metal","slam death metal","swedish death metal","old school death metal","death-doom","blackened death metal","symphonic death metal","progressive death metal","progressive technical death metal","dissonant death metal","cosmic death metal","grisly death metal","grim death metal","instrumental death metal","technical brutal death metal","charred death","black death","deathrash","new wave of osdm","osdm","british death metal","canadian death metal","quebec death metal","danish death metal","dutch death metal","finnish death metal","french death metal","german death metal","indonesian death metal","irish death metal","italian death metal","mexican death metal","norwegian death metal","peruvian death metal","polish death metal","portuguese death metal","russian death metal","spanish death metal","texas death metal","turkish death metal","colombian death metal","new york death metal","australian death metal","belgian death metal","atmospheric death metal","guttural brutal death metal","slamming guttural brutal death metal","blasting brutal death metal","brutal technical death metal","brutal slamming death metal","industrial death metal","new wave of old school death metal"],
     "deathcore": ["deathcore","blackened deathcore","slam deathcore","slamming deathcore","technical deathcore","downtempo deathcore","beatdown","uk beatdown","symphonic deathcore","progressive deathcore","melodic deathcore","brutal deathcore","myspace deathcore","nu deathcore","indonesian deathcore","russian deathcore","ukrainian deathcore","beatdown deathcore","slamming beatdown","japanese deathcore","experimental deathcore","atmospheric deathcore"],
     "deep house": ["deep house","deep euro house","deep groove house","turkish deep house","deep disco house","south african deep house","deep deep house","deep soul house","south african soulful deep house","deep vocal house","lo-fi house","outsider house","float house","soulful house","chill house","melodic house","organic house","organic electronic","jazz house","saxophone house","lounge house","beach house","minimal deep house","deep funk house","vapor house","tulum"],
     "dembow": ["dembow","dembow dominicano","trap dominicano","drill dominicano"],
@@ -1239,12 +1243,13 @@
     "dungeon synth": ["dungeon synth","fantasy synth","keller synth","winter synth","comfy synth","forest synth","medieval ambient","tanzelcore"],
     "dutch hip hop": ["dutch hip hop","dutch rap pop","dutch trap","dutch underground hip hop","old school nederhop","antilliaanse rap","vlaamse rap","west-vlaamse hip hop","surinamese hip hop"],
     "east coast hip hop": ["east coast hip hop","hardcore hip hop","nyc rap","queens hip hop","brooklyn hip hop","bronx hip hop","harlem hip hop","upstate ny rap","buffalo hip hop","new jersey rap","new jersey underground rap","philly rap","pittsburgh rap","boston hip hop","rhode island rap","baltimore hip hop","dmv rap","virginia hip hop","deep east coast hip hop","wu fam","brockton hip hop","maine hip hop"],
-    "edm": ["edm","dutch edm","belgian edm","brazilian edm","finnish edm","mexican edm","hungarian edm","lithuanian edm","ukrainian edm","japanese edm","deep big room"],
-    "electro house": ["electro house","progressive electro house","dutch house","fidget house","bouncy house","speed house","complextro","big room","melbourne bounce","future bounce","future house","future rave","slap house","dirty dutch","bloghouse","gaming edm","midtempo bass","dirty electro","electro trash","tecktonik","jungle terror"],
+    "edm": ["edm","dutch edm","belgian edm","brazilian edm","finnish edm","mexican edm","hungarian edm","lithuanian edm","ukrainian edm","japanese edm"],
+    "electro house": ["electro house","progressive electro house","dutch house","fidget house","bouncy house","speed house","complextro","melbourne bounce","dirty dutch","bloghouse","gaming edm","midtempo bass","dirty electro","electro trash","tecktonik","jungle terror"],
     "electro swing": ["electro swing","swing house","swing revival","neo-swing"],
     "electronic": ["electronic","electro","electronica","detroit electro","canadian electronic","danish electronic","scottish electronic","lithuanian electronic","ukrainian electronic","icelandic electronic","belarusian electronic","slovenian electronic","romanian electronic","korean electronic","japanese electronic","spanish electronic","singaporean electronic","belgian electronic","south african electronic","taiwan electronic","estonian electronic","slovak electronic","czech electronic","bulgarian electronic","chinese electronic","georgian electronic","latvian electronic","bosnian electronic","macedonian electronic","finnish electronic","colombian electronic","cuban electronic","croatian electronic","mexican electronic","indonesian electronic","luxembourgian electronic","african electronic","nz electronic","irish electronic","swedish electronic","serbian electronic","boston electronic","uk experimental electronic","vintage french electronic","hamburg electronic","leipzig electronic","frankfurt electronic","munich electronic","dusseldorf electronic","cologne electronic","tijuana electronic","electronica argentina","electronica chilena","electronica venezuela","electronica peruana","musica eletronica brasileira","eletronica underground brasileira","polish electronica","italian electronica","german electronica","finnish electro","danish electro","berlin school","synthesizer","modular synth","moog","abstractro","ethnotronica","progressive electronic","minimal electronic","minimal electro","retro electro"],
     "electropop": ["electropop","canadian electropop","australian electropop","swedish electropop","danish electropop","spanish electropop","czsk electropop","indie electropop","electropowerpop","etherpop","shiver pop","vapor pop","dark pop","alt z","covertronica","pop electronico","electrofox","electra","hopebeat"],
-    "emo": ["emo","emo rap","emocore","midwest emo","pop emo","emo rock","emo pop punk","real emo","acoustic emo","bedroom emo","twinkle emo","alternative emo","5th wave emo","fifth wave emo","diy emo","new england emo","north carolina emo","indie emo","indie emo rock","lo-fi emo","dreamo","japanese emo","russian emo","swedish emo","italian emo","french emo","emo mexicano","emo punk","mall emo","emo revival","twinkle daddies","orgcore","deep orgcore","deep pop emo","pixie","aussie emo","epunk","desi emo rap","czsk emo rap","post-emo","ukrainian emo","twinkly emo"],
+    "emo": ["emo","emocore","midwest emo","pop emo","emo rock","emo pop punk","real emo","acoustic emo","bedroom emo","twinkle emo","alternative emo","5th wave emo","fifth wave emo","diy emo","new england emo","north carolina emo","indie emo","indie emo rock","lo-fi emo","dreamo","japanese emo","russian emo","swedish emo","italian emo","french emo","emo mexicano","emo punk","mall emo","emo revival","twinkle daddies","orgcore","deep orgcore","deep pop emo","pixie","aussie emo","epunk","post-emo","ukrainian emo","twinkly emo"],
+    "emo rap": ["emo rap","emo trap","emo trap en espanol","desi emo rap","czsk emo rap"],
     "enka": ["enka","japanese traditional","modern enka","ryukoka","min'yo","okinawan folk","okinawan pop","ryukyu ongaku","tsugaru shamisen","shamisen","koto","shakuhachi","gagaku","taiko","ainu folk"],
     "epic": ["epic","epic trailer music","trailer music"],
     "epiccore": ["epiccore"],
@@ -1266,12 +1271,14 @@
     "funk carioca": ["funk carioca","brega funk","funk 150 bpm","funk mandelao","funk ostentacao","funk paulista","funk viral","mega funk","rave funk","funk rj","funk bh","funk consciente","funk das antigas","funk melody","funk evangelico","funk capixaba","funk floripa","funk sc","funk mineiro","funk putaria","funk ousadia","trap funk","trapnejo","funknejo","cumbia funk","deep funk ostentacao","chill baile","fvnky rimex","funk bruxaria","beat bruxaria","bruxaria funk","funk automotivo","beat automotivo","som automotivo","mega funk automotivo","eletrofunk","eletro funk","electro funk brasil","arrocha funk","arrochafunk","funk arrocha","funk arrochado","funk mtg","deboxe","funk mexicano"],
     "funk rock": ["funk rock"],
     "future bass": ["future bass","kawaii future bass","kawaii edm","chill trap","wave","hardwave","vapor twitch","future beats","twerk","trap and bass"],
+    "future house": ["future house","future bounce"],
     "gangster rap": ["gangster rap","chicano rap","crunk","snap music","houston rap","southern hip hop","memphis rap","memphis horrorcore","atl hip hop","old school atlanta hip hop","chicago rap","detroit hip hop","detroit trap","flint hip hop","miami hip hop","florida rap","baton rouge rap","new orleans rap","dfw rap","texas latin rap","tennessee hip hop","kentucky hip hop","st louis rap","minnesota hip hop","midwest hip hop","ohio hip hop","indiana hip hop","north carolina hip hop","south carolina hip hop","alabama rap","mississippi hip hop","arkansas hip hop","dirty texas rap","scam rap","horrorcore","chopped and screwed","kansas city hip hop","cincinnati rap","austin hip hop","san antonio rap","milwaukee hip hop","iowa hip hop","kansas hip hop","denver rap","alaska hip hop","idaho hip hop","nashville hip hop","hawaiian hip hop"],
     "garage rock": ["garage rock","classic garage rock","freakbeat","garage psych","garage rock revival","proto-punk","punk blues","deep classic garage rock","canadian garage rock","french garage rock","swedish garage rock","garage rock mexicano","australian garage punk","garage pop","indie garage rock","garage punk","medway sound","mod revival","modern mod","pub rock","rautalanka","indorock","beat italiano"],
     "german hip hop": ["german hip hop","frauenrap","german alternative rap","german cloud rap","german underground rap","oldschool deutschrap","deep german hip hop","hamburg hip hop","cologne hip hop","bayerischer rap","german trap","german viral rap","german jazz rap","austrian hip hop","swiss hip hop","schweizer rap","christlicher rap"],
     "german pop": ["german pop","neue deutsche welle","neue neue deutsche welle","german pop rock","german singer-songwriter","german indie","german indie pop","german indie rock","german indie folk","deep german indie","hamburger schule","austropop","austrian pop","austrian indie","swiss pop","swiss indie","mundart","kleinkunst","antideutsche"],
     "german rock": ["german rock","ostrock","german alternative rock","german hard rock","german punk","german punk rock","deep german punk","german street punk","german oi","german post-punk","german post-hardcore","german post-rock","german prog"],
-    "glam rock": ["glam rock","glam punk","hard glam","glam metal","pop metal","new wave of glam metal","sleaze rock"],
+    "glam metal": ["glam metal","pop metal","new wave of glam metal","sleaze rock","hard glam"],
+    "glam rock": ["glam rock","glam punk"],
     "global christian": ["global christian","african gospel","clap and tap","celtic worship","latin christian","latin worship","adoracion pentecostal","musica instrumental cristiana","deep latin christian","electronica cristiana","mariachi cristiano","salsa cristiana","reggaeton cristiano","trap cristiano","pop cristiano","reggae cristao","louvores pentecostais","fogo pentecostal","louvor icm","hinos ccb","coral gospel","quarteto gospel","gospel antigas","mpb gospel","musica eletronica gospel","musica crista reformada","adventista","indie cristao","tagalog worship","pinoy praise","papuri","bisaya worship","world worship","world devotional","south african gospel","ghanaian gospel","yoruba worship","igbo worship","kikuyu gospel","ugandan gospel","rwandan gospel","zambian gospel","zim gospel","congolese gospel","swahili gospel","haitian gospel","kompa chretien","pacific islands gospel","indonesian worship","korean worship","japanese worship","chinese worship","cantonese worship","thai worship","myanmar gospel","mizo gospel","tamil worship","telugu worship","malayalam worship","hindi worship","french worship","louange","chant religieux","german worship","swiss worship","psalmen","kerkkoor","norsk lovsang","svensk lovsang","dansk lovsang","finnish worship","hengelliset laulut","uwielbienie","ceske chvaly","slovenske chvaly","muzica crestina","gospel italiano","uk worship","nz christian","messianic praise","apostolic worship","chasidic pop","jewish pop","chabad niggunim","jewish cantorial","islamic recitation","quran","nasheed","nasyid","naat","latmiya","ilahiler","sholawat","zikir","taraneem","coptic hymn","mezmur","bhajan","modern bhajan","jain bhajan","odia bhajan","kirtan","hare krishna","shabad","tamil devotional","telugu devotional","marathi devotional","tibetan mantra","mantra","nohay","japanese buddhist chant","fo jing","bahai","lldm","zcc","musicas espiritas"],
     "gospel": ["gospel","black gospel","brazilian gospel","gospel r&b","gospel soul","naija worship","southern gospel","spiritual","spirituals","contemporary gospel","traditional gospel","family gospel","baptist gospel","groove gospel","gospel singers","gospel blues","gospel reggae"],
     "gothic metal": ["gothic metal","metal gotico","italian gothic metal","love metal","dark metal","vampire metal","melodic gothic metal","progressive gothic metal","symphonic gothic metal","symphonic doom metal"],
@@ -1298,7 +1305,9 @@
     "indie rock": ["indie rock","british indie rock","english indie rock","scottish indie rock","irish indie rock","australian indie rock","swedish indie rock","dutch indie rock","belgian indie rock","spanish indie rock","portuguese indie rock","polish indie rock","russian indie rock","ukrainian alternative rock","greek indie rock","japanese indie rock","thai indie rock","argentine indie rock","indie rock mexicano","indie rock colombiano","indie rock peruano","indie rockism","indie punk","indie shoegaze","indie fuzzpop","lo-fi indie","slacker rock","gbvfi","american post-punk","uk post-punk revival","dance-punk","crank wave","windmill scene","deep indie rock"],
     "indietronica": ["indietronica","indie psych-pop","metropopolis","indietronica italiana","aussietronica","latintronica","jamtronica","livetronica","new rave","indie dance","indie sleaze"],
     "indonesian pop": ["indonesian pop","classic indo pop","indonesian indie","pop minang","indonesian pop rock","indonesian singer-songwriter","indonesian jazz","indonesian folk","indonesian folk pop","indonesian alternative rock","indonesian rock","classic indonesian rock","indonesian idol pop","indonesian lo-fi pop","indonesian viral pop","indonesian r&b","indonesian indie pop","indonesian indie rock","indonesian emo","indonesian emo rap","indonesian punk","indonesian pop punk","indonesian post-hardcore","indonesian ska","indonesian reggae","indonesian hip hop","indonesian underground hip hop","indonesian trap","indonesian edm","indonesian blues","indonesian psychedelia","indonesian neo-psychedelia","indonesian shoegaze","indonesian metal","indonesian thrash metal","malaysian hip hop","keroncong","gamelan","javanese gamelan","balinese traditional","sundanese traditional","lagu jawa","lagu sunda","lagu bali","lagu timur","lagu melayu","lagu aceh","lagu bugis","batak","trio batak","lagu karo","lagu manado","lagu maluku","maluku pop","lagu sasak","lagu sabahan","lagu iban","lagu betawi","bandung indie","yogyakarta indie","semarang indie","surabaya indie","malang indie","bogor indie","bali indie","lampung indie","rock kapak","dikir barat","sulawesi indie","lombok indie","pontianak indie","south borneo indie","balikpapan indie","lagu jambi","lagu lampung","lagu madura"],
-    "industrial": ["industrial","aggrotech","ebm","old school ebm","electro-industrial","dark electro-industrial","dark electro","industrial rock","industrial metal","martial industrial","death industrial","power noise","rhythmic noise","industrial pop","post-industrial","cyber metal","neue deutsche harte","british industrial","industrial noise","new beat","swedish ebm","italian industrial","neo-industrial rock","harsh ebm","terror ebm","anhalt ebm","old school industrial"],
+    "industrial": ["industrial","aggrotech","ebm","old school ebm","electro-industrial","dark electro-industrial","dark electro","martial industrial","death industrial","power noise","rhythmic noise","industrial pop","post-industrial","british industrial","industrial noise","new beat","swedish ebm","italian industrial","harsh ebm","terror ebm","anhalt ebm","old school industrial"],
+    "industrial metal": ["industrial metal","cyber metal","neue deutsche harte"],
+    "industrial rock": ["industrial rock","neo-industrial rock"],
     "instrumental": ["instrumental","background piano","background music","background jazz","background jazz product","calming instrumental","instrumental worship","musica evangelica instrumental","lds instrumental","korean instrumental","japanese instrumental","chinese instrumental","thai instrumental","viet instrumental","turkish instrumental","latin instrumental","musica de fondo","japanese piano","indian violin","electric bass","double drumming"],
     "italian hip hop": ["italian hip hop","italian underground hip hop","rap italiano old school","rap genovese","rap napoletano","rap siciliano","rap sardegna","rap toscana","trap italiana","drill italiana","emo rap italiano","emo trap italiana","trap metal italiana"],
     "italian pop": ["italian pop","classic italian pop","italian adult pop","itpop","italian pop rock","pop virale italiano","indie rock italiano","milan indie","rome indie","turin indie","bergamo indie","puglia indie","firenze indie","indie liguria","indie veneto","indie napoletano","indie siciliano","canzone napoletana","neomelodici","canzone genovese","canzone siciliane","classic italian folk pop","vintage italian pop","r&b italiano","italian lounge","sanremo"],
@@ -1329,12 +1338,15 @@
     "lullaby": ["lullaby","baby sleep","music box","instrumental lullaby"],
     "math rock": ["math rock","math pop","midwest math rock","japanese math rock","british math rock","instrumental math rock","math rock latinoamericano"],
     "medieval": ["medieval","early music","gregorian chant","renaissance","medieval rock","medieval folk","medieval ensemble","early music ensemble","early music choir","american early music","polish early music","portuguese early music","musique ancienne","musica antigua","franco-flemish school","english renaissance","french renaissance","german renaissance","italian renaissance","spanish renaissance","ars subtilior","trecento","troubadour","trouvere","minnesang","madrigal","bardcore","tavern","rune folk","bard","ancient mediterranean","mittelalter","mittelalter rock","medieval synth"],
+    "melodic death metal": ["melodic death metal","gothenburg metal","swedish melodeath","american melodeath","finnish melodeath","german melodeath","technical melodic death metal","symphonic melodic death metal","deep melodic death metal","progressive melodic death metal","melodic death-thrash metal","modern melodic death metal","melodic black death metal"],
+    "melodic techno": ["melodic techno","minimal melodic techno","melodic house and techno"],
     "merengue": ["merengue","mambo","merengue tipico","dominican merengue","merengue clasico","merengue hip hop","merenhouse","merengueton","tecno-merengue","mambo chileno","bomba","plena","bomba y plena","musica tradicional dominicana","tipico","punta","plena uruguaya","candombe"],
     "metal": ["metal"],
     "metalcore": ["metalcore","chaotic hardcore","chaotic metalcore","symphonic metalcore","electronicore","mathcore","melodic metalcore","progressive metalcore","post-metalcore","american metalcore","australian metalcore","canadian metalcore","uk metalcore","german metalcore","finnish metalcore","swedish metalcore","italian metalcore","polish metalcore","russian metalcore","ukrainian metalcore","chinese metalcore","metalcore espanol","nu-metalcore","alternative metalcore","deep metalcore","deep melodic metalcore","rap metalcore","trancecore","technical metalcore","old school metalcore","crabcore"],
     "moombahton": ["moombahton","moombahcore","dutch moombahton"],
     "moroccan rap": ["moroccan rap","trap maroc","north moroccan rap"],
     "mpb": ["mpb","jovem guarda","nova mpb","pop folk","tropicalia","velha guarda","violao","nova musica pernambucana","nova musica carioca","nova musica paulista","nova musica maranhense","nova musica amazonense","musica popular mineira","clube da esquina","musica baiana","musica alagoana","musica maranhense","musica paraibana","musica potiguar","musica cearense","musica sergipana","musica piauiense","musica capixaba","musica paranaense","musica catarinense","musica brasiliense","musica goiana","musica sul-mato-grossense","musica mato-grossense","musica popular amazonense","piano mpb","choro","choro contemporaneo","chorinho","bandolim","brass band brasileiro","trombone brasileiro","bandinhas"],
+    "neo soul": ["neo soul"],
     "neofolk": ["neofolk","dark folk","apocalyptic folk","deep neofolk","neo-pagan","viking folk","pagan folk","combat folk","folk noir","murderfolk"],
     "new age": ["new age","new age piano","meditation","guided meditation","world meditation","healing","healing hz","432hz","528hz","solfeggio product","binaural","brain waves","chakra","reiki","kundalini","singing bowl","handpan","spa","massage","yoga","zen","relaxative","nu age","native american flute","shamanic"],
     "new jack swing": ["new jack swing","new jack smooth","90s r&b","freestyle","deep freestyle","popping","latin freestyle"],
@@ -1343,6 +1355,7 @@
     "nightcore": ["nightcore","sped up","speed up","speed up turkce","slowed and reverb","slowed","daycore"],
     "noise": ["noise","harsh noise","harsh noise wall","hnw","japanoise","noise rock","power electronics","noise pop","spanish noise pop","uk noise rock","polish noise rock","rock noise","noise punk","black noise","no wave"],
     "nu jazz": ["nu jazz","japanese jazztronica","electro jazz"],
+    "nu metal": ["nu metal","christian nu metal","russian nu metal"],
     "old school hip hop": ["old school hip hop","golden age hip hop","old school uk hip hop","miami bass","booty bass","edo old school","britcore"],
     "oldies": ["oldies","golden oldies","classic oldies","beach music","harlem renaissance"],
     "opera": ["opera","arias","libretto","operatic pop","popera","classical crossover","classical tenor","italian tenor","classical soprano","italian soprano","boy soprano","classical mezzo-soprano","italian mezzo-soprano","classical contralto","classical baritone","italian baritone","classical countertenor","castrato","baroque singing","vintage classical singing","wagnerian singing","italian opera","french opera","german opera","opera chorus","operetta","zarzuela","cantonese opera","chinese opera","beijing opera","trallalero","marcha funebre"],
@@ -1367,7 +1380,7 @@
     "post-rock": ["post-rock","instrumental post-rock","american post-rock","louisville underground","british post-rock","canadian post-rock","australian post-rock","nordic post-rock","french post-rock","belgian post-rock","spanish post-rock","portuguese post-rock","italian post-rock","polish post-rock","russian post-rock","japanese post-rock","chinese post-rock","taiwan post-rock","thai post-rock","southeast asian post-rock","mexican post-rock","post-rock latinoamericano","cinematic post-rock","ambient post-rock","atmospheric post-rock","cosmic post-rock","malaysian post-rock","indian instrumental rock"],
     "power metal": ["power metal","epic metal","fantasy metal","melodic power metal","swedish power metal","finnish power metal","german power metal","british power metal","italian power metal","russian power metal","mexican power metal","progressive power metal","neo classical metal","neoclassical metal","opera metal","extreme power metal","epic power metal","folk power metal"],
     "power pop": ["power pop","modern power pop","underground power pop","power-pop punk","deep power-pop punk"],
-    "progressive house": ["progressive house","classic progressive house","dark progressive house","deep progressive house","japanese progressive house","minimal melodic techno","melodic techno","anjunadeep","anjunabeats","melodic house and techno","melodic progressive house","festival progressive house"],
+    "progressive house": ["progressive house","classic progressive house","dark progressive house","deep progressive house","japanese progressive house","anjunadeep","anjunabeats","melodic progressive house","festival progressive house"],
     "progressive metal": ["progressive metal","instrumental metal","swedish progressive metal","finnish progressive metal","italian progressive metal","instrumental progressive metal","melodic progressive metal","progressive alternative","extreme progressive metal","progressive math metal"],
     "progressive rock": ["progressive rock","canterbury scene","crossover prog","krautrock","neo-prog","neo-trad prog","synth prog","symphonic prog","symphonic rock","rock opera","theatrical rock","avant-prog","modern progressive rock","deep progressive rock","rock progressivo italiano","italian modern prog","french progressive rock","rock progressif francais","rock progressif","dutch prog","spanish prog","spanish progressive rock","polish prog","swedish prog","svensk progg","norwegian prog","finnish progressive rock","prog quebec","rock progresivo mexicano","neo-kraut","eclectic prog","heavy prog","british progressive rock","canadian progressive rock"],
     "psychedelic": ["psychedelic","psychedelic pop","psychedelic folk","polish psychedelia","thai psychedelic","czech psychedelic","vintage french psychedelic","italian occult psychedelia","psicodelia mexicana","psicodelia chilena","norwegian psychedelic","french psychedelic","turkish psychedelic"],
@@ -1375,7 +1388,8 @@
     "psytrance": ["psytrance","goa trance","dark psytrance","deep darkpsy","forest psy","progressive psytrance","full-on","full on groove","deep full on","twilight psy","hi-tech","zenonesque","psytech","suomisaundi","nitzhonot","deep psytrance","south african psytrance","psybient","psybass","psycore","psyprog","progressive goa","vocal psytrance","minimal psytrance"],
     "punjabi pop": ["punjabi pop","bhangra","classic bhangra","classic punjabi pop","desi hip hop","punjabi hip hop","punjabi folk","uk bhangra","uk desi rap"],
     "punk": ["punk","early us punk","deep punk rock","punk 'n' roll","canadian punk","vancouver punk","quebec punk","new jersey punk","chicago punk","texas punk","arizona punk","portland punk","uk diy punk","northern irish punk","dutch punk","dutch punk rock","belgian punk","austrian punk","swiss punk","french punk","early french punk","spanish punk","punk urbano","punk catala","punk euskera","punk galego","punk tuga","italian punk","punk rock italiano","polish punk","czech punk","slovak punk","hungarian punk","romanian punk","greek punk","turkish punk","israeli punk","russian punk","russian punk rock","belarusian punk","swedish punk","trallpunk","danspunk","norwegian punk","norwegian punk rock","danish punk","finnish punk","icelandic punk","brisbane punk","melbourne punk","adelaide punk","nz punk","south african punk","chinese punk","singaporean punk","malaysian punk","malang punk","punk mexicano","punk rock mexicano","argentine punk","punk chileno","punk melodico chileno","peruvian punk","punk colombiano","punk ecuatoriano","punk tico","folk punk","surf punk","beach punk","horror punk","horror punk brasileiro","synth punk","art punk","anarcho-punk","boston punk","atlanta punk","kentucky punk","long island punk","irish punk","hawaiian punk","chicano punk","acoustic punk","black punk","dub punk","slash punk","punk ska","nordnorsk ponk","punk cover","peace punk","political punk","melodic punk","british punk","japanese punk","siberian punk","77 punk","pirate punk","old school punk"],
-    "r&b": ["r&b","alternative r&b","trap soul"],
+    "r&b": ["r&b"],
+    "rage rap": ["rage rap","supertrap"],
     "rap": ["rap"],
     "rap rock": ["rap rock","punk rap","rap punk"],
     "reggae": ["reggae","roots reggae","roots rock reggae","modern reggae","traditional reggae","early reggae","vintage reggae","lovers rock","lovers reggae","rocksteady","mento","nyahbinghi","uk reggae","french reggae","german reggae","italian reggae","spanish reggae","reggae catala","euskal reggae","reggae tuga","nederreggae","swiss reggae","polish reggae","czsk reggae","swedish reggae","finnish reggae","russian reggae","turkish reggae","chinese reggae","japanese reggae","korean reggae","israeli reggae","bulgarian reggae","serbian reggae","australian reggae fusion","nz reggae","jawaiian","hawaiian","hawaiian reggae","california reggae","west coast reggae","east coast reggae","african reggae","reggae maghreb","seggae","sega","sega mauricien","maloya","kaneka","brazilian reggae","reggae do maranhao","reggae gaucho","argentine reggae","reggae cuyano","reggae uruguayo","reggae peruano","reggae boliviano","reggae mexicano","reggae tico","reggae puerto rico","colombian reggae","reggae en espanol","trinidadian reggae","virgin islands reggae","reggae cover","kaseko","baithak gana","skinhead reggae","dancehall reggae","reggae pop","latin reggae","christian reggae","salegy","tsapiky"],
@@ -1387,7 +1401,7 @@
     "rock en espanol": ["rock en espanol","latin alternative","latinx alternative","deep latin alternative","argentine rock","rock nacional","argentine alternative rock","chilean rock","mexican rock","rock nacional mexicano","mexican classic rock","rock urbano mexicano","colombian rock","peruvian rock","venezuelan rock","uruguayan rock","ecuadorian alternative rock","paraguayan rock","bolivian rock","puerto rican rock","panamanian rock","rock dominicano","rock tico","rock chapin","rock catracho","rock nica","spanish rock","spanish modern rock","rock alternativo espanol","spanish invasion","rock catala","euskal rock","galician rock","rock en asturiano","rock canario","rock of gibraltar","rock alternativo","rock barrial","rock radical vasco","rock transgresivo"],
     "rockabilly": ["rockabilly","neo-rockabilly","traditional rockabilly","psychobilly","deep psychobilly","uk rockabilly","canadian rockabilly","australian rockabilly","german rockabilly","french rockabilly","spanish rockabilly","italian rockabilly","swedish rockabilly","finnish rockabilly","rockabilly en espanol","vintage rockabilly"],
     "russian pop": ["russian pop","classic russian pop","russian dance","russian hip hop","ukrainian hip hop","kazakh hip hop","russian alt pop","russian viral pop","russian dance pop","russian synthpop","soviet synthpop","russian edm","russian trance","russian rave","russian electronic","russian witch house","russian drain","zxc","russian trap","russian gangster rap","russian underground rap","russian viral rap","russian old school hip hop","russian emo rap","zhenskiy rep","russian chanson","russian romance","russian bard","estrada","soviet estrada","kavkaz","chechen pop","lezginka"],
-    "russian rock": ["russian rock","classic russian rock","new wave of russian rock","russian alternative rock","russian nu metal"],
+    "russian rock": ["russian rock","classic russian rock","new wave of russian rock","russian alternative rock"],
     "salsa": ["salsa","boogaloo","pachanga","modern salsa","salsa choke","salsa colombiana","salsa cubana","salsa puertorriquena","salsa urbana","salsa venezolana","salsa peruana","salsa international","salsa dura","salsa romantica","salsa sensual","salsa guajira","salsa brava","salsa erotica","timba","son cubano","son cubano clasico","son montuno","guajira","charanga","orquesta cubana","orquesta tropical","cha-cha-cha","cuban rumba","guaguanco","afro-cuban traditional","fania","salsa boricua","dominican salsa","new york salsa"],
     "samba": ["samba","samba paulista","samba-enredo","samba-rock","samba moderno","samba de roda","roda de samba","samba gospel","partido alto","samba-canção","samba cancao","samba de breque","marchinha","marchinha de carnaval","batucada","candomble","umbanda","capoeira"],
     "scandinavian hip hop": ["scandinavian hip hop","swedish hip hop","swedish gangsta rap","swedish trap","swedish trap pop","swedish pop rap","swedish underground rap","norwegian hip hop","norwegian trap","norwegian pop rap","norrlandsk hip hop","nordnorsk rap","danish hip hop","finnish hip hop","suomirap","finnish trap","icelandic hip hop"],
@@ -1403,13 +1417,16 @@
     "sigilkore": ["sigilkore","hexd","jewelxxet","yabujincore"],
     "singer-songwriter": ["singer-songwriter","acoustic pop","cantautor","cantautori","canzone d'autore","gen z singer-songwriter","liedermacher","lilith","neo mellow","british singer-songwriter","irish singer-songwriter","scottish singer-songwriter","canadian singer-songwriter","australian singer-songwriter","nz singer-songwriter","nashville singer-songwriter","austin singer-songwriter","swedish singer-songwriter","norwegian singer-songwriter","danish singer-songwriter","icelandic singer-songwriter","laulaja-lauluntekija","dutch singer-songwriter","belgian singer-songwriter","swiss singer-songwriter","cantautor catala","cantautora mexicana","cantautora argentina","czech singer-songwriter","israeli singer-songwriter","vietnamese singer-songwriter","neo-singer-songwriter","indie singer-songwriter","deep indie singer-songwriter","deep acoustic pop","scottish hush","one-person band"],
     "ska": ["ska","traditional ska","ska punk","two-tone","3rd wave ska","third wave ska","skacore","ska-core","ska core","jamaican ska","ska revival","modern ska punk","ska jazz","latin ska","ska espanol","ska catala","ska mexicano","ska argentino","ska chileno","brazilian ska","german ska","italian ska","japanese ska","australian ska","euroska","crack rock steady","bluebeat","russian ska","ska rock","j-ska","turkish ska","christian ska","patchanka","mestizaje"],
+    "slap house": ["slap house"],
     "sleep": ["sleep","white noise","pink noise","color noise","rain","water","ocean","environmental","sound","nature sounds","birdsong","whale song","asmr","pet calming","subliminal product"],
     "slowcore": ["slowcore","sadcore"],
     "sludge metal": ["sludge metal","sludgecore","atmospheric sludge metal","progressive sludge","black sludge","blackened sludge"],
     "smooth jazz": ["smooth jazz","smooth saxophone","deep smooth jazz"],
     "soca": ["soca","calypso","chutney","power soca","groovy soca","bajan soca","vincy soca","grenada soca","bouyon","dennery segment","raboday","steelpan"],
+    "soft rock": ["soft rock","mellow gold","deep soft rock"],
     "soukous": ["soukous","rumba congolaise","ndombolo","musique urbaine kinshasa","musique urbaine brazzaville","musique traditionnelle congolaise","sebene"],
-    "soul": ["soul","classic soul","motown","deep motown","soul funk","retro soul","souldies","british soul","brazilian soul","traditional soul","smooth soul","instrumental soul","southern soul","deep southern soul","southern soul blues","northern soul","deep northern soul","philly soul","chicago soul","memphis soul","new orleans soul","psychedelic soul","blue-eyed soul","neo soul","latin soul","uk soul","french soul","scandinavian soul","acoustic soul","chicano soul"],
+    "soul": ["soul","classic soul","motown","deep motown","soul funk","retro soul","souldies","british soul","brazilian soul","traditional soul","smooth soul","instrumental soul","southern soul","deep southern soul","southern soul blues","northern soul","deep northern soul","philly soul","chicago soul","memphis soul","new orleans soul","psychedelic soul","blue-eyed soul","latin soul","uk soul","french soul","scandinavian soul","acoustic soul","chicano soul"],
+    "southern rock": ["southern rock","modern southern rock","swamp rock"],
     "soundtrack": ["soundtrack","classic soundtrack","film music","movie music","original motion picture soundtrack","original score","score","theme music","tv music","tv themes","theme","bgm","british soundtrack","canadian soundtrack","french soundtrack","german soundtrack","italian soundtrack","vintage italian soundtrack","nordic soundtrack","turkish soundtrack","japanese soundtrack","korean soundtrack","chinese soundtrack","chinese bgm","thai ost","thai bl ost","korean bl ost","latin soundtrack","oceania soundtrack","deep soundtrack","library music","italian library music","spytrack","sound team","middle earth","fantasy","hong kong tv drama"],
     "spanish hip hop": ["spanish hip hop","rap underground espanol","rap canario","rap catala","trap catala","rap galego","rap euskera","urbano espanol","spanish trap"],
     "speed metal": ["speed metal","black speed metal","new wave of speed metal","melodic speed metal","technical speed metal","blackened speed metal"],
@@ -1429,7 +1446,7 @@
     "thai pop": ["thai pop","t-pop","luk thung","classic luk thung","mor lam","molam","phleng phuea chiwit","thai indie","thai rock","thai teen pop","thai viral pop","thai pop rap","thai hip hop","thai trap","thai metal","classic thai pop","t-pop girl group"],
     "thrash metal": ["thrash metal","crossover thrash","thrash punk","punk metal","metal punk","teutonic thrash metal","trash metal","bay area thrash","teutonic thrash","old school thrash","german thrash metal","swedish thrash metal","polish thrash metal","russian thrash metal","australian thrash metal","mexican thrash metal","colombian thrash metal","technical thrash","technical thrash metal","progressive thrash","progressive thrash metal","melodic thrash","new wave of thrash metal","power thrash","british thrash metal","speed thrash metal","spanish thrash metal","turkish thrash metal","ukrainian thrash metal","brutal thrash metal","modern thrash metal","italian thrash metal","symphonic thrash metal","melodic thrash metal","canadian thrash metal"],
     "trance": ["trance","progressive trance","uplifting trance","vocal trance","hard trance","old school hard trance","tech trance","euro trance","dream trance","classic trance","melodic trance","german trance","dutch trance","italian trance","trance brasileiro","trance mexicano","progressive uplifting trance","progressive trance house","deep uplifting trance","deep progressive trance","cosmic uplifting trance","acid trance","balearic trance","bubble trance","chill-out trance","focus trance","glitter trance","covertrance","pure trance","dark trance","deep trance","cybertrance","neotrance","emotional trance","minimal trance"],
-    "trap": ["trap","atl trap","cloud rap","dark trap","desi trap","emo trap","emo trap en espanol","plugg","rage rap","sad rap","trap queen","viral rap","southern trap","deep southern trap","melodic trap","tread","electronic trap","edm trap","festival trap","future trap","liquid trap","wave trap","instrumental trap","bass trap","hybrid trap","ambient trap","traprun","trap beats","south african trap","vietnamese trap","trap tuga","trap angolano","ua trap","israeli trap","greek trap","bulgarian trap","romanian trap","magyar trap","slovak trap","lithuanian trap","detroit trap en espanol","swiss trap","irish trap","indian trap","arabic trap","texas trap","florida trap","dungeon rap","futuristic swag","soundcloud rap","mumble rap","trill","hard trap","supertrap","witch trap"],
+    "trap": ["trap","atl trap","dark trap","desi trap","plugg","trap queen","viral rap","southern trap","deep southern trap","melodic trap","tread","electronic trap","edm trap","festival trap","future trap","liquid trap","wave trap","instrumental trap","bass trap","hybrid trap","ambient trap","traprun","trap beats","south african trap","vietnamese trap","trap tuga","trap angolano","ua trap","israeli trap","greek trap","bulgarian trap","romanian trap","magyar trap","slovak trap","lithuanian trap","detroit trap en espanol","swiss trap","irish trap","indian trap","arabic trap","texas trap","florida trap","dungeon rap","futuristic swag","soundcloud rap","mumble rap","trill","hard trap","witch trap"],
     "trap metal": ["trap metal","scream rap","necrotrap","turkce trap metal","russian trap metal","death rap","ragecore"],
     "trip hop": ["trip hop","bristol electronic"],
     "tropical house": ["tropical house","sax house","deep tropical house","swedish tropical house"],
@@ -1449,6 +1466,7 @@
     "vocal jazz": ["vocal jazz","contemporary vocal jazz","deep vocal jazz","japanese vocal jazz"],
     "west coast hip hop": ["west coast hip hop","g-funk","deep g funk","cali rap","oakland hip hop","bay area hip hop","sacramento hip hop","san diego rap","oc rap","seattle hip hop","portland hip hop","hyphy","jerkin","westcoast flow","west coast trap"],
     "worship": ["worship","worship pop","pop worship","anthem worship","devotional","roots worship","modern uplift"],
+    "yacht rock": ["yacht rock"],
     "zydeco": ["zydeco","cajun","louisiana blues","swamp pop","second line"]
   };
 
@@ -1675,7 +1693,9 @@
 
   const BLACKLIST_UMBRELLA_MAP = {
     "afrobeats": ["afropop","amapiano","afro house","afro r&b","afro-funk","afrobeat","alte","bongo flava","gengetone","highlife","juju","fuji","coupe-decale","makossa","gqom","kwaito","singeli","kizomba","semba","soukous","ndombolo","asakaa","hiplife","zouglou"],
-    "alternative": ["alternative rock","indie rock","alternative pop","alternative r&b","alternative hip hop","alternative metal","alternative country","grunge","post-grunge","britpop","shoegaze","dream pop","emo","post-punk","new wave","indie pop"],
+    "alternative": ["alternative rock","indie rock","alternative pop","alternative r&b","alternative hip hop","alternative metal","nu metal","alternative country","grunge","post-grunge","britpop","shoegaze","dream pop","emo","post-punk","new wave","indie pop"],
+    "alternative metal": ["nu metal","rap metal","funk metal","modern metal","post-grunge","rap rock","nu-metalcore"],
+    "alternative r&b": ["trap soul","indie r&b","dark r&b","chill r&b","bedroom r&b","neo soul","contemporary r&b"],
     "alternative rock": ["indie rock","grunge","post-grunge","britpop","shoegaze","dream pop","math rock","post-rock","midwest emo","noise rock","jangle pop","chamber pop","lo-fi rock","college rock","slacker rock","madchester","baggy"],
     "amapiano": ["private school amapiano","bacardi","barcadi","deep amapiano","underground amapiano","gospel amapiano","sgija"],
     "ambient": ["dark ambient","space ambient","ambient techno","drone","chillout","lowercase","new age","illbient","warm drone","sleep","psybient"],
@@ -1710,6 +1730,7 @@
     "funk": ["p-funk","g-funk","funk rock","jazz funk","boogie","synth funk","deep funk","new orleans funk","brit funk","latin funk","afro-funk","afrobeat","modern funk","traditional funk","minneapolis sound","go-go","rare groove"],
     "funk carioca": ["baile funk","brazilian funk","funk brasileiro","brega funk","funk 150 bpm","funk mandelao","funk mtg","mtg funk","funk ostentacao","funk paulista","funk viral","mega funk","rave funk","funk rj","funk bh","funk consciente","funk das antigas","funk melody","funk evangelico","funk capixaba","trap funk","cumbia funk","chill baile","deep funk ostentacao","funk bruxaria","funk automotivo","eletrofunk","arrocha funk","deboxe"],
     "garage rock": ["garage punk","proto-punk","freakbeat","garage rock revival","pub rock","mod revival","rautalanka"],
+    "glam rock": ["glam metal","glam punk","sleaze rock","hard glam","pop metal"],
     "gospel": ["christian pop","worship","global christian","christian hip hop"],
     "grindcore": ["goregrind","pornogrind","electrogrind","deathgrind","cybergrind","mathgrind","mincecore","noisecore","gorenoise","powerviolence"],
     "hard rock": ["glam metal","arena rock","sleaze rock","pub rock","shock rock","nwocr","melodic hard rock"],
@@ -6701,7 +6722,7 @@
           [STORAGE_KEY_RANGE_EXCLUDE_UNLISTENED]: "false",
           [STORAGE_KEY_FOLLOWED_RELEASES_CONFIG]: JSON.stringify(DEFAULT_FR_CONFIG),
           [STORAGE_KEY_LOCAL_FILES_HANDLING]: "convert_keep",
-          [STORAGE_KEY_GENRE_FILTER_SOURCES]: '{"spotify_track":true,"lastfm_track":false,"lastfm_artist":false,"deezer":false,"everynoise_artist":false}',
+          [STORAGE_KEY_GENRE_FILTER_SOURCES]: '{"spotify_track":true,"lastfm_track":false,"lastfm_artist":false,"deezer":false,"everynoise_artist":true}',
           [STORAGE_KEY_CF_FETCH_POPULARITY]: "false",
           [STORAGE_KEY_CF_FETCH_LASTFM]: "false",
           [STORAGE_KEY_CF_RELEASE_DATE_FORMAT]: "YYYY-MM-DD",
@@ -8250,20 +8271,6 @@
     } finally {
       pendingBlacklistEvaluations.delete(track.uri);
     }
-  }
-
-  let cachedCuratedSet = null;
-  function getCuratedGenresSet() {
-    if (cachedCuratedSet) return cachedCuratedSet;
-    const s = new Set();
-    if (typeof GENRE_MAPPINGS !== "undefined") {
-      Object.keys(GENRE_MAPPINGS).forEach(k => s.add(normalizeGenre(k)));
-    }
-    if (typeof MUSIC_MODEL_MAP !== "undefined") {
-      Object.keys(MUSIC_MODEL_MAP).forEach(k => s.add(normalizeGenre(k)));
-    }
-    cachedCuratedSet = s;
-    return s;
   }
 
   function showMatchedGenresModal(rule, onRuleChange = null) {
@@ -24490,7 +24497,7 @@ shadowRoot.innerHTML = `
         tracks = convertedTracks;
 
         const openModal = async () => {
-            const gfSources = JSON.parse(localStorage.getItem(STORAGE_KEY_GENRE_FILTER_SOURCES) || '{"spotify_track":true,"lastfm_track":false,"lastfm_artist":false,"deezer":false,"everynoise_artist":false}');
+            const gfSources = JSON.parse(localStorage.getItem(STORAGE_KEY_GENRE_FILTER_SOURCES) || '{"spotify_track":true,"lastfm_track":false,"lastfm_artist":false,"deezer":false,"everynoise_artist":true}');
             const { trackGenreMap, rawTrackGenres } = await fetchAllTrackGenres(
                 tracks,
                 null,
@@ -33492,7 +33499,7 @@ shadowRoot.innerHTML = `
             groupGenres: jobGroupGenres = true,
             filterNoise: jobFilterNoise = true
         } = filters.genreFilterSettings;
-        const gfSources = JSON.parse(localStorage.getItem(STORAGE_KEY_GENRE_FILTER_SOURCES) || '{"spotify_track":true,"lastfm_track":false,"lastfm_artist":false,"deezer":false,"everynoise_artist":false}');
+        const gfSources = JSON.parse(localStorage.getItem(STORAGE_KEY_GENRE_FILTER_SOURCES) || '{"spotify_track":true,"lastfm_track":false,"lastfm_artist":false,"deezer":false,"everynoise_artist":true}');
 
         const { rawTrackGenres } = await fetchAllTrackGenres(
             filteredTracks,
@@ -35378,8 +35385,10 @@ shadowRoot.innerHTML = `
         let rawDetectedGenres = safeFilters.detectedGenres ? [...safeFilters.detectedGenres] : [];
         let detectedGenres = [];
         let detectedSet = new Set();
+        let ungroupedDetectedGenres = [];
+        let ungroupedDetectedSet = new Set();
 
-        let gfSources = JSON.parse(localStorage.getItem(STORAGE_KEY_GENRE_FILTER_SOURCES) || '{"spotify_track":true,"lastfm_track":false,"lastfm_artist":false,"deezer":false,"everynoise_artist":false}');
+        let gfSources = JSON.parse(localStorage.getItem(STORAGE_KEY_GENRE_FILTER_SOURCES) || '{"spotify_track":true,"lastfm_track":false,"lastfm_artist":false,"deezer":false,"everynoise_artist":true}');
 
         const syncSets = () => {
             selectedSet.clear();
@@ -35388,7 +35397,7 @@ shadowRoot.innerHTML = `
             for (let i = 0; i < excludedGenres.length; i++) excludedSet.add(excludedGenres[i]);
         };
 
-        const resolveSavedList = (list) => {
+        const resolveSavedList = (list, useGrouping = groupGenres) => {
             if (!list || list.length === 0) return [];
             const onlySpTrack = gfSources.spotify_track && !gfSources.lastfm_track && !gfSources.lastfm_artist && !gfSources.everynoise_artist && !gfSources.deezer;
             const defaultSrc = onlySpTrack ? 'spotify_track' : 'lastfm_artist';
@@ -35396,25 +35405,29 @@ shadowRoot.innerHTML = `
             for (let i = 0; i < list.length; i++) {
                 const item = list[i];
                 if (onlySpTrack && isSpotifyTrackExcludedConcept(item)) continue;
-                const resolved = resolveGenreForFilter(item, defaultSrc, groupGenres, filterNoise, genrePlaylistsCache);
+                const resolved = resolveGenreForFilter(item, defaultSrc, useGrouping, filterNoise, genrePlaylistsCache);
                 resolved.forEach(r => out.add(r));
             }
             return Array.from(out);
         };
 
         if (rawDetectedGenres.length > 0) {
-            detectedGenres = resolveSavedList(rawDetectedGenres);
+            detectedGenres = resolveSavedList(rawDetectedGenres, groupGenres);
             detectedSet = new Set(detectedGenres);
+            ungroupedDetectedGenres = groupGenres ? resolveSavedList(rawDetectedGenres, false).filter(g => !detectedSet.has(g)) : [];
+            ungroupedDetectedSet = new Set(ungroupedDetectedGenres);
         }
 
         let isScanned = false;
         let isScanning = false;
         const groupedCatalogGenres = Object.keys(GENRE_MAPPINGS).sort();
+        const groupedCatalogSet = new Set(groupedCatalogGenres);
         const getCatalogGenresList = () => groupGenres ? groupedCatalogGenres : getFilterCatalogSubgenresPool(genrePlaylistsCache);
         let lastScanResult = null;
         let scannedTracks = [];
         let cachedFetchedTracks = null;
         const genreCounts = new Map();
+        const ungroupedGenreCounts = new Map();
         const currentTrackGenreMap = new Map();
 
         const updateStats = () => {
@@ -35450,21 +35463,29 @@ shadowRoot.innerHTML = `
         const pillWidthCache = new Map();
 
         const getDynamicPillWidth = (genreName, isDetected) => {
-            const countVal = isDetected ? (genreCounts.has(genreName) ? genreCounts.get(genreName) : '-') : null;
-            const cacheKey = `${genreName}\0${isDetected ? countVal : ''}`;
+            const countVal = isDetected ? (genreCounts.get(genreName) ?? ungroupedGenreCounts.get(genreName) ?? '-') : null;
+            const isSurfacedSub = groupGenres && !detectedSet.has(genreName) && !groupedCatalogSet.has(genreName);
+            const parentLabel = isSurfacedSub ? getSubgenreParentLabel(genreName) : "";
+            const cacheKey = `${genreName}\0${isDetected ? countVal : ''}\0${parentLabel}`;
             let cached = pillWidthCache.get(cacheKey);
             if (cached !== undefined) return cached;
 
             measureCtx.font = "500 13px 'SpotifyMixUI', sans-serif";
             const textWidth = Math.ceil(measureCtx.measureText(genreName).width);
 
+            let parentTagWidth = 0;
+            if (parentLabel) {
+                measureCtx.font = "400 11px 'SpotifyMixUI', sans-serif";
+                parentTagWidth = Math.ceil(measureCtx.measureText(parentLabel).width) + 12 + 6;
+            }
+
             if (isDetected) {
                 measureCtx.font = "400 12px 'SpotifyMixUI', sans-serif";
                 const badgeTextW = Math.ceil(measureCtx.measureText(String(countVal)).width);
                 const badgeW = Math.max(24, badgeTextW + 18);
-                cached = 10 + textWidth + 6 + badgeW + 6 + 4;
+                cached = 10 + textWidth + parentTagWidth + 6 + badgeW + 6 + 4;
             } else {
-                cached = 12 + textWidth + 12 + 4;
+                cached = 12 + textWidth + parentTagWidth + 12 + 4;
             }
 
             pillWidthCache.set(cacheKey, cached);
@@ -35490,15 +35511,37 @@ shadowRoot.innerHTML = `
             const searchTerm = searchInput ? searchInput.value.trim().toLowerCase() : '';
 
             const aliasMatchedSet = searchTerm ? buildGenreSearchMatchSet(searchTerm, groupGenres) : null;
+            const subAliasSet = (searchTerm && groupGenres) ? buildGenreSearchMatchSet(searchTerm, false) : aliasMatchedSet;
 
-            const matchesSearch = (g) => {
+            const matchesSearch = (g, aliasSet = aliasMatchedSet) => {
                 if (!searchTerm) return true;
                 const lower = g.toLowerCase();
-                return lower.includes(searchTerm) || aliasMatchedSet.has(lower) || aliasMatchedSet.has(normalizeGenre(lower));
+                return lower.includes(searchTerm) || aliasSet.has(lower) || aliasSet.has(normalizeGenre(lower));
             };
 
-            const filteredDetected = detectedGenres.filter(matchesSearch);
-            const filteredCommon = getCatalogGenresList().filter(g => !detectedSet.has(g) && matchesSearch(g));
+            let filteredDetected;
+            let filteredCommon;
+
+            if (!searchTerm) {
+                const activeDetSubs = groupGenres ? ungroupedDetectedGenres.filter(g => selectedSet.has(g) || excludedSet.has(g)) : [];
+                filteredDetected = activeDetSubs.length > 0 ? [...detectedGenres, ...activeDetSubs] : detectedGenres;
+
+                const baseCommon = getCatalogGenresList().filter(g => !detectedSet.has(g));
+                const activeCommonSubs = groupGenres
+                    ? getFilterCatalogSubgenresPool(genrePlaylistsCache).filter(g => !detectedSet.has(g) && !ungroupedDetectedSet.has(g) && !groupedCatalogSet.has(g) && (selectedSet.has(g) || excludedSet.has(g)))
+                    : [];
+                filteredCommon = activeCommonSubs.length > 0 ? [...baseCommon, ...activeCommonSubs] : baseCommon;
+            } else {
+                const mainDet = detectedGenres.filter(g => matchesSearch(g, aliasMatchedSet));
+                const subDet = groupGenres ? ungroupedDetectedGenres.filter(g => matchesSearch(g, subAliasSet)) : [];
+                filteredDetected = subDet.length > 0 ? [...mainDet, ...subDet] : mainDet;
+
+                const mainCommon = getCatalogGenresList().filter(g => !detectedSet.has(g) && matchesSearch(g, aliasMatchedSet));
+                const subCommon = groupGenres
+                    ? getFilterCatalogSubgenresPool(genrePlaylistsCache).filter(g => !detectedSet.has(g) && !ungroupedDetectedSet.has(g) && !groupedCatalogSet.has(g) && matchesSearch(g, subAliasSet))
+                    : [];
+                filteredCommon = subCommon.length > 0 ? [...mainCommon, ...subCommon] : mainCommon;
+            }
 
             const items = [];
             let currentY = 0;
@@ -35567,10 +35610,15 @@ shadowRoot.innerHTML = `
                 if (selectedSet.has(genre)) statusClass = 'selected';
                 else if (excludedSet.has(genre)) statusClass = 'excluded';
 
-                const countDisplay = isDetected ? (genreCounts.has(genre) ? genreCounts.get(genre) : '-') : 0;
+                const isSurfacedSub = groupGenres && !detectedSet.has(genre) && !groupedCatalogSet.has(genre);
+                const parentLabel = isSurfacedSub ? getSubgenreParentLabel(genre) : "";
+                const parentHtml = parentLabel ? `<span class="genre-parent-tag">${escapeHtml(parentLabel, "")}</span>` : "";
+                const titleAttr = parentLabel ? ` title="Subgenre grouped under ${escapeHtml(parentLabel, "")}"` : "";
+
+                const countDisplay = isDetected ? (genreCounts.get(genre) ?? ungroupedGenreCounts.get(genre) ?? '-') : 0;
                 const hasCountClass = isDetected ? 'detected has-count' : '';
 
-                buttonsHtml += `<button class="genre-button ${statusClass} ${hasCountClass}" data-genre="${esc}"><span>${esc}</span>${isDetected ? `<span class="genre-count-badge">${countDisplay}</span>` : ''}</button>`;
+                buttonsHtml += `<button class="genre-button ${statusClass} ${hasCountClass}" data-genre="${esc}"${titleAttr}><span>${esc}</span>${parentHtml}${isDetected ? `<span class="genre-count-badge">${countDisplay}</span>` : ''}</button>`;
             }
             return `<div class="dgf-virtual-item dgf-virtual-row" data-vidx="${idx}" style="top: ${item.top}px; height: ${item.height}px;">${buttonsHtml}</div>`;
         };
@@ -35728,6 +35776,7 @@ shadowRoot.innerHTML = `
 
         const processRawGenres = (rawGenresMap) => {
             genreCounts.clear();
+            ungroupedGenreCounts.clear();
             currentTrackGenreMap.clear();
             pillWidthCache.clear();
 
@@ -35764,6 +35813,7 @@ shadowRoot.innerHTML = `
             }
             const totalUniqueArtistsInPlaylist = playlistArtistNames.size;
             const nameSetsMap = new Map();
+            const ungroupedNameSetsMap = new Map();
 
             scannedTracks.forEach(track => {
                 const rawData = rawGenresMap.get(track.uri);
@@ -35806,9 +35856,21 @@ shadowRoot.innerHTML = `
                 }
 
                 nameSetsMap.set(track.uri, genresCountedForTrack);
+
+                if (groupGenres && rawData) {
+                    const ungroupedList = buildTrackGenresForFilter(rawData, gfSources, false, filterNoise, genrePlaylistsCache);
+                    const uSet = new Set();
+                    for (let i = 0; i < ungroupedList.length; i++) {
+                        uSet.add(ungroupedList[i].name);
+                    }
+                    ungroupedNameSetsMap.set(track.uri, uSet);
+                } else {
+                    ungroupedNameSetsMap.set(track.uri, genresCountedForTrack);
+                }
             });
 
             currentTrackGenreMap._nameSetsMap = nameSetsMap;
+            currentTrackGenreMap._ungroupedNameSetsMap = ungroupedNameSetsMap;
 
             const getTier = (details) => {
                 if (filterNoise) return 1;
@@ -35836,8 +35898,25 @@ shadowRoot.innerHTML = `
             });
             detectedSet = new Set(detectedGenres);
 
+            if (groupGenres) {
+                ungroupedNameSetsMap.forEach((uSet) => {
+                    uSet.forEach(gName => {
+                        if (!detectedSet.has(gName)) {
+                            ungroupedGenreCounts.set(gName, (ungroupedGenreCounts.get(gName) || 0) + 1);
+                        }
+                    });
+                });
+                ungroupedDetectedGenres = Array.from(ungroupedGenreCounts.keys()).sort((a, b) => {
+                    const diff = (ungroupedGenreCounts.get(b) || 0) - (ungroupedGenreCounts.get(a) || 0);
+                    return diff !== 0 ? diff : a.localeCompare(b);
+                });
+            } else {
+                ungroupedDetectedGenres = [];
+            }
+            ungroupedDetectedSet = new Set(ungroupedDetectedGenres);
+
             if (onScanComplete) {
-                onScanComplete(detectedGenres);
+                onScanComplete(rawDetectedGenres);
             }
 
             renderGenres();
@@ -35879,6 +35958,9 @@ shadowRoot.innerHTML = `
               .genre-button.selected { background-color: #1ED760; color: black; }
               .genre-button.excluded { background-color: #a92121; color: white; }
               .genre-button.has-count { padding: 4px 6px 4px 10px; }
+              .genre-parent-tag { font-size: 11px; font-weight: 400; color: #9e9e9e; background: rgba(255, 255, 255, 0.08); padding: 1px 6px; border-radius: 8px; white-space: nowrap; flex-shrink: 0; }
+              .genre-button.selected .genre-parent-tag { color: rgba(0, 0, 0, 0.75); background: rgba(0, 0, 0, 0.15); }
+              .genre-button.excluded .genre-parent-tag { color: rgba(255, 255, 255, 0.85); background: rgba(0, 0, 0, 0.25); }
               .genre-count-badge { background-color: rgba(255, 255, 255, 0.1); color: #e0e0e0; padding: 3px 9px; border-radius: 12px; font-size: 12px; font-weight: 400; min-width: 16px; text-align: center; }
               .genre-button.selected .genre-count-badge { background-color: rgba(0, 0, 0, 0.2); color: #000; }
               .genre-button.excluded .genre-count-badge { background-color: rgba(255, 255, 255, 0.2); color: #fff; }
@@ -35933,7 +36015,7 @@ shadowRoot.innerHTML = `
                         Group Similar Genres
                         <span class="tooltip-container">
                             ${infoIconSvg}
-                            <span class="custom-tooltip">Groups micro-genres and regional variations into main genres (e.g. 'bedroom pop' → 'indie pop').</span>
+                            <span class="custom-tooltip">Groups micro-genres and regional variations into main genres (e.g. 'bedroom pop' → 'indie pop'). Specific subgenres can still be found and selected by searching.</span>
                         </span>
                     </label>
                     <label class="switch-label">
@@ -36210,6 +36292,7 @@ shadowRoot.innerHTML = `
 
         modalContainer.querySelector('#group-genres-toggle').addEventListener('change', (e) => {
             groupGenres = e.target.checked;
+            pillWidthCache.clear();
             const rawItems = collectRawItemsWithSources(lastScanResult);
             selectedGenres = translateGenreSelectionForGrouping(selectedGenres, rawItems, groupGenres, filterNoise, genrePlaylistsCache);
             excludedGenres = translateGenreSelectionForGrouping(excludedGenres, rawItems, groupGenres, filterNoise, genrePlaylistsCache);
@@ -36217,7 +36300,10 @@ shadowRoot.innerHTML = `
             if (lastScanResult) {
                 processRawGenres(lastScanResult);
             } else {
-                detectedGenres = resolveSavedList(rawDetectedGenres);
+                detectedGenres = resolveSavedList(rawDetectedGenres, groupGenres);
+                detectedSet = new Set(detectedGenres);
+                ungroupedDetectedGenres = groupGenres ? resolveSavedList(rawDetectedGenres, false).filter(g => !detectedSet.has(g)) : [];
+                ungroupedDetectedSet = new Set(ungroupedDetectedGenres);
                 renderGenres();
                 updateStats();
             }
@@ -36225,15 +36311,19 @@ shadowRoot.innerHTML = `
 
         modalContainer.querySelector('#filter-noise-toggle').addEventListener('change', (e) => {
             filterNoise = e.target.checked;
+            pillWidthCache.clear();
             if (lastScanResult) {
                 processRawGenres(lastScanResult);
             } else {
-                detectedGenres = resolveSavedList(rawDetectedGenres);
+                detectedGenres = resolveSavedList(rawDetectedGenres, groupGenres);
+                detectedSet = new Set(detectedGenres);
+                ungroupedDetectedGenres = groupGenres ? resolveSavedList(rawDetectedGenres, false).filter(g => !detectedSet.has(g)) : [];
+                ungroupedDetectedSet = new Set(ungroupedDetectedGenres);
                 renderGenres();
                 updateStats();
             }
             if (filterNoise) {
-                const validPool = new Set([...detectedGenres, ...getCatalogGenresList()]);
+                const validPool = new Set([...detectedGenres, ...ungroupedDetectedGenres, ...getCatalogGenresList(), ...getFilterCatalogSubgenresPool(genrePlaylistsCache)]);
                 selectedGenres = selectedGenres.filter(g => validPool.has(g) || resolveGenreForFilter(g, 'lastfm_artist', groupGenres, true, genrePlaylistsCache).length > 0);
                 excludedGenres = excludedGenres.filter(g => validPool.has(g) || resolveGenreForFilter(g, 'lastfm_artist', groupGenres, true, genrePlaylistsCache).length > 0);
                 updateMountedStates();
@@ -38968,7 +39058,7 @@ shadowRoot.innerHTML = `
 
   async function showGenreFilterModal(tracks, initialTrackGenreMap, rawGenreData, sourceUri) {
     const abortController = new AbortController();
-    let gfSources = JSON.parse(localStorage.getItem(STORAGE_KEY_GENRE_FILTER_SOURCES) || '{"spotify_track":true,"lastfm_track":false,"lastfm_artist":false,"deezer":false,"everynoise_artist":false}');
+    let gfSources = JSON.parse(localStorage.getItem(STORAGE_KEY_GENRE_FILTER_SOURCES) || '{"spotify_track":true,"lastfm_track":false,"lastfm_artist":false,"deezer":false,"everynoise_artist":true}');
     let activeTitleSources = { ...gfSources };
     const originallyFetchedSources = { ...gfSources };
 
@@ -39011,6 +39101,9 @@ shadowRoot.innerHTML = `
     let allGenres = new Set();
     let genreCounts = new Map();
     let masterSortedGenres = [];
+    let ungroupedAllGenres = new Set();
+    let ungroupedGenreCounts = new Map();
+    let masterUngroupedSubgenres = [];
     let groupGenres = groupSimilarGenres;
     let filterNoise = filterNoiseGenres;
 
@@ -39107,6 +39200,25 @@ shadowRoot.innerHTML = `
             if (detailsA.isTrusted !== detailsB.isTrusted) return detailsA.isTrusted ? -1 : 1;
             return a.localeCompare(b);
         });
+
+        ungroupedAllGenres.clear();
+        ungroupedGenreCounts.clear();
+        if (groupGenres && trackGenreMap._ungroupedNameSetsMap) {
+            trackGenreMap._ungroupedNameSetsMap.forEach((uSet) => {
+                uSet.forEach(gName => {
+                    if (!allGenres.has(gName)) {
+                        ungroupedAllGenres.add(gName);
+                        ungroupedGenreCounts.set(gName, (ungroupedGenreCounts.get(gName) || 0) + 1);
+                    }
+                });
+            });
+            masterUngroupedSubgenres = Array.from(ungroupedAllGenres).sort((a, b) => {
+                const diff = (ungroupedGenreCounts.get(b) || 0) - (ungroupedGenreCounts.get(a) || 0);
+                return diff !== 0 ? diff : a.localeCompare(b);
+            });
+        } else {
+            masterUngroupedSubgenres = [];
+        }
     };
 
     const rebuildGenreMap = (updateDomStat = true) => {
@@ -39208,6 +39320,8 @@ shadowRoot.innerHTML = `
       .genre-button.selected::before { background: linear-gradient(to right, rgb(30 215 96 / 35%), rgb(30 215 96 / 80%)); opacity: 1; }
       .genre-button.excluded { color: #ffffff; border: none; }
       .genre-button.excluded::before { background: linear-gradient(to right, rgb(169 33 33 / 45%), rgb(169 33 33 / 85%)); opacity: 1; }
+      .genre-parent-tag { font-size: 11px; font-weight: 400; color: #9e9e9e; background: rgba(255, 255, 255, 0.07); padding: 1px 6px; border-radius: 8px; white-space: nowrap; flex-shrink: 0; }
+      .genre-button.selected .genre-parent-tag, .genre-button.excluded .genre-parent-tag { color: rgba(255, 255, 255, 0.85); background: rgba(0, 0, 0, 0.22); }
       .genre-count-badge { background-color: #454545; color: #e0e0e0; padding: 1px 8px; border-radius: 12px; font-size: 13px; font-weight: 400; min-width: 22px; text-align: center; line-height: 1.5; flex-shrink: 0; transition: background-color 0.1s ease, color 0.1s ease; }
       .genre-button.selected .genre-count-badge { background-color: rgb(20, 109, 52); color: #ffffff; }
       .genre-button.excluded .genre-count-badge { background-color: rgb(91, 21, 21); color: #ffffff; }
@@ -39368,7 +39482,7 @@ shadowRoot.innerHTML = `
                             Group Similar Genres
                             <span class="tooltip-container">
                                 ${infoIconSvg}
-                                <span class="custom-tooltip">Groups micro-genres and regional variations into main genres (e.g. 'bedroom pop' → 'indie pop').</span>
+                                <span class="custom-tooltip">Groups micro-genres and regional variations into main genres (e.g. 'bedroom pop' → 'indie pop'). Specific subgenres can still be found and selected by searching.</span>
                             </span>
                         </label>
                         <label class="switch">
@@ -39476,19 +39590,27 @@ shadowRoot.innerHTML = `
     const pillWidthCache = new Map();
 
     const getPillWidth = (genreName, count) => {
-        const cacheKey = `${genreName}\0${count}`;
+        const isSurfacedSub = groupGenres && !allGenres.has(genreName);
+        const parentLabel = isSurfacedSub ? getSubgenreParentLabel(genreName) : "";
+        const cacheKey = `${genreName}\0${count}\0${parentLabel}`;
         let cached = pillWidthCache.get(cacheKey);
         if (cached !== undefined) return cached;
 
         measureCtx.font = "500 14px 'SpotifyMixUI', sans-serif";
         const textWidth = Math.ceil(measureCtx.measureText(genreName).width);
 
+        let parentTagWidth = 0;
+        if (parentLabel) {
+            measureCtx.font = "400 11px 'SpotifyMixUI', sans-serif";
+            parentTagWidth = Math.ceil(measureCtx.measureText(parentLabel).width) + 12 + 8;
+        }
+
         const countStr = String(count);
         measureCtx.font = "400 13px 'SpotifyMixUI', sans-serif";
         const badgeTextWidth = Math.ceil(measureCtx.measureText(countStr).width);
         const badgeWidth = Math.max(22, badgeTextWidth + 16);
 
-        cached = 16 + textWidth + 8 + badgeWidth + 7 + 4;
+        cached = 16 + textWidth + parentTagWidth + 8 + badgeWidth + 7 + 4;
         pillWidthCache.set(cacheKey, cached);
         return cached;
     };
@@ -39504,7 +39626,7 @@ shadowRoot.innerHTML = `
 
         for (let i = 0; i < currentFilteredGenres.length; i++) {
             const g = currentFilteredGenres[i];
-            const count = genreCounts.get(g) || 0;
+            const count = genreCounts.get(g) ?? ungroupedGenreCounts.get(g) ?? 0;
             const w = getPillWidth(g, count);
 
             if (currentRow.length > 0 && currentWidth + GAP + w > availWidth) {
@@ -39527,14 +39649,18 @@ shadowRoot.innerHTML = `
         let inner = "";
         for (let i = 0; i < rowGenres.length; i++) {
             const genre = rowGenres[i];
-            const count = genreCounts.get(genre) || 0;
+            const count = genreCounts.get(genre) ?? ungroupedGenreCounts.get(genre) ?? 0;
             const escaped = escapeHtml(genre, "");
+            const isSurfacedSub = groupGenres && !allGenres.has(genre);
+            const parentLabel = isSurfacedSub ? getSubgenreParentLabel(genre) : "";
+            const parentHtml = parentLabel ? `<span class="genre-parent-tag">${escapeHtml(parentLabel, "")}</span>` : "";
+            const titleAttr = parentLabel ? ` title="Subgenre grouped under ${escapeHtml(parentLabel, "")}"` : "";
             let stateClass = "";
             if (selectedSet.has(genre)) stateClass = "selected";
             else if (excludedSet.has(genre)) stateClass = "excluded";
             else if (relatedGenres.has(genre)) stateClass = "related";
 
-            inner += `<button class="genre-button ${stateClass}" data-genre="${escaped}"><span class="genre-button-label">${escaped}</span><span class="genre-count-badge">${count}</span></button>`;
+            inner += `<button class="genre-button ${stateClass}" data-genre="${escaped}"${titleAttr}><span class="genre-button-label">${escaped}</span>${parentHtml}<span class="genre-count-badge">${count}</span></button>`;
         }
         return `<div class="genre-virtual-row" data-row="${rowIdx}" style="top: ${topPx}px;">${inner}</div>`;
     };
@@ -39654,21 +39780,25 @@ shadowRoot.innerHTML = `
 
         if (selectedSet.size > 0 || excludedSet.size > 0) {
             const nameSetsMap = trackGenreMap._nameSetsMap;
+            const ungroupedNameSetsMap = trackGenreMap._ungroupedNameSetsMap;
             const hasSelected = selectedSet.size > 0;
             const hasExcluded = excludedSet.size > 0;
 
             for (let t = 0; t < tracks.length; t++) {
                 const trackUri = tracks[t].uri;
                 const trackGenreNames = nameSetsMap ? nameSetsMap.get(trackUri) : null;
-                if (!trackGenreNames || trackGenreNames.size === 0) {
+                const ungroupedNames = ungroupedNameSetsMap ? ungroupedNameSetsMap.get(trackUri) : null;
+                if ((!trackGenreNames || trackGenreNames.size === 0) && (!ungroupedNames || ungroupedNames.size === 0)) {
                     if (!hasSelected) filteredCount++;
                     continue;
                 }
 
+                const hasGenre = (g) => (trackGenreNames && trackGenreNames.has(g)) || (ungroupedNames && ungroupedNames.has(g));
+
                 if (hasExcluded) {
                     let isExcluded = false;
-                    for (const g of trackGenreNames) {
-                        if (excludedSet.has(g)) {
+                    for (const g of excludedSet) {
+                        if (hasGenre(g)) {
                             isExcluded = true;
                             break;
                         }
@@ -39680,7 +39810,7 @@ shadowRoot.innerHTML = `
                 if (hasSelected) {
                     if (matchAllGenres) {
                         for (const s of selectedSet) {
-                            if (!trackGenreNames.has(s)) {
+                            if (!hasGenre(s)) {
                                 isMatched = false;
                                 break;
                             }
@@ -39688,7 +39818,7 @@ shadowRoot.innerHTML = `
                     } else {
                         isMatched = false;
                         for (const s of selectedSet) {
-                            if (trackGenreNames.has(s)) {
+                            if (hasGenre(s)) {
                                 isMatched = true;
                                 break;
                             }
@@ -39699,8 +39829,15 @@ shadowRoot.innerHTML = `
                 if (isMatched) {
                     filteredCount++;
                     if (hasSelected) {
-                        for (const g of trackGenreNames) {
-                            if (!selectedSet.has(g)) relatedGenres.add(g);
+                        if (trackGenreNames) {
+                            for (const g of trackGenreNames) {
+                                if (!selectedSet.has(g)) relatedGenres.add(g);
+                            }
+                        }
+                        if (ungroupedNames) {
+                            for (const g of ungroupedNames) {
+                                if (!selectedSet.has(g)) relatedGenres.add(g);
+                            }
                         }
                     }
                 }
@@ -39713,15 +39850,31 @@ shadowRoot.innerHTML = `
     }
 
     function updateGenreButtons() {
+        syncSelectionSets();
         const searchTerm = searchBar.value.trim().toLowerCase();
         if (!searchTerm) {
-            currentFilteredGenres = masterSortedGenres;
+            if (groupGenres && masterUngroupedSubgenres.length > 0) {
+                const activeSubs = masterUngroupedSubgenres.filter(g => selectedSet.has(g) || excludedSet.has(g));
+                currentFilteredGenres = activeSubs.length > 0 ? [...masterSortedGenres, ...activeSubs] : masterSortedGenres;
+            } else {
+                currentFilteredGenres = masterSortedGenres;
+            }
         } else {
             const aliasMatchedSet = buildGenreSearchMatchSet(searchTerm, groupGenres);
-            currentFilteredGenres = masterSortedGenres.filter(genre => {
+            const matchedMains = masterSortedGenres.filter(genre => {
                 const lower = genre.toLowerCase();
                 return lower.includes(searchTerm) || aliasMatchedSet.has(lower) || aliasMatchedSet.has(normalizeGenre(lower));
             });
+            if (groupGenres && masterUngroupedSubgenres.length > 0) {
+                const subAliasSet = buildGenreSearchMatchSet(searchTerm, false);
+                const matchedSubs = masterUngroupedSubgenres.filter(genre => {
+                    const lower = genre.toLowerCase();
+                    return lower.includes(searchTerm) || subAliasSet.has(lower) || subAliasSet.has(normalizeGenre(lower));
+                });
+                currentFilteredGenres = matchedSubs.length > 0 ? [...matchedMains, ...matchedSubs] : matchedMains;
+            } else {
+                currentFilteredGenres = matchedMains;
+            }
         }
 
         genreContainer.scrollTop = 0;
@@ -39743,8 +39896,8 @@ shadowRoot.innerHTML = `
             if (sourcesContainer) sourcesContainer.innerHTML = getDynamicGenreSourcesHtml(activeTitleSources, originallyFetchedSources);
 
             rebuildGenreMap();
-            selectedGenres = selectedGenres.filter(g => allGenres.has(g));
-            excludedGenres = excludedGenres.filter(g => allGenres.has(g));
+            selectedGenres = selectedGenres.filter(g => allGenres.has(g) || ungroupedAllGenres.has(g));
+            excludedGenres = excludedGenres.filter(g => allGenres.has(g) || ungroupedAllGenres.has(g));
             updateGenreButtons();
             if (needsRefetch) {
                 showNotification("Settings saved. Close and reopen the Genre Filter to fetch newly enabled sources.", "warning");
@@ -39849,13 +40002,22 @@ shadowRoot.innerHTML = `
         if (!genre) return;
         selectedGenres = selectedGenres.filter(g => g !== genre);
         excludedGenres = excludedGenres.filter(g => g !== genre);
-        updateFilteredTracksCount();
+        if (groupGenres && !searchBar.value.trim() && !allGenres.has(genre)) {
+            updateGenreButtons();
+        } else {
+            updateFilteredTracksCount();
+        }
     });
 
     clearAllBtn.addEventListener("click", () => {
+        const hadUngroupedSub = groupGenres && !searchBar.value.trim() && (selectedGenres.some(g => !allGenres.has(g)) || excludedGenres.some(g => !allGenres.has(g)));
         selectedGenres = [];
         excludedGenres = [];
-        updateFilteredTracksCount();
+        if (hadUngroupedSub) {
+            updateGenreButtons();
+        } else {
+            updateFilteredTracksCount();
+        }
     });
 
     matchAllGenresToggle.addEventListener("change", () => {
@@ -39902,8 +40064,8 @@ shadowRoot.innerHTML = `
         excludedGenres = translateGenreSelectionForGrouping(excludedGenres, rawItems, groupGenres, filterNoise, genrePlaylistsCache);
 
         rebuildGenreMap();
-        selectedGenres = selectedGenres.filter(g => allGenres.has(g));
-        excludedGenres = excludedGenres.filter(g => allGenres.has(g));
+        selectedGenres = selectedGenres.filter(g => allGenres.has(g) || ungroupedAllGenres.has(g));
+        excludedGenres = excludedGenres.filter(g => allGenres.has(g) || ungroupedAllGenres.has(g));
         updateGenreButtons();
     });
 
@@ -39913,8 +40075,8 @@ shadowRoot.innerHTML = `
         saveSettings();
 
         rebuildGenreMap();
-        selectedGenres = selectedGenres.filter(g => allGenres.has(g));
-        excludedGenres = excludedGenres.filter(g => allGenres.has(g));
+        selectedGenres = selectedGenres.filter(g => allGenres.has(g) || ungroupedAllGenres.has(g));
+        excludedGenres = excludedGenres.filter(g => allGenres.has(g) || ungroupedAllGenres.has(g));
         updateGenreButtons();
     });
 
@@ -39950,14 +40112,20 @@ shadowRoot.innerHTML = `
 
     selectAllButton.addEventListener("click", () => {
         const filteredSet = new Set(currentFilteredGenres);
-        const allSelected = currentFilteredGenres.length > 0 && currentFilteredGenres.every(genre => selectedSet.has(genre));
+        const mainTargets = groupGenres ? currentFilteredGenres.filter(g => allGenres.has(g)) : currentFilteredGenres;
+        const mainTargetSet = new Set(mainTargets);
+        const subTargets = groupGenres
+            ? currentFilteredGenres.filter(g => !allGenres.has(g) && !mainTargetSet.has(getSubgenreParentLabel(g)))
+            : [];
+        const targetGenres = [...mainTargets, ...subTargets];
+        const allSelected = targetGenres.length > 0 && targetGenres.every(genre => selectedSet.has(genre));
 
         selectedGenres = selectedGenres.filter(genre => !filteredSet.has(genre));
         excludedGenres = excludedGenres.filter(genre => !filteredSet.has(genre));
 
         if (!allSelected) {
-            for (let i = 0; i < currentFilteredGenres.length; i++) {
-                selectedGenres.push(currentFilteredGenres[i]);
+            for (let i = 0; i < targetGenres.length; i++) {
+                selectedGenres.push(targetGenres[i]);
             }
         }
 
@@ -40649,7 +40817,7 @@ shadowRoot.innerHTML = `
     if (requestedSources) {
       reqSources = { ...requestedSources };
     } else {
-      const savedSettings = JSON.parse(localStorage.getItem(STORAGE_KEY_GENRE_FILTER_SOURCES) || '{"spotify_track":true,"lastfm_track":false,"lastfm_artist":false,"deezer":false,"everynoise_artist":false}');
+      const savedSettings = JSON.parse(localStorage.getItem(STORAGE_KEY_GENRE_FILTER_SOURCES) || '{"spotify_track":true,"lastfm_track":false,"lastfm_artist":false,"deezer":false,"everynoise_artist":true}');
       reqSources = { ...savedSettings };
       if (!SPOTIFY_TRACK_GENRES_WORKING) {
         reqSources.spotify_artist = true;
@@ -41674,18 +41842,6 @@ shadowRoot.innerHTML = `
           matched.add(canonical.toLowerCase());
           if (norm) matched.add(norm);
           if (canonSub) matched.add(canonSub);
-          if (groupGenres) {
-            const mains = VARIANT_TO_MAIN_GENRE_MAP[getNormalizedGenreKey(canonical)];
-            if (mains) mains.forEach(m => matched.add(m.toLowerCase()));
-          }
-        }
-      }
-    }
-
-    if (groupGenres && typeof GENRE_MAPPINGS !== "undefined" && GENRE_MAPPINGS) {
-      for (const [mainGenre, variants] of Object.entries(GENRE_MAPPINGS)) {
-        if (variants.some(v => v.includes(searchTerm))) {
-          matched.add(mainGenre.toLowerCase());
         }
       }
     }
@@ -41699,6 +41855,16 @@ shadowRoot.innerHTML = `
     }
 
     return matched;
+  }
+
+  function getSubgenreParentLabel(genreName) {
+    if (!genreName) return "";
+    const normKey = getNormalizedGenreKey(normalizeGenre(genreName));
+    const mains = VARIANT_TO_MAIN_GENRE_MAP[normKey];
+    if (!mains || mains.length === 0) return "";
+    const lower = genreName.toLowerCase();
+    const filtered = mains.filter(m => m.toLowerCase() !== lower);
+    return filtered.length > 0 ? filtered[0] : "";
   }
 
   function toCanonicalSubgenreName(tag, genreMap = genrePlaylistsCache) {
@@ -42048,8 +42214,10 @@ shadowRoot.innerHTML = `
   function buildGenreFilterTrackMap(tracks, rawGenresMap, gfSources, groupGenres = true, filterNoise = true, genreMap = genrePlaylistsCache) {
     const map = new Map();
     const nameSetsMap = new Map();
+    const ungroupedNameSetsMap = new Map();
     if (!tracks || !rawGenresMap) {
       map._nameSetsMap = nameSetsMap;
+      map._ungroupedNameSetsMap = ungroupedNameSetsMap;
       return map;
     }
 
@@ -42063,9 +42231,21 @@ shadowRoot.innerHTML = `
         nameSet.add(genres[j].name);
       }
       nameSetsMap.set(uri, nameSet);
+
+      if (groupGenres && rawData) {
+        const ungrouped = buildTrackGenresForFilter(rawData, gfSources, false, filterNoise, genreMap);
+        const uSet = new Set();
+        for (let j = 0; j < ungrouped.length; j++) {
+          uSet.add(ungrouped[j].name);
+        }
+        ungroupedNameSetsMap.set(uri, uSet);
+      } else {
+        ungroupedNameSetsMap.set(uri, nameSet);
+      }
     }
 
     map._nameSetsMap = nameSetsMap;
+    map._ungroupedNameSetsMap = ungroupedNameSetsMap;
     return map;
   }
 
@@ -42216,9 +42396,11 @@ shadowRoot.innerHTML = `
 
     const excludedSet = hasExcluded ? new Set(excludedGenres) : null;
     const nameSetsMap = trackGenreMap._nameSetsMap;
+    const ungroupedNameSetsMap = trackGenreMap._ungroupedNameSetsMap;
 
     return tracks.filter(track => {
       let trackGenreNames = nameSetsMap ? nameSetsMap.get(track.uri) : null;
+      const ungroupedNames = ungroupedNameSetsMap ? ungroupedNameSetsMap.get(track.uri) : null;
       if (!trackGenreNames) {
         const trackGenres = trackGenreMap.get(track.uri);
         if (!trackGenres || trackGenres.length === 0) return !hasSelected;
@@ -42226,13 +42408,15 @@ shadowRoot.innerHTML = `
         for (let i = 0; i < trackGenres.length; i++) {
           trackGenreNames.add(trackGenres[i].name);
         }
-      } else if (trackGenreNames.size === 0) {
+      } else if (trackGenreNames.size === 0 && (!ungroupedNames || ungroupedNames.size === 0)) {
         return !hasSelected;
       }
 
+      const hasGenre = (g) => trackGenreNames.has(g) || (ungroupedNames ? ungroupedNames.has(g) : false);
+
       if (hasExcluded) {
-        for (const g of trackGenreNames) {
-          if (excludedSet.has(g)) return false;
+        for (const g of excludedSet) {
+          if (hasGenre(g)) return false;
         }
       }
 
@@ -42240,12 +42424,12 @@ shadowRoot.innerHTML = `
 
       if (effectiveMatchAll) {
         for (let i = 0; i < selectedGenres.length; i++) {
-          if (!trackGenreNames.has(selectedGenres[i])) return false;
+          if (!hasGenre(selectedGenres[i])) return false;
         }
         return true;
       } else {
         for (let i = 0; i < selectedGenres.length; i++) {
-          if (trackGenreNames.has(selectedGenres[i])) return true;
+          if (hasGenre(selectedGenres[i])) return true;
         }
         return false;
       }
@@ -45522,7 +45706,7 @@ shadowRoot.innerHTML = `
                 onSettingsClick: (event) => {
                     event.stopPropagation();
                     closeAllMenus();
-                    const currentSources = JSON.parse(localStorage.getItem(STORAGE_KEY_GENRE_FILTER_SOURCES) || '{"spotify_track":true,"lastfm_track":false,"lastfm_artist":false,"deezer":false,"everynoise_artist":false}');
+                    const currentSources = JSON.parse(localStorage.getItem(STORAGE_KEY_GENRE_FILTER_SOURCES) || '{"spotify_track":true,"lastfm_track":false,"lastfm_artist":false,"deezer":false,"everynoise_artist":true}');
                     showGenreFilterSettingsModal(currentSources, (newSources) => {
                         localStorage.setItem(STORAGE_KEY_GENRE_FILTER_SOURCES, JSON.stringify(newSources));
                         showNotification("Genre Filter sources updated.");
@@ -50983,7 +51167,7 @@ shadowRoot.innerHTML = `
       let weightSum = 0;
 
       const resolveModel = (name, allowMoodFallback = false) => {
-          if (!name || (!Spicetify.URI.isLocal(uri) && artists.length === 0)) return null;
+          if (!name) return null;
           const lower = name.toLowerCase().trim();
           const norm = normalizeGenre(lower);
           const compactKey = getNormalizedGenreKey(lower);
