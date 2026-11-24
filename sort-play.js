@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "6.13.0";
+  const SORT_PLAY_VERSION = "6.14.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -102,6 +102,9 @@
   const STORAGE_KEY_SELECTED_ARTIST_COLUMN_TYPE = "sort-play-selected-artist-column-type";
   const STORAGE_KEY_RELEASE_DATE_FORMAT = "sort-play-release-date-format";
   const STORAGE_KEY_REMOVE_DATE_ADDED = "sort-play-remove-date-added";
+  const STORAGE_KEY_EXTRA_COLUMNS_CONFIG = "sort-play-extra-columns-config-v1";
+  const STORAGE_KEY_EXTRA_COLUMN_WIDTHS = "sort-play-extra-column-widths-v1";
+  const STORAGE_KEY_EXTRA_COLS_WINDOW_POS = "sort-play-extra-cols-window-pos";
   const STORAGE_KEY_INCLUDE_SONG_STATS = "sort-play-include-song-stats";
   const STORAGE_KEY_INCLUDE_LYRICS = "sort-play-include-lyrics";
   const STORAGE_KEY_AI_MODEL = "sort-play-ai-model";
@@ -153,6 +156,7 @@
   const STORAGE_KEY_GENRE_BLACKLIST_NOTIFY = "sort-play-genre-blacklist-notify";
   const STORAGE_KEY_GENRE_BLACKLIST_PROTECT_LIKED = "sort-play-genre-blacklist-protect-liked";
   const STORAGE_KEY_GENRE_BLACKLIST_CONFIG = "sort-play-genre-blacklist-config";
+  const STORAGE_KEY_ANALYSIS_GENRE_SOURCES = "sort-play-analysis-genre-sources";
 
   const SYNCABLE_SETTINGS_KEYS = [
     STORAGE_KEY_SHOW_GENRE_TAGS, STORAGE_KEY_SHOW_GENRE_TAGS_NP, STORAGE_KEY_SHOW_GENRE_TAGS_AP,
@@ -194,6 +198,7 @@
     STORAGE_KEY_SELECTED_COLUMN_TYPE, STORAGE_KEY_SELECTED_SECOND_COLUMN_TYPE,
     STORAGE_KEY_SELECTED_ALBUM_COLUMN_TYPE, STORAGE_KEY_SELECTED_ARTIST_COLUMN_TYPE,
     STORAGE_KEY_RELEASE_DATE_FORMAT, STORAGE_KEY_REMOVE_DATE_ADDED,
+    STORAGE_KEY_EXTRA_COLUMNS_CONFIG, STORAGE_KEY_EXTRA_COLUMN_WIDTHS,
     STORAGE_KEY_INCLUDE_SONG_STATS, STORAGE_KEY_INCLUDE_LYRICS,
     STORAGE_KEY_AI_MODEL, STORAGE_KEY_MATCH_ALL_GENRES,
     STORAGE_KEY_GROUP_SIMILAR_GENRES, STORAGE_KEY_FILTER_NOISE_GENRES,
@@ -214,7 +219,8 @@
     STORAGE_KEY_CF_RELEASE_DATE_FORMAT, STORAGE_KEY_CF_MY_SCROBBLES_MODE, STORAGE_KEY_CF_KEY_MODE,
     STORAGE_KEY_PRESERVE_DATE_ADDED, STORAGE_KEY_DEDICATED_OVERRIDES, STORAGE_KEY_BACKUP_UNAVAILABLE_ON_REMOVE,
     STORAGE_KEY_BACKUP_DUPLICATES_ON_REMOVE, STORAGE_KEY_GENRE_BLACKLIST, STORAGE_KEY_GENRE_BLACKLIST_ENABLED,
-    STORAGE_KEY_GENRE_BLACKLIST_NOTIFY, STORAGE_KEY_GENRE_BLACKLIST_PROTECT_LIKED, STORAGE_KEY_GENRE_BLACKLIST_CONFIG
+    STORAGE_KEY_GENRE_BLACKLIST_NOTIFY, STORAGE_KEY_GENRE_BLACKLIST_PROTECT_LIKED, STORAGE_KEY_GENRE_BLACKLIST_CONFIG,
+    STORAGE_KEY_ANALYSIS_GENRE_SOURCES
   ];
   const AI_MODELS = [
     { id: "gemini-3.1-pro-preview", label: "Gemini 3.1 Pro", requiresCustomKey: true },
@@ -224,7 +230,7 @@
     { id: "gemini-flash-lite-latest", label: "Gemini Flash-Lite Latest", requiresCustomKey: false }
   ];
   const DEFAULT_AI_MODEL = AI_MODELS[1].id;
-  const DEFAULT_FR_CONFIG = { keywords: [], filterMode: 'exclude', matchWholeWord: false, filterTitle: true, filterAlbum: true, versions: { live: 'all', remix: 'all', acoustic: 'all', instrumental: 'all' }, artistFilterMode: 'exclude', selectedArtists: [] };
+  const DEFAULT_FR_CONFIG = { keywords: [], filterMode: 'exclude', matchWholeWord: false, filterTitle: true, filterAlbum: true, versions: { live: 'all', remix: 'all', acoustic: 'all', instrumental: 'all' }, artistFilterMode: 'exclude', selectedArtists: [], releaseDateMode: 'standard' };
   const STRICT_VERSION_REGEX_STR = "(?:\\(|\\[|-).*?\\b";
   const STRICT_LIVE_REGEX = new RegExp(STRICT_VERSION_REGEX_STR + "live\\b.*?(?:\\)|\\]|$)", "i");
   const STRICT_REMIX_REGEX = new RegExp(STRICT_VERSION_REGEX_STR + "remix\\b.*?(?:\\)|\\]|$)", "i");
@@ -242,6 +248,99 @@
   let showAlbumColumn = false;
   let showArtistColumn = false; 
   let removeDateAdded = false;
+  const EXTRA_COLUMN_TYPES = {
+    playCount: { label: 'Plays', fullLabel: 'Play Count', weight: 1.8, minW: 112, numeric: true },
+    popularity: { label: 'Popularity', fullLabel: 'Popularity', weight: 1.1, minW: 80, numeric: true },
+    releaseDate: { label: 'Rel. Date', fullLabel: 'Release Date', weight: 1.5, minW: 98, numeric: true },
+    trueReleaseDate: { label: 'True Date', fullLabel: 'True Release Date', weight: 1.5, minW: 98, numeric: true },
+    scrobbles: { label: 'Scrobbles', fullLabel: 'Scrobbles', weight: 1.65, minW: 98, numeric: true },
+    personalScrobbles: { label: 'My Scrobbles', fullLabel: 'My Scrobbles', weight: 1.4, minW: 96, numeric: true },
+    lastScrobbled: { label: 'Last Played', fullLabel: 'Last Scrobbled', weight: 1.65, minW: 108 },
+    djInfo: { label: 'DJ Info', fullLabel: 'DJ Info', weight: 2.05, minW: 132 },
+    key: { label: 'Key', fullLabel: 'Key', weight: 1.05, minW: 70 },
+    tempo: { label: 'BPM', fullLabel: 'Tempo (BPM)', weight: 0.9, minW: 58, numeric: true },
+    energy: { label: 'Energy', fullLabel: 'Energy', weight: 0.95, minW: 62, numeric: true },
+    danceability: { label: 'Dance', fullLabel: 'Danceability', weight: 0.95, minW: 62, numeric: true },
+    valence: { label: 'Valence', fullLabel: 'Valence', weight: 0.95, minW: 62, numeric: true }
+  };
+  const EXTRA_COLUMN_FORMAT_OPTIONS = {
+    playCount: [
+      { value: 'raw', label: 'Full (1,234,567)' },
+      { value: 'abbreviated', label: 'Short (1.2M)' },
+      { value: 'rounded_abbreviated', label: 'Simple (1M)' }
+    ],
+    scrobbles: [
+      { value: 'raw', label: 'Full (1,234,567)' },
+      { value: 'abbreviated', label: 'Short (1.2M)' },
+      { value: 'rounded_abbreviated', label: 'Simple (1M)' }
+    ],
+    personalScrobbles: [
+      { value: 'number', label: 'Full (1,234)' },
+      { value: 'abbreviated', label: 'Short (1.2K)' },
+      { value: 'sign', label: 'Checkmark (✅)' }
+    ],
+    releaseDate: [
+      { value: 'YYYY-MM-DD', label: 'YYYY-MM-DD' },
+      { value: 'MM-DD-YYYY', label: 'MM-DD-YYYY' },
+      { value: 'DD-MM-YYYY', label: 'DD-MM-YYYY' },
+      { value: 'MMM D, YYYY', label: 'Month D, YYYY' },
+      { value: 'D MMM, YYYY', label: 'D Month, YYYY' },
+      { value: 'YYYY, MMM D', label: 'YYYY, Month D' },
+      { value: 'YYYY-MM', label: 'YYYY-MM' },
+      { value: 'MM-YYYY', label: 'MM-YYYY' },
+      { value: 'YYYY', label: 'YYYY' }
+    ],
+    trueReleaseDate: [
+      { value: 'YYYY-MM-DD', label: 'YYYY-MM-DD' },
+      { value: 'MM-DD-YYYY', label: 'MM-DD-YYYY' },
+      { value: 'DD-MM-YYYY', label: 'DD-MM-YYYY' },
+      { value: 'MMM D, YYYY', label: 'Month D, YYYY' },
+      { value: 'D MMM, YYYY', label: 'D Month, YYYY' },
+      { value: 'YYYY, MMM D', label: 'YYYY, Month D' },
+      { value: 'YYYY-MM', label: 'YYYY-MM' },
+      { value: 'MM-YYYY', label: 'MM-YYYY' },
+      { value: 'YYYY', label: 'YYYY' }
+    ],
+    lastScrobbled: [
+      { value: 'relative', label: 'Time Ago' },
+      { value: 'tiered', label: 'Tiered (Words)' },
+      { value: 'standard', label: 'Date Only' },
+      { value: 'datetime', label: 'Date & Time' }
+    ],
+    djInfo: [
+      { value: 'standard', label: 'Standard (Cm)' },
+      { value: 'camelot', label: 'Camelot (5A)' },
+      { value: 'openkey', label: 'Open Key (4d)' },
+      { value: 'full_name', label: 'Full (C Minor)' },
+      { value: 'standard_camelot', label: 'Std + Camelot' }
+    ],
+    key: [
+      { value: 'standard', label: 'Standard (Cm)' },
+      { value: 'camelot', label: 'Camelot (5A)' },
+      { value: 'openkey', label: 'Open Key (4d)' },
+      { value: 'full_name', label: 'Full (C Minor)' },
+      { value: 'standard_camelot', label: 'Std + Camelot' }
+    ]
+  };
+  const spNumberFormatter = new Intl.NumberFormat('en-US');
+  const extraColResizeObservers = new WeakMap();
+  const extraColMemCache = {
+    playCounts: new Map(),
+    releaseDates: new Map(),
+    trueReleaseDates: new Map(),
+    scrobbles: new Map(),
+    personalScrobbles: new Map(),
+    lastScrobbled: new Map(),
+    popularity: new Map(),
+    aiStats: new Map()
+  };
+  let extraColumnsConfig = {
+    playlist: { enabled: true, columns: [{ id: 'playlist2', type: 'releaseDate', enabled: false }, { id: 'playlist1', type: 'playCount', enabled: false }] },
+    album: { enabled: true, columns: [{ id: 'album1', type: 'releaseDate', enabled: false }] },
+    artist: { enabled: true, columns: [{ id: 'artist1', type: 'releaseDate', enabled: false }] }
+  };
+  let extraColumnWidths = { layouts: {}, cols: {} };
+  let extraColumnWidthsSaveTimer = null;
   let hasNewUpdate = false;
   let cachedCommits = null;
   let lastCommitFetch = 0;
@@ -354,6 +453,20 @@
   let isUpdatingTracklist = false;
   let isUpdatingAlbumTracklist = false;
   let isUpdatingArtistTracklist = false;
+  const spViewSortOriginals = window.__spViewSortOriginals || (window.__spViewSortOriginals = {
+    getContents: PlaylistAPI.getContents.bind(PlaylistAPI),
+    getPlaylist: PlaylistAPI.getPlaylist.bind(PlaylistAPI),
+    move: typeof PlaylistAPI.move === 'function' ? PlaylistAPI.move.bind(PlaylistAPI) : null,
+    playerPlay: typeof Platform.PlayerAPI?.play === 'function' ? Platform.PlayerAPI.play.bind(Platform.PlayerAPI) : null
+  });
+  const playlistViewSortState = new Map();
+  const playlistViewSortLoading = new Map();
+  const playlistViewSortRefreshTimers = new Map();
+  const playlistRawItemsCache = new Map();
+  const viewSortUnresolvedPlayCounts = new Map();
+  let viewSortRecentScrobblesCache = { username: null, map: null, ts: 0 };
+  let isSyntheticViewSortUpdate = false;
+  let playlistViewSortSeq = 0;
   let internalTokenRefreshPromise = null;
   let s_Access_Token = null;
   let s_Token_Exp = 0;
@@ -972,6 +1085,7 @@
     "latin hip hop": ["latin hip hop","latin rap","rap latino"],
     "doujin": ["doujin","doujin ongaku"],
     "krushclub": ["krushclub","krush club","krushclub!","krush-club"],
+    "krushfunk": ["krushfunk","krush funk","krush-funk"],
     "jerk rap": ["jerk rap","jerk","new jerk"],
     "new jazz": ["new jazz","newjazz"],
     "sexy drill": ["sexy drill","slizzy drill","slizzy","sexy drill rap"],
@@ -2646,6 +2760,12 @@
       replaceBase: false
     },
     {
+      synthesized: "krushfunk",
+      baseTags: ["funk", "phonk", "brazilian phonk", "funk carioca"],
+      contextTags: ["krush", "krushfunk", "krush funk"],
+      replaceBase: false
+    },
+    {
       synthesized: "jerk rap",
       baseTags: ["jerk"],
       contextTags: ["hoodtrap", "kashtrap", "plugg", "cloud rap", "rage", "underground rap", "trap", "vampjerk"],
@@ -3220,7 +3340,7 @@
   const CACHE_EXPIRE_AI_DATA = null;
   const CACHE_EXPIRE_PALETTE = null;
   const CACHE_EXPIRE_METADATA = 24 * 60 * 60 * 1000; 
-  const CACHE_EXPIRE_ARTIST_LISTENERS = 24 * 60 * 60 * 1000;
+  const CACHE_EXPIRE_ARTIST_LISTENERS = 1 * 60 * 60 * 1000;
   const CACHE_EXPIRE_GENRES = 7 * 24 * 60 * 60 * 1000;
   const CACHE_EXPIRE_EVERYNOISE = null;
   const CACHE_EXPIRE_SHOUTBOX = 60 * 60 * 1000;
@@ -3515,6 +3635,16 @@
   const banIconSvg = `<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M6 18 18 6"/></svg>`;
   const tagAddIconSvg = `<svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor"><path d="M8 2a.75.75 0 0 1 .75.75v4.5h4.5a.75.75 0 0 1 0 1.5h-4.5v4.5a.75.75 0 0 1-1.5 0v-4.5h-4.5a.75.75 0 0 1 0-1.5h4.5v-4.5A.75.75 0 0 1 8 2z"/></svg>`;
   const tagRemoveIconSvg = `<svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor"><path d="M2.47 2.47a.75.75 0 0 1 1.06 0L8 6.94l4.47-4.47a.75.75 0 1 1 1.06 1.06L9.06 8l4.47 4.47a.75.75 0 1 1-1.06 1.06L8 9.06l-4.47 4.47a.75.75 0 0 1-1.06-1.06L6.94 8 2.47 3.53a.75.75 0 0 1 0-1.06z"/></svg>`;
+  const viewSortArrowAscSvg = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M14 10 8 4l-6 6z"></path></svg>`;
+  const viewSortArrowDescSvg = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="m14 6-6 6-6-6z"></path></svg>`;
+  const viewSortDotsSvg = `<svg class="sp-col-dots-svg" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><g class="sp-col-dots-group"><circle class="sp-col-dot sp-col-dot-1" cx="8" cy="3.5" r="1.45"></circle><circle class="sp-col-dot sp-col-dot-2" cx="8" cy="8" r="1.45"></circle><circle class="sp-col-dot sp-col-dot-3" cx="8" cy="12.5" r="1.45"></circle></g></svg><svg class="sp-col-abort-svg" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M2.47 2.47a.75.75 0 0 1 1.06 0L8 6.94l4.47-4.47a.75.75 0 1 1 1.06 1.06L9.06 8l4.47 4.47a.75.75 0 1 1-1.06 1.06L8 9.06l-4.47 4.47a.75.75 0 0 1-1.06-1.06L6.94 8 2.47 3.53a.75.75 0 0 1 0-1.06z"></path></svg>`;
+  const alignLeftIconSvg = `<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="1.6" rx=".8"/><rect x="1.5" y="7.2" width="9" height="1.6" rx=".8"/><rect x="1.5" y="11.9" width="11.5" height="1.6" rx=".8"/></svg>`;
+  const alignCenterIconSvg = `<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="1.6" rx=".8"/><rect x="3.5" y="7.2" width="9" height="1.6" rx=".8"/><rect x="2.25" y="11.9" width="11.5" height="1.6" rx=".8"/></svg>`;
+  const alignRightIconSvg = `<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="1.6" rx=".8"/><rect x="5.5" y="7.2" width="9" height="1.6" rx=".8"/><rect x="3" y="11.9" width="11.5" height="1.6" rx=".8"/></svg>`;
+  const dragGripIconSvg = `<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><circle cx="5.5" cy="3.5" r="1.25"/><circle cx="10.5" cy="3.5" r="1.25"/><circle cx="5.5" cy="8" r="1.25"/><circle cx="10.5" cy="8" r="1.25"/><circle cx="5.5" cy="12.5" r="1.25"/><circle cx="10.5" cy="12.5" r="1.25"/></svg>`;
+  const eyeOffIconSvg = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.53 13.53 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="2" y1="2" x2="22" y2="22"/></svg>`;
+  const moveLeftIconSvg = `<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5 5.5 8 10 12.5"/></svg>`;
+  const moveRightIconSvg = `<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5"/></svg>`;
   
   const VIBE_DEFS = [
     { id: 'workout', label: 'Hype / Adrenaline', icon: flameSvg, color: '#D16666', desc: 'High energy, fast tempo, and a heavy beat to get your adrenaline pumping and keep you energized.', long_desc: 'Focuses on high energy, fast tempos, and strong rhythmic elements. Tracks with heavy beats and intense drops perfect for feeling unstoppable, powering through tasks, or intense exercise.' },
@@ -3670,12 +3800,45 @@
     return artists.map(artist => artist.name).join(", ");
   }
 
-  function formatPlayCount(count, format) {
-    if (count === null || count === undefined || isNaN(count) || count === "N/A" || count === "_" || count === "―" || Number(count) === 0) {
+  function isTrackItemPlayable(track) {
+    if (!track) return true;
+    if (track.isPlayable === false || track.is_playable === false || track.playable === false || track.playability?.playable === false) return false;
+    const inner = track.track;
+    if (inner && (inner.isPlayable === false || inner.is_playable === false || inner.playable === false || inner.playability?.playable === false)) return false;
+    return true;
+  }
+
+  function getPlayCountSortValue(track) {
+    if (!track) return null;
+    if (track.uri && Spicetify.URI.isLocal(track.uri)) return null;
+    const raw = track.playCount !== undefined ? track.playCount : track.playcount;
+    if (raw === null || raw === undefined || raw === "N/A" || raw === "_" || raw === "―") return null;
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n < 0) return null;
+    if (n === 0) return isTrackItemPlayable(track) ? 0 : null;
+    return n;
+  }
+
+  function compareNullableNumeric(aVal, bVal, isAsc) {
+    const hasA = typeof aVal === 'number' && Number.isFinite(aVal);
+    const hasB = typeof bVal === 'number' && Number.isFinite(bVal);
+    if (!hasA && !hasB) return 0;
+    if (!hasA) return 1;
+    if (!hasB) return -1;
+    return isAsc ? aVal - bVal : bVal - aVal;
+  }
+
+  function formatPlayCount(count, format, showUnderThousand = false) {
+    if (count === null || count === undefined || isNaN(count) || count === "N/A" || count === "_" || count === "―") {
         return 'N/A';
     }
 
     const num = Number(count);
+    if (!Number.isFinite(num) || num < 0) return 'N/A';
+    if (num === 0) {
+        if (!showUnderThousand) return 'N/A';
+        return (format === 'abbreviated' || format === 'rounded_abbreviated') ? '<1K' : '<1,000';
+    }
 
     if (format === 'abbreviated') {
         if (num >= 1_000_000_000) {
@@ -3809,7 +3972,7 @@
   }
 
   function formatTempo(value, format) {
-    if (value === null || isNaN(value)) return '―';
+    if (value === null || value === undefined || isNaN(value) || Number(value) <= 0) return '―';
     const rounded = Math.round(value);
     if (format === 'raw') {
         return rounded.toString();
@@ -4723,15 +4886,52 @@
   };
   
   const parseVarint = (obj) => {
-    const bytes = Object.values(obj);
-    let res = 0n;
-    let shift = 0n;
-    for (let i = 1; i < bytes.length; i++) {
-      res += BigInt(bytes[i] & 0x7f) << shift;
-      if (!(bytes[i] & 0x80)) break;
-      shift += 7n;
+    if (!obj) return null;
+    const bytes = obj instanceof Uint8Array ? obj : Object.values(obj);
+    const len = bytes.length;
+    if (len < 2) return null;
+    let i = 0;
+    const readVarint = () => {
+      let val = 0n, shift = 0n;
+      while (i < len) {
+        const b = bytes[i++];
+        val |= BigInt(b & 0x7f) << shift;
+        if (!(b & 0x80)) return val;
+        shift += 7n;
+        if (shift > 63n) return null;
+      }
+      return null;
+    };
+    let field1Fallback = null;
+    while (i < len) {
+      const tagBig = readVarint();
+      if (tagBig === null) break;
+      const tag = Number(tagBig);
+      const field = tag >>> 3;
+      const wire = tag & 7;
+      if (wire === 0) {
+        const vBig = readVarint();
+        if (vBig === null) break;
+        const v = Number(vBig);
+        if (Number.isFinite(v) && v >= 0) {
+          if (field === 3) return v;
+          if (field === 1 && field1Fallback === null) field1Fallback = v;
+        }
+      } else if (wire === 1) {
+        if (i + 8 > len) break;
+        i += 8;
+      } else if (wire === 2) {
+        const subLen = Number(readVarint());
+        if (!Number.isFinite(subLen) || subLen < 0 || i + subLen > len) break;
+        i += subLen;
+      } else if (wire === 5) {
+        if (i + 4 > len) break;
+        i += 4;
+      } else {
+        break;
+      }
     }
-    return Number(res);
+    return field1Fallback;
   };
 
   const getMetadataClient = () => {
@@ -4763,10 +4963,16 @@
       });
 
       const results = new Map();
-      if (response.extension && response.extension[0] && response.extension[0].entityExtension) {
+      if (response?.extension?.[0]?.entityExtension) {
           response.extension[0].entityExtension.forEach(item => {
-              if (item.extensionData && item.extensionData.value) {
-                  results.set(item.entityUri, parseVarint(item.extensionData.value));
+              const status = item?.header?.statusCode;
+              if (status !== undefined && status !== 200) return;
+              if (item?.header?.isEmpty) return;
+              const rawVal = item?.extensionData?.value;
+              if (!rawVal) return;
+              const parsed = parseVarint(rawVal);
+              if (parsed !== null && Number.isFinite(parsed) && parsed >= 0) {
+                  results.set(item.entityUri, parsed);
               }
           });
       }
@@ -5121,6 +5327,37 @@
       });
   }
 
+  function inferDatePrecision(dateStr) {
+      if (!dateStr || typeof dateStr !== 'string') return null;
+      const trimmed = dateStr.trim();
+      if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) return 'day';
+      if (/^\d{4}-\d{2}$/.test(trimmed)) return 'month';
+      if (/^\d{4}$/.test(trimmed)) return 'year';
+      return null;
+  }
+
+  function isStrictlyEarlierDate(candDate, candPrecision, bestDate, bestPrecision) {
+      if (!candDate) return false;
+      const candTime = new Date(candDate).getTime();
+      if (isNaN(candTime)) return false;
+      if (!bestDate) return true;
+      const bestTime = new Date(bestDate).getTime();
+      if (isNaN(bestTime)) return true;
+      if (candTime >= bestTime) return false;
+      const rank = { year: 1, month: 2, day: 3 };
+      const cPrec = candPrecision || inferDatePrecision(candDate) || 'day';
+      const bPrec = bestPrecision || inferDatePrecision(bestDate) || 'day';
+      if (rank[cPrec] < rank[bPrec]) {
+          const cMatch = String(candDate).match(/^(\d{4})(?:-(\d{2}))?/);
+          const bMatch = String(bestDate).match(/^(\d{4})(?:-(\d{2}))?/);
+          if (cMatch && bMatch) {
+              if (cPrec === 'year' && cMatch[1] === bMatch[1]) return false;
+              if (cPrec === 'month' && cMatch[1] === bMatch[1] && cMatch[2] && cMatch[2] === bMatch[2]) return false;
+          }
+      }
+      return true;
+  }
+
   function parseDateProtobuf(bytes) {
       let year = null, month = null, day = null;
       let i = 0;
@@ -5143,7 +5380,10 @@
           if (field === 3) day = decoded;
       }
       if (year) {
-          return `${year}-${String(month||1).padStart(2,'0')}-${String(day||1).padStart(2,'0')}`;
+          return {
+              date: `${year}-${String(month||1).padStart(2,'0')}-${String(day||1).padStart(2,'0')}`,
+              precision: day ? 'day' : (month ? 'month' : 'year')
+          };
       }
       return null;
   }
@@ -5151,6 +5391,7 @@
   function extractCoreMetadataFromExtKind10(bytes) {
       let isrc = null;
       let releaseDate = null;
+      let datePrecision = null;
       let albumTypeEnum = 1;
       
       for (let i = 0; i < bytes.length - 10; i++) {
@@ -5201,13 +5442,16 @@
                            const dBytes = bytes.slice(state.i, state.i + dLen);
                            state.i += dLen;
                            if (!releaseDate) {
-                               const parsedDate = parseDateProtobuf(dBytes);
-                               if (parsedDate) {
+                               const parsed = parseDateProtobuf(dBytes);
+                               if (parsed?.date) {
                                    const currentYear = new Date().getFullYear();
-                                   const parts = parsedDate.split('-');
+                                   const parts = parsed.date.split('-');
                                    if (parts.length === 3) {
                                        const y = parseInt(parts[0], 10);
-                                       if (y >= 1900 && y <= currentYear + 2) releaseDate = parsedDate;
+                                       if (y >= 1900 && y <= currentYear + 2) {
+                                           releaseDate = parsed.date;
+                                           datePrecision = parsed.precision;
+                                       }
                                    }
                                }
                            }
@@ -5220,13 +5464,16 @@
                    const dBytes = bytes.slice(state.i, state.i + dLen);
                    state.i += dLen;
                    if (!releaseDate) {
-                       const parsedDate = parseDateProtobuf(dBytes);
-                       if (parsedDate) {
+                       const parsed = parseDateProtobuf(dBytes);
+                       if (parsed?.date) {
                            const currentYear = new Date().getFullYear();
-                           const parts = parsedDate.split('-');
+                           const parts = parsed.date.split('-');
                            if (parts.length === 3) {
                                const y = parseInt(parts[0], 10);
-                               if (y >= 1900 && y <= currentYear + 2) releaseDate = parsedDate;
+                               if (y >= 1900 && y <= currentYear + 2) {
+                                   releaseDate = parsed.date;
+                                   datePrecision = parsed.precision;
+                               }
                            }
                        }
                    }
@@ -5239,7 +5486,7 @@
       const ALBUM_TYPE_MAP = { 1: "album", 2: "single", 3: "compilation", 4: "ep" };
       const albumType = ALBUM_TYPE_MAP[albumTypeEnum] || "album";
 
-      return { isrc, releaseDate, albumType };
+      return { isrc, releaseDate, datePrecision, albumType };
   }
 
   async function fetchCoreMetadataBatch(uris) {
@@ -5262,6 +5509,7 @@
               results.set(uri, {
                   isrc: meta.external_ids?.isrc || null,
                   releaseDate: meta.album.release_date || null,
+                  datePrecision: meta.album.release_date_precision || null,
                   albumType: meta.album.album_type
               });
           } else {
@@ -5293,6 +5541,7 @@
                               
                               if (extracted.isrc) existingMeta.external_ids.isrc = extracted.isrc;
                               if (extracted.releaseDate) existingMeta.album.release_date = extracted.releaseDate;
+                              if (extracted.datePrecision) existingMeta.album.release_date_precision = extracted.datePrecision;
                               if (extracted.albumType) {
                                   existingMeta.album.album_type = extracted.albumType;
                                   existingMeta.albumType = extracted.albumType;
@@ -5514,6 +5763,7 @@
                       id: body.album?.gid ? hexToBase62(body.album.gid) : null,
                       uri: body.album?.gid ? `spotify:album:${hexToBase62(body.album.gid)}` : null,
                       release_date: body.album?.date ? `${body.album.date.year}-${String(body.album.date.month || 1).padStart(2,'0')}-${String(body.album.date.day || 1).padStart(2,'0')}` : null,
+                      release_date_precision: body.album?.date ? (body.album.date.day ? 'day' : (body.album.date.month ? 'month' : 'year')) : null,
                       images: body.album?.cover_group?.image?.map(img => ({ url: `https://i.scdn.co/image/${img.file_id}` })) || []
                   },
                   artists: body.artist?.map(a => {
@@ -5609,6 +5859,7 @@
       STORAGE_KEY_SHOW_SECOND_ADDITIONAL_COLUMN, STORAGE_KEY_SHOW_ALBUM_COLUMN, STORAGE_KEY_SHOW_ARTIST_COLUMN,
       STORAGE_KEY_SELECTED_COLUMN_TYPE, STORAGE_KEY_SELECTED_SECOND_COLUMN_TYPE, STORAGE_KEY_SELECTED_ALBUM_COLUMN_TYPE,
       STORAGE_KEY_SELECTED_ARTIST_COLUMN_TYPE, STORAGE_KEY_RELEASE_DATE_FORMAT, STORAGE_KEY_REMOVE_DATE_ADDED,
+      STORAGE_KEY_EXTRA_COLUMNS_CONFIG, STORAGE_KEY_EXTRA_COLUMN_WIDTHS,
       STORAGE_KEY_MY_SCROBBLES_DISPLAY_MODE, STORAGE_KEY_KEY_DISPLAY_MODE, STORAGE_KEY_INCLUDE_SONG_STATS,
       STORAGE_KEY_INCLUDE_LYRICS, STORAGE_KEY_AI_MODEL, STORAGE_KEY_SHOW_LIKE_BUTTON, STORAGE_KEY_LIKE_BUTTON_CONFIG,
       STORAGE_KEY_LASTFM_AUTOCORRECT, STORAGE_KEY_LFM_COMMENTS_COLLAPSED, STORAGE_KEY_CUSTOM_FILTER_PAGE_SIZE,
@@ -5647,7 +5898,7 @@
   };
 
   const INTERNAL_RUNTIME_SETTINGS_KEYS = [
-    STORAGE_KEY_GENRE_WINDOW_POS, STORAGE_KEY_GLOBAL_PLAYLIST_COUNTS,
+    STORAGE_KEY_GENRE_WINDOW_POS, STORAGE_KEY_EXTRA_COLS_WINDOW_POS, STORAGE_KEY_GLOBAL_PLAYLIST_COUNTS,
     "sort-play-last-version", "sort-play-hardware-limit", "sort-play-history-migrated-v1",
     "sort-play-lfm-keys", "sort-play-lfm-key-version", "sort-play-gemini-keys", "sort-play-gemini-key-version"
   ];
@@ -5803,34 +6054,39 @@
         req.onerror = () => resolve(null);
     }),
     getMany: (store, keys, expiryMs = null) => new Promise(resolve => {
-        if (!idb.db) return resolve(new Map());
+        if (!idb.db || !keys || keys.length === 0) return resolve(new Map());
         const results = new Map();
         const missingKeys = [];
-        
-        keys.forEach(k => {
-            if (idb.mem[store]?.has(k)) {
-                const item = idb.mem[store].get(k);
+        const seenKeys = new Set();
+        const memStore = idb.mem[store];
+
+        for (let i = 0; i < keys.length; i++) {
+            const k = keys[i];
+            if (seenKeys.has(k)) continue;
+            seenKeys.add(k);
+            if (memStore?.has(k)) {
+                const item = memStore.get(k);
                 if (idb.isValid(item, expiryMs)) results.set(k, item.val);
-                else missingKeys.push(k);
-            } else {
-                missingKeys.push(k);
+                continue;
             }
-        });
+            missingKeys.push(k);
+        }
 
         if (missingKeys.length === 0) return resolve(results);
 
         const tx = idb.db.transaction([store], "readonly");
         const os = tx.objectStore(store);
-        
-        missingKeys.forEach(key => {
+
+        for (let i = 0; i < missingKeys.length; i++) {
+            const key = missingKeys[i];
             const r = os.get(key);
             r.onsuccess = () => {
-                if (r.result && idb.isValid(r.result, expiryMs)) {
-                    results.set(key, r.result.val);
-                    idb.mem[store].set(key, r.result);
+                if (r.result) {
+                    if (memStore) memStore.set(key, r.result);
+                    if (idb.isValid(r.result, expiryMs)) results.set(key, r.result.val);
                 }
             };
-        });
+        }
         tx.oncomplete = () => resolve(results);
         tx.onerror = () => resolve(results);
     }),
@@ -5845,8 +6101,9 @@
         });
     },
     setMany: (store, entries) => {
+        const now = Date.now();
         entries.forEach(e => {
-            const item = { val: e.val, ts: Date.now() };
+            const item = { val: e.val, ts: now };
             if (idb.mem[store]) idb.mem[store].set(e.key, item);
         });
         return new Promise(resolve => {
@@ -5854,7 +6111,7 @@
             const tx = idb.db.transaction([store], "readwrite");
             const os = tx.objectStore(store);
             entries.forEach(e => {
-                os.put({ val: e.val, ts: Date.now() }, e.key);
+                os.put({ val: e.val, ts: now }, e.key);
             });
             tx.oncomplete = () => resolve();
             tx.onerror = () => resolve();
@@ -5949,15 +6206,18 @@
     const existing = await idb.get('scrobbles', key);
     const bestCount = (typeof existing === 'number' && existing > scrobbleCount) ? existing : scrobbleCount;
     await idb.set('scrobbles', key, bestCount);
+    setExtraColMem('scrobbles', key, bestCount);
     return bestCount;
   }
   
   async function setCachedReleaseDate(trackId, rawReleaseDate, trackNumber = 0, discNumber = 1) { 
     await idb.set('releaseDates', trackId, { date: rawReleaseDate, trackNumber: trackNumber, discNumber: discNumber });
+    setExtraColMem('releaseDates', trackId, rawReleaseDate);
   }
 
   async function setCachedPlayCount(trackId, playCount) {
     await idb.set('playCounts', trackId, playCount);
+    setExtraColMem('playCounts', trackId, playCount);
   }
 
   async function getCachedPersonalScrobbles(key) {
@@ -5965,6 +6225,8 @@
   }
   async function setCachedPersonalScrobbles(key, scrobbleCount, isPending) {
     await idb.set('personalScrobbles', key, { count: scrobbleCount, pendingUpdate: isPending });
+    if (isPending) extraColMemCache.personalScrobbles.delete(key);
+    else setExtraColMem('personalScrobbles', key, scrobbleCount);
   }
 
   async function getCachedPaletteAnalysis(albumId) {
@@ -5976,6 +6238,7 @@
   
   async function flagCachedPersonalScrobbleForUpdate(key) {
     try {
+      extraColMemCache.personalScrobbles.delete(key);
       const cached = await idb.get('personalScrobbles', key);
       
       if (cached) {
@@ -6244,8 +6507,14 @@
   let lfmGatewayHasWorkingKey = false;
   const lfmSuspectKeyStrikes = new Map();
   const inFlightLfmTrackInfo = new Map();
+  const inFlightLfmTrends = new Map();
   const pendingLfmArtistFetches = new Map();
   const pendingLfmTrackGenresFetches = new Map();
+  const LFM_DOUBLE_ENCODE_PLUS_METHODS = new Set([
+    'track.getinfo', 'artist.getinfo', 'track.getsimilar', 'artist.getsimilar',
+    'track.gettoptags', 'artist.gettoptags', 'track.getcorrection', 'artist.getcorrection',
+    'artist.gettoptracks', 'artist.gettopalbums'
+  ]);
 
   async function fetchLfmWithGateway(params) {
     if (L_F_M_Key_Pool.length === 0) await fetchLastFmKeys();
@@ -6308,13 +6577,17 @@
         return { shouldRetry: false, status };
     };
 
+    const method = (params.get('method') || '').toLowerCase();
+    const shouldDoubleEncodePlus = LFM_DOUBLE_ENCODE_PLUS_METHODS.has(method);
+
     while (true) {
         const apiKey = getNextLfmKey();
         if (!apiKey) {
             throw new Error("All Last.fm API keys are invalid or have been revoked.");
         }
         params.set('api_key', apiKey);
-        const queryString = params.toString().replace(/\+/g, '%20').replace(/%2B/ig, '%252B');
+        const rawQuery = params.toString().replace(/\+/g, '%20');
+        const queryString = shouldDoubleEncodePlus ? rawQuery.replace(/%2B/ig, '%252B') : rawQuery;
         const directUrl = `${CONFIG.lastfm.baseUrl}?${queryString}`;
         const gatewayUrl = `${GATEWAY_URL}${encodeURIComponent(directUrl)}`;
 
@@ -6669,10 +6942,9 @@
             newReleasesDaysLimit = storedNewReleases;
         } else {
             const intVal = parseInt(storedNewReleases, 10);
-            if (intVal === 7) newReleasesDaysLimit = 'release-1';
-            else if (intVal === 14) newReleasesDaysLimit = 'release-2';
+            if (intVal === 14) newReleasesDaysLimit = 'release-2';
             else if (intVal === 21) newReleasesDaysLimit = 'release-3';
-            else newReleasesDaysLimit = intVal;
+            else newReleasesDaysLimit = isNaN(intVal) ? 'release-2' : intVal;
         }
     } else {
         newReleasesDaysLimit = 'release-2';
@@ -6763,6 +7035,9 @@
             if (!Array.isArray(followedReleasesConfig.selectedArtists)) {
                 followedReleasesConfig.selectedArtists = [];
             }
+            if (!['standard', 'trueFilterSort', 'trueSortOnly'].includes(followedReleasesConfig.releaseDateMode)) {
+                followedReleasesConfig.releaseDateMode = 'standard';
+            }
         } catch(e) {}
     }
     rangeExcludeUnlistened = localStorage.getItem(STORAGE_KEY_RANGE_EXCLUDE_UNLISTENED) === "true";
@@ -6817,6 +7092,7 @@
     }
     lfmOverridesCache = null;
     migrateLegacyNpSettings();
+    migrateAndLoadExtraColumnsConfig();
     prefetchBlacklistMap.clear();
   }
   
@@ -6831,6 +7107,8 @@
     localStorage.setItem(STORAGE_KEY_SELECTED_ARTIST_COLUMN_TYPE, selectedArtistColumnType);
     localStorage.setItem(STORAGE_KEY_RELEASE_DATE_FORMAT, releaseDateFormat);
     localStorage.setItem(STORAGE_KEY_REMOVE_DATE_ADDED, removeDateAdded);
+    localStorage.setItem(STORAGE_KEY_EXTRA_COLUMNS_CONFIG, JSON.stringify(extraColumnsConfig));
+    localStorage.setItem(STORAGE_KEY_EXTRA_COLUMN_WIDTHS, JSON.stringify(extraColumnWidths));
     localStorage.setItem(STORAGE_KEY_INCLUDE_SONG_STATS, includeSongStats);
     localStorage.setItem(STORAGE_KEY_INCLUDE_LYRICS, includeLyrics);
     localStorage.setItem(STORAGE_KEY_AI_MODEL, selectedAiModel);
@@ -7087,6 +7365,7 @@
           [STORAGE_KEY_GENRE_BLACKLIST_PROTECT_LIKED]: "true",
           [STORAGE_KEY_GENRE_BLACKLIST]: "[]",
           [STORAGE_KEY_GENRE_BLACKLIST_CONFIG]: JSON.stringify({ sources: { spotify_track: true, everynoise_artist: true, lastfm_track: true, lastfm_artist: true, deezer: false }, minSpotifyConfidence: 25 }),
+          [STORAGE_KEY_EXTRA_COLUMN_WIDTHS]: JSON.stringify({ layouts: {}, cols: {} }),
           "sort-play-dedicated-playlist-meta": "{}"
         };
 
@@ -7095,6 +7374,27 @@
             const parsed = JSON.parse(value);
             if (parsed && !parsed.title?.enabled && !parsed.artist?.enabled && parsed.title?.items?.length === 1 && parsed.title.items[0].type === "releaseDate" && parsed.title.items[0].format === "YYYY-MM-DD") {
               return true;
+            }
+          } catch (e) {}
+          return false;
+        }
+
+        if (key === STORAGE_KEY_EXTRA_COLUMNS_CONFIG) {
+          try {
+            const parsed = JSON.parse(value);
+            const isDefCtx = (ctx, defCols) => parsed?.[ctx]?.enabled !== false && Array.isArray(parsed?.[ctx]?.columns) && parsed[ctx].columns.length === defCols.length && parsed[ctx].columns.every((c, i) => !c.enabled && c.id === defCols[i].id && c.type === defCols[i].type && !c.format && !c.align);
+            if (isDefCtx('playlist', [{ id: 'playlist2', type: 'releaseDate' }, { id: 'playlist1', type: 'playCount' }]) && isDefCtx('album', [{ id: 'album1', type: 'releaseDate' }]) && isDefCtx('artist', [{ id: 'artist1', type: 'releaseDate' }])) return true;
+          } catch (e) {}
+          return false;
+        }
+
+        if (key === STORAGE_KEY_EXTRA_COLUMN_WIDTHS) {
+          try {
+            const parsed = JSON.parse(value);
+            if (parsed && typeof parsed === 'object') {
+              const keys = Object.keys(parsed);
+              if (keys.length === 0) return true;
+              if (keys.every(k => k === 'layouts' || k === 'cols') && Object.keys(parsed.layouts || {}).length === 0 && Object.keys(parsed.cols || {}).length === 0) return true;
             }
           } catch (e) {}
           return false;
@@ -7249,6 +7549,7 @@
       try { displayNowPlayingData(); } catch (e) {}
       try { displayGenreTags(); } catch (e) {}
       try { updateArtistPageGenres(); } catch (e) {}
+      document.querySelectorAll("div[data-sp-grid]").forEach(g => { delete g._spLayoutKey; });
       try { onPageChange(); } catch (e) {}
 
       const confirmed = await showConfirmationModal({
@@ -7647,7 +7948,7 @@
   }
 
   
-  function showSimpleInputModal({ title, descriptionHtml = "", inputLabel = "", inputType = "text", inputValue = "", inputPlaceholder = "", subtextHtml = "", saveButtonText = "Save", dropdownOptions = null, secondaryDropdownOptions = null, secondaryInputLabel = "", secondaryInputValue = "", secondaryInputPlaceholder = "", secondaryInputType = "text", toggleOptions = null, onSave, onCancel = null, onPrimaryChange = null }) {
+  function showSimpleInputModal({ title, descriptionHtml = "", inputLabel = "", inputType = "text", inputValue = "", inputPlaceholder = "", subtextHtml = "", saveButtonText = "Save", dropdownOptions = null, secondaryDropdownOptions = null, secondaryInputLabel = "", secondaryInputValue = "", secondaryInputPlaceholder = "", secondaryInputType = "text", toggleOptions = null, numberOption = null, onSave, onCancel = null, onPrimaryChange = null }) {
     const existingSimple = document.getElementById("sort-play-simple-input-overlay");
     if (existingSimple) {
         existingSimple._cleanup?.();
@@ -7719,6 +8020,17 @@
                 </label>
             </div>
         `).join('');
+        if (numberOption) {
+            inputHtml += `
+                <div id="sp-simple-number-row" style="display: flex; justify-content: space-between; align-items: center; gap: 15px; border-top: 1px solid rgba(255,255,255,0.08); margin-top: 8px; padding-top: 14px; transition: opacity 0.2s;">
+                    <div style="display: flex; flex-direction: column; flex: 1;">
+                        <label for="sp-number-${numberOption.id}" style="color: #e5e5e5; font-size: 16px;">${numberOption.label}</label>
+                        ${numberOption.subtext ? `<span style="color: #b3b3b3; font-size: 13px; margin-top: 4px; line-height: 1.4;">${numberOption.subtext}</span>` : ''}
+                    </div>
+                    <input type="number" id="sp-number-${numberOption.id}" min="${numberOption.min ?? 0}" step="${numberOption.step ?? 50}" value="${numberOption.value ?? 0}" placeholder="${numberOption.placeholder ?? '0'}" style="width: 84px; padding: 7px 10px; border-radius: 8px; border: 1px solid #3a3a3a; background: #282828; color: #fff; font-size: 14px; font-weight: 600; text-align: center; outline: none; flex-shrink: 0;">
+                </div>
+            `;
+        }
     } else if (dropdownOptions) {
         inputHtml = `
             ${inputLabel ? `<label style="color: #c1c1c1; font-size: 14px;">${inputLabel}</label>` : ''}
@@ -7821,7 +8133,21 @@
     addHoverEffect(saveButton, "#1ED760", "#3BE377");
     addHoverEffect(cancelButton, "#333333", "#444444");
 
-    [inputField, secondaryInputField].filter(Boolean).forEach(inp => {
+    const numberField = (toggleOptions && numberOption) ? modalContainer.querySelector(`#sp-number-${numberOption.id}`) : null;
+    const numberRow = (toggleOptions && numberOption) ? modalContainer.querySelector("#sp-simple-number-row") : null;
+    if (numberField && numberRow && Array.isArray(numberOption.disableWhenAllFalse) && numberOption.disableWhenAllFalse.length > 0) {
+        const syncNumberRowState = () => {
+            const anyActive = numberOption.disableWhenAllFalse.some(id => modalContainer.querySelector(`#sp-toggle-${id}`)?.checked);
+            numberField.disabled = !anyActive;
+            numberRow.style.opacity = anyActive ? "1" : "0.45";
+        };
+        numberOption.disableWhenAllFalse.forEach(id => {
+            modalContainer.querySelector(`#sp-toggle-${id}`)?.addEventListener("change", syncNumberRowState);
+        });
+        syncNumberRowState();
+    }
+
+    [inputField, secondaryInputField, numberField].filter(Boolean).forEach(inp => {
         if (inp.tagName === "INPUT") {
             inp.addEventListener("keydown", (e) => {
                 if (e.key === "Enter") {
@@ -7838,6 +8164,10 @@
             toggleOptions.forEach(opt => {
                 results[opt.id] = modalContainer.querySelector(`#sp-toggle-${opt.id}`).checked;
             });
+            if (numberOption && numberField) {
+                const parsed = parseInt(numberField.value, 10);
+                results[numberOption.id] = Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+            }
             onSave(results, saveButton, closeModal);
         } else if (modalContainer.querySelector("#sp-simple-secondary-input")) {
             const results = {
@@ -9584,7 +9914,7 @@
         .sliderx:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: .2s; }
         input:checked + .sliderx { background-color: #1DB954; }
         input:checked + .sliderx:before { transform: translateX(16px); }
-        .mgr-conf-select { background: #242424; border: 1px solid #3e3e3e; color: #e5e5e5; border-radius: 6px; height: 24px; padding: 0 6px; font-size: 12px; font-weight: 500; cursor: pointer; outline: none; transition: border-color 0.15s ease, opacity 0.2s ease; }
+        .mgr-conf-select { background: #242424; border: 1px solid #3e3e3e; color: #e5e5e5; border-radius: 6px; height: 24px; padding: 0 6px; font-size: 12px; font-weight: 500; cursor: pointer; outline: none; field-sizing: content; transition: border-color 0.15s ease, opacity 0.2s ease; }
         .mgr-conf-select:hover:not(:disabled) { border-color: #666; color: #fff; }
         .mgr-conf-select:focus { border-color: #888; }
         .mgr-conf-select:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -10275,104 +10605,32 @@
       </div>
     `;
 
-    const extraColumnConfigs = [
-        {
-            id: 'additionalColumnSetting',
-            pfx: '',
-            label: 'Playlist Extra Column',
-            getVisible: () => showAdditionalColumn,
-            setVisible: v => { showAdditionalColumn = v; },
-            getType: () => selectedColumnType,
-            setType: v => { selectedColumnType = v; },
-            includePlayCount: true,
-            isPlaylistCol: true,
-            onUpdate: () => updateTracklist()
-        },
-        {
-            id: 'secondAdditionalColumnSetting',
-            pfx: 'second',
-            label: 'Playlist Second Extra Column',
-            getVisible: () => showSecondAdditionalColumn,
-            setVisible: v => { showSecondAdditionalColumn = v; },
-            getType: () => selectedSecondColumnType,
-            setType: v => { selectedSecondColumnType = v; },
-            includePlayCount: true,
-            isPlaylistCol: true,
-            onUpdate: () => updateTracklist()
-        },
-        {
-            id: 'albumColumnSetting',
-            pfx: 'album',
-            label: 'Album Extra Column',
-            getVisible: () => showAlbumColumn,
-            setVisible: v => { showAlbumColumn = v; },
-            getType: () => selectedAlbumColumnType,
-            setType: v => { selectedAlbumColumnType = v; },
-            includePlayCount: false,
-            isPlaylistCol: false,
-            onUpdate: () => onPageChange()
-        },
-        {
-            id: 'artistColumnSetting',
-            pfx: 'artist',
-            label: 'Artist Extra Column',
-            getVisible: () => showArtistColumn,
-            setVisible: v => { showArtistColumn = v; },
-            getType: () => selectedArtistColumnType,
-            setType: v => { selectedArtistColumnType = v; },
-            includePlayCount: false,
-            isPlaylistCol: false,
-            onUpdate: () => onPageChange()
-        }
+    const extraColumnSurfaces = [
+        { ctx: 'playlist', id: 'playlistExtraColsSetting', label: 'Playlists' },
+        { ctx: 'album', id: 'albumExtraColsSetting', label: 'Albums' },
+        { ctx: 'artist', id: 'artistExtraColsSetting', label: 'Artists' }
     ];
 
-    const FORMAT_SPECS = [
-        { id: 'dateFormat', typeMatch: t => t === 'releaseDate' || t === 'trueReleaseDate', attr: 'format', update: v => { releaseDateFormat = v; } },
-        { id: 'myScrobbles', typeMatch: t => t === 'personalScrobbles', attr: 'mode', update: v => { myScrobblesDisplayMode = v; } },
-        { id: 'key', typeMatch: t => t === 'key', attr: 'mode', update: v => { keyDisplayMode = v; } },
-        { id: 'lastScrobbled', typeMatch: t => t === 'lastScrobbled', attr: 'format', update: v => { lastScrobbledFormat = v; } }
-    ];
+    const getExtraSurfaceSummaryText = (ctx) => {
+        const active = getActiveExtraColumns(ctx);
+        if (active.length === 0) return 'Off';
+        if (active.length <= 2) return active.map(c => c.label).join(' · ');
+        return `${active[0].label} · ${active[1].label} +${active.length - 2}`;
+    };
 
-    const getColumnOptionsHtml = (selectedValue, includePlayCount = true) => `
-        ${includePlayCount ? `<option value="playCount" ${selectedValue === 'playCount' ? 'selected' : ''}>Play Count</option>` : ''}
-        <option value="popularity" ${selectedValue === 'popularity' ? 'selected' : ''}>Popularity</option>
-        <option value="releaseDate" ${selectedValue === 'releaseDate' ? 'selected' : ''}>Release Date</option>
-        <option value="trueReleaseDate" ${selectedValue === 'trueReleaseDate' ? 'selected' : ''}>True Release Date</option>
-        <option value="scrobbles" ${selectedValue === 'scrobbles' ? 'selected' : ''}>Scrobbles</option>
-        <option value="personalScrobbles" ${selectedValue === 'personalScrobbles' ? 'selected' : ''}>My Scrobbles</option>
-        <option value="lastScrobbled" ${selectedValue === 'lastScrobbled' ? 'selected' : ''}>Last Scrobbled</option>
-        <option value="djInfo" ${selectedValue === 'djInfo' ? 'selected' : ''}>DJ Info</option>
-        <option value="key" ${selectedValue === 'key' ? 'selected' : ''}>Key</option>
-        <option value="tempo" ${selectedValue === 'tempo' ? 'selected' : ''}>Tempo (BPM)</option>
-        <option value="energy" ${selectedValue === 'energy' ? 'selected' : ''}>Energy</option>
-        <option value="danceability" ${selectedValue === 'danceability' ? 'selected' : ''}>Danceability</option>
-        <option value="valence" ${selectedValue === 'valence' ? 'selected' : ''}>Valence</option>
-    `;
-
-    const renderExtraColumnRowHtml = (cfg) => {
-        const makeId = (name) => cfg.pfx ? `${cfg.pfx}${name}` : `${name.charAt(0).toLowerCase()}${name.slice(1)}`;
-        const selectId = cfg.pfx ? `${cfg.pfx}ColumnTypeSelect` : 'columnTypeSelect';
-        const toggleId = cfg.pfx ? `show${cfg.pfx.charAt(0).toUpperCase() + cfg.pfx.slice(1)}ColumnToggle` : 'showAdditionalColumnToggle';
-
+    const renderExtraColumnRowHtml = (s) => {
+        const active = getActiveExtraColumns(s.ctx);
+        const isOn = active.length > 0;
         return `
-        <div class="setting-row" id="${cfg.id}">
-            <label class="col description">${cfg.label}</label>
-            <div class="col action" style="position: relative;">
-                <button id="${makeId('DateFormatSettingsBtn')}" class="column-settings-button" title="Release Date Format Settings" style="display: none;">${settingsSvg}</button>
-                <button id="${makeId('MyScrobblesSettingsBtn')}" class="column-settings-button" title="My Scrobbles Display Settings" style="display: none;">${settingsSvg}</button>
-                <button id="${makeId('KeySettingsBtn')}" class="column-settings-button" title="Key Display Settings" style="display: none;">${settingsSvg}</button>
-                <button id="${makeId('LastScrobbledSettingsBtn')}" class="column-settings-button" title="Last Scrobbled Format Settings" style="display: none;">${settingsSvg}</button>
-                <select id="${selectId}" class="column-type-select" ${!cfg.getVisible() ? 'disabled' : ''}>
-                    ${getColumnOptionsHtml(cfg.getType(), cfg.includePlayCount)}
-                </select>
+        <div class="setting-row" id="${s.id}">
+            <label class="col description">${s.label}</label>
+            <div class="col action">
+                <button type="button" class="ec-summary-pill ${isOn ? 'on' : ''}" data-ec-manage="${s.ctx}" title="Manage ${s.label} Extra Columns">${escapeHtml(getExtraSurfaceSummaryText(s.ctx))}</button>
+                <button type="button" class="column-settings-button" data-ec-manage="${s.ctx}" title="Configure ${s.label} Extra Columns">${settingsSvg}</button>
                 <label class="switch">
-                    <input type="checkbox" id="${toggleId}" ${cfg.getVisible() ? 'checked' : ''}>
+                    <input type="checkbox" class="ec-surface-toggle" data-ec-ctx="${s.ctx}" ${isOn ? 'checked' : ''}>
                     <span class="sliderx"></span>
                 </label>
-                <div id="${makeId('DateFormatDropdownContainer')}" class="column-settings-dropdown">${getDateFormatDropdownHtml(releaseDateFormat)}</div>
-                <div id="${makeId('MyScrobblesDropdownContainer')}" class="column-settings-dropdown">${getMyScrobblesDropdownHtml(myScrobblesDisplayMode)}</div>
-                <div id="${makeId('KeyDropdownContainer')}" class="column-settings-dropdown">${getKeyDropdownHtml(keyDisplayMode)}</div>
-                <div id="${makeId('LastScrobbledDropdownContainer')}" class="column-settings-dropdown">${getLastScrobbledDropdownHtml(lastScrobbledFormat)}</div>
             </div>
         </div>`;
     };
@@ -10399,6 +10657,7 @@
       .setting-row .col.description { float: left; padding-right: 10px; width: auto; color: #c1c1c1; }
       .setting-row .col.action { display: flex; float: right; align-items: center; justify-content: flex-end; text-align: right; gap: 8px; position: relative; }
       select { padding: 2px 8px; border-radius: 15px; border: 1px solid #434343; background: #282828; color: white; cursor: pointer; font-size: 13px; max-width: 130px; height: auto; }
+      #preserveDateBehaviorSelect, #localFilesHandlingSelect, #colorSortModeSelect, #artistDiscographyDedupModeSelect { field-sizing: content; }
       select.column-type-select { flex-grow: 1; margin-right: 5px; width: 125px; }
       select:disabled, select:disabled:hover { opacity: 0.5; cursor: not-allowed; background-color: #282828 !important; border-color: #434343 !important; color: white !important; }
       .setting-row.dependent-disabled { opacity: 0.5; pointer-events: none; }
@@ -10407,6 +10666,9 @@
       .column-settings-button svg { width: 20px; height: 20px; fill: #b3b3b3; }
       .column-settings-button:hover svg { fill: #ffffff; }
       .column-settings-button:disabled { opacity: 0.3; cursor: not-allowed; }
+      .ec-summary-pill{background:#262626;border:1px solid #3a3a3a;color:#999;border-radius:14px;padding:3px 10px;font-size:12px;font-weight:500;cursor:pointer;max-width:175px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:all .15s}
+      .ec-summary-pill.on{color:#e6e6e6;border-color:#4a4a4a;background:#2c2c2c}
+      .ec-summary-pill:hover{border-color:#1ed760;color:#fff;background:#323232}
       .column-settings-dropdown { display: none; position: absolute; background-color: #282828; min-width: 140px; box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); z-index: 1001; border-radius: 4px; padding: 4px 0; left: -55px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #555 #282828; }
       .column-settings-dropdown::-webkit-scrollbar { width: 8px; }
       .column-settings-dropdown::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.1); border-radius: 4px; }
@@ -10650,13 +10912,13 @@
     </div>
     <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
 
-    ${extraColumnConfigs.map(renderExtraColumnRowHtml).join('')}
+    ${extraColumnSurfaces.map(renderExtraColumnRowHtml).join('')}
     
     <div class="setting-row" id="removeDateAdded">
         <label class="col description">Remove Playlist "Date Added" Column</label>
         <div class="col action">
             <label class="switch">
-                <input type="checkbox" ${removeDateAdded ? 'checked' : ''} ${!showAdditionalColumn ? 'disabled' : ''}>
+                <input type="checkbox" ${removeDateAdded ? 'checked' : ''} ${getActiveExtraColumns('playlist').length === 0 ? 'disabled' : ''}>
                 <span class="sliderx"></span>
             </label>
         </div>
@@ -11427,6 +11689,7 @@
     lastFmAutocorrectToggle.addEventListener("change", async () => {
         lastFmAutocorrect = lastFmAutocorrectToggle.checked;
         saveSettings();
+        clearExtraColMem(['scrobbles', 'personalScrobbles', 'lastScrobbled']);
         await idb.clear('scrobbles');
         await idb.clear('personalScrobbles');
         await idb.clear('lastScrobbledDates');
@@ -11648,40 +11911,8 @@
         }
     });
 
-    const extraColumnInstances = extraColumnConfigs.map(cfg => {
-        const makeId = (name) => cfg.pfx ? `${cfg.pfx}${name}` : `${name.charAt(0).toLowerCase()}${name.slice(1)}`;
-        const selectId = cfg.pfx ? `${cfg.pfx}ColumnTypeSelect` : 'columnTypeSelect';
-        const toggleId = cfg.pfx ? `show${cfg.pfx.charAt(0).toUpperCase() + cfg.pfx.slice(1)}ColumnToggle` : 'showAdditionalColumnToggle';
-
-        const toggle = modalContainer.querySelector(`#${toggleId}`);
-        const select = modalContainer.querySelector(`#${selectId}`);
-        const formats = FORMAT_SPECS.map(spec => {
-            const cap = spec.id.charAt(0).toUpperCase() + spec.id.slice(1);
-            return {
-                spec,
-                btn: modalContainer.querySelector(`#${makeId(`${cap}SettingsBtn`)}`),
-                drop: modalContainer.querySelector(`#${makeId(`${cap}DropdownContainer`)}`)
-            };
-        });
-
-        return { cfg, toggle, select, formats };
-    });
-
-    const allDropdowns = extraColumnInstances.flatMap(inst => inst.formats.map(f => f.drop));
-
-    const updateColumnVisibility = (inst) => {
-        const isShown = inst.cfg.getVisible();
-        const type = inst.cfg.getType();
-        inst.formats.forEach(({ spec, btn, drop }) => {
-            const matches = isShown && spec.typeMatch(type);
-            btn.style.display = matches ? 'flex' : 'none';
-            btn.disabled = !matches;
-            if (!matches) drop.style.display = 'none';
-        });
-    };
-
     const updateRemoveDateAddedState = () => {
-        const anyPlaylistExtra = showAdditionalColumn || showSecondAdditionalColumn;
+        const anyPlaylistExtra = getActiveExtraColumns('playlist').length > 0;
         removeDateAddedToggle.disabled = !anyPlaylistExtra;
         removeDateAddedToggle.parentElement.classList.toggle("disabled", !anyPlaylistExtra);
         if (!anyPlaylistExtra) {
@@ -11690,8 +11921,23 @@
         }
     };
 
-    updateRemoveDateAddedState();
-    extraColumnInstances.forEach(updateColumnVisibility);
+    const syncExtraColumnsSummary = () => {
+        extraColumnSurfaces.forEach(s => {
+            const active = getActiveExtraColumns(s.ctx);
+            const isOn = active.length > 0;
+            const pill = modalContainer.querySelector(`.ec-summary-pill[data-ec-manage="${s.ctx}"]`);
+            if (pill) {
+                pill.textContent = getExtraSurfaceSummaryText(s.ctx);
+                pill.classList.toggle('on', isOn);
+            }
+            const toggle = modalContainer.querySelector(`.ec-surface-toggle[data-ec-ctx="${s.ctx}"]`);
+            if (toggle) toggle.checked = isOn;
+        });
+        updateRemoveDateAddedState();
+    };
+
+    overlay._syncExtraColumnsSummary = syncExtraColumnsSummary;
+    syncExtraColumnsSummary();
 
     setTimeout(() => {
         modalContainer.querySelectorAll('.sliderx').forEach(sliderx => {
@@ -11699,129 +11945,25 @@
         });
     }, 50);
 
-    allDropdowns.forEach(dropdown => {
-        if (!dropdown) return;
-        dropdown.addEventListener('wheel', (event) => {
-            const { scrollTop, clientHeight, scrollHeight } = dropdown;
-            if ((event.deltaY < 0 && scrollTop === 0) || (event.deltaY > 0 && Math.abs(scrollHeight - clientHeight - scrollTop) < 1)) {
-                event.preventDefault();
-            }
-        }, { passive: false });
-    });
-
-    FORMAT_SPECS.forEach(spec => {
-        const drops = extraColumnInstances.map(inst => inst.formats.find(f => f.spec === spec).drop);
-        drops.forEach(container => {
-            container.querySelectorAll("button").forEach(button => {
-                button.addEventListener("click", (event) => {
-                    event.stopPropagation();
-                    const newValue = button.getAttribute(`data-${spec.attr}`);
-                    spec.update(newValue);
-                    drops.forEach(c => {
-                        c.querySelectorAll("button").forEach(btn => btn.classList.toggle("selected", btn.getAttribute(`data-${spec.attr}`) === newValue));
-                    });
-                    allDropdowns.forEach(c => { c.style.display = 'none'; });
-                    document.querySelectorAll('.sort-play-data, .sort-play-second-data').forEach(el => {
-                        el.textContent = "";
-                        delete el.dataset.spProcessed;
-                    });
-                    saveSettings();
-                    onPageChange();
-                });
-            });
+    modalContainer.querySelectorAll('[data-ec-manage]').forEach(btn => {
+        btn.addEventListener("click", () => {
+            showExtraColumnsManagerModal(btn.dataset.ecManage, true);
         });
     });
 
-    extraColumnInstances.forEach(inst => {
-        inst.toggle.addEventListener("change", () => {
-            inst.cfg.setVisible(inst.toggle.checked);
-            inst.select.disabled = !inst.toggle.checked;
-            if (inst.cfg.isPlaylistCol) updateRemoveDateAddedState();
-            updateColumnVisibility(inst);
-            saveSettings();
-            inst.cfg.onUpdate();
-        });
-
-        inst.select.addEventListener("change", () => {
-            inst.cfg.setType(inst.select.value);
-            updateColumnVisibility(inst);
-            saveSettings();
-            inst.cfg.onUpdate();
+    modalContainer.querySelectorAll('.ec-surface-toggle').forEach(toggle => {
+        toggle.addEventListener("change", () => {
+            setExtraColumnsContextEnabled(toggle.dataset.ecCtx, toggle.checked);
+            syncExtraColumnsSummary();
         });
     });
 
     removeDateAddedToggle.addEventListener("change", () => {
-        if (showAdditionalColumn || showSecondAdditionalColumn) {
+        if (getActiveExtraColumns('playlist').length > 0) {
             removeDateAdded = removeDateAddedToggle.checked;
             saveSettings();
             updateTracklist();
         }
-    });
-
-    const setupSettingsButtonToggle = (button, dropdown, otherDropdowns) => {
-        button.addEventListener("click", (event) => {
-            event.stopPropagation();
-            const isCurrentlyVisible = dropdown.style.display === 'block';
-
-            otherDropdowns.forEach(d => d.style.display = 'none');
-            if (isCurrentlyVisible) {
-                dropdown.style.display = 'none';
-                return;
-            }
-
-            dropdown.style.top = 'auto';
-            dropdown.style.bottom = 'auto';
-            dropdown.style.marginTop = 'auto';
-            dropdown.style.marginBottom = 'auto';
-            dropdown.style.maxHeight = '';
-            dropdown.style.overflowY = '';
-
-            dropdown.style.visibility = 'hidden';
-            dropdown.style.display = 'block';
-            const dropdownRect = dropdown.getBoundingClientRect();
-            dropdown.style.display = 'none';
-            dropdown.style.visibility = 'visible';
-
-            const buttonRect = button.getBoundingClientRect();
-            const scrollContainer = shadowRoot.querySelector(".sp-settings-main-section");
-            if (!scrollContainer) return;
-            const scrollContainerRect = scrollContainer.getBoundingClientRect();
-
-            const dropdownHeight = dropdownRect.height;
-            const margin = 9;
-            const boundaryMargin = 20;
-
-            const spaceBelow = scrollContainerRect.bottom - buttonRect.bottom;
-            const spaceAbove = buttonRect.top - scrollContainerRect.top;
-
-            if (spaceBelow >= dropdownHeight + margin + boundaryMargin) {
-                dropdown.style.top = '100%';
-                dropdown.style.marginTop = `${margin}px`;
-            } else if (spaceAbove >= dropdownHeight + margin + boundaryMargin) {
-                dropdown.style.bottom = '100%';
-                dropdown.style.marginBottom = `${margin}px`;
-            } else {
-                if (spaceAbove > spaceBelow) {
-                    dropdown.style.bottom = '100%';
-                    dropdown.style.marginBottom = `${margin}px`;
-                    dropdown.style.maxHeight = `${spaceAbove - margin - boundaryMargin}px`;
-                    dropdown.style.overflowY = 'auto';
-                } else {
-                    dropdown.style.top = '100%';
-                    dropdown.style.marginTop = `${margin}px`;
-                    dropdown.style.maxHeight = `${spaceBelow - margin - boundaryMargin}px`;
-                    dropdown.style.overflowY = 'auto';
-                }
-            }
-
-            dropdown.style.display = 'block';
-        });
-    };
-
-    extraColumnInstances.forEach(inst => {
-        inst.formats.forEach(({ btn, drop }) => {
-            setupSettingsButtonToggle(btn, drop, allDropdowns.filter(d => d !== drop));
-        });
     });
 
     const notifBtn = modalContainer.querySelector("#notificationHistoryBtn");
@@ -11831,10 +11973,6 @@
 
     document.addEventListener('click', (event) => {
         const path = event.composedPath();
-        if (!path.some(el => el?.classList?.contains('column-settings-dropdown') || el?.classList?.contains('column-settings-button'))) {
-            allDropdowns.forEach(d => d.style.display = 'none');
-        }
-        
         if (notifBtn && notifDropdown && !path.includes(notifBtn) && !path.includes(notifDropdown)) {
             notifDropdown.classList.remove('visible');
             notifBtn.classList.remove('active');
@@ -11844,14 +11982,7 @@
     document.addEventListener('keydown', (event) => {
         if (event.key !== 'Escape') return;
         const otherModals = Array.from(document.querySelectorAll('.sort-play-modal-container')).filter(el => el !== modalContainer);
-        if (otherModals.length > 0 || document.getElementById('sp-chat-image-viewer-overlay')) return;
-        const hasOpenColumnDrop = allDropdowns.some(d => d && d.style.display === 'block');
-        if (hasOpenColumnDrop) {
-            event.preventDefault();
-            event.stopPropagation();
-            allDropdowns.forEach(d => { if (d) d.style.display = 'none'; });
-            return;
-        }
+        if (otherModals.length > 0 || document.getElementById('sp-chat-image-viewer-overlay') || document.getElementById('sort-play-extra-cols-overlay')) return;
         if (notifDropdown && notifDropdown.classList.contains('visible')) {
             event.preventDefault();
             event.stopPropagation();
@@ -16435,6 +16566,1058 @@
     });
   }
 
+  function showExtraColumnsManagerModal(initialTab = null, fromSettings = false) {
+    for (const id of ["sort-play-extra-cols-overlay", "sort-play-extra-cols-window"]) {
+        const existing = document.getElementById(id);
+        if (existing) {
+            existing._cleanup?.();
+            existing.remove();
+        }
+    }
+
+    const isFloating = !fromSettings;
+    const abortController = new AbortController();
+    const validTabs = ['playlist', 'album', 'artist'];
+    let activeTab = validTabs.includes(initialTab) ? initialTab : (getExtraColumnContextForPage() || 'playlist');
+    let widthResetFeedback = false;
+    let widthResetTimer = null;
+    let undoState = null;
+    let undoTimer = null;
+    let liveRefreshTimer = null;
+    let scrollResizeObserver = null;
+    let dragAutoScrollRaf = null;
+    const activeExitTimers = new Set();
+    const dirtyContexts = new Set();
+    let isClosing = false;
+    let isInternalUpdate = false;
+
+    const TABS = [
+        { id: 'playlist', label: 'Playlists', emptyLabel: 'Playlists & Lists', sub: 'Playlists, Liked Songs, Local Files & Search' },
+        { id: 'album', label: 'Albums', emptyLabel: 'Albums', sub: 'Album pages' },
+        { id: 'artist', label: 'Artists', emptyLabel: 'Artists', sub: 'Artist Popular tracks & Discography list view' }
+    ];
+
+    const TYPE_GROUPS = [
+        { label: 'Spotify Stats', types: ['playCount', 'popularity'] },
+        { label: 'Release Info', types: ['releaseDate', 'trueReleaseDate'] },
+        { label: 'Last.fm', types: ['scrobbles', 'personalScrobbles', 'lastScrobbled'] },
+        { label: 'Audio / DJ', types: ['djInfo', 'key', 'tempo', 'energy', 'danceability', 'valence'] }
+    ];
+
+    const runInternal = (fn) => {
+        isInternalUpdate = true;
+        try { return fn(); }
+        finally { isInternalUpdate = false; }
+    };
+
+    const clearExitTimers = () => {
+        for (const t of activeExitTimers) clearTimeout(t);
+        activeExitTimers.clear();
+    };
+
+    const stopDragAutoScroll = () => {
+        if (dragAutoScrollRaf) {
+            cancelAnimationFrame(dragAutoScrollRaf);
+            dragAutoScrollRaf = null;
+        }
+    };
+
+    const clearUndoIfCtx = (ctx) => {
+        if (!undoState || undoState.ctx !== ctx) return;
+        undoState = null;
+        clearTimeout(undoTimer);
+        syncFooter();
+    };
+
+    const pushUndo = (ctx, label) => {
+        clearTimeout(undoTimer);
+        undoState = { ctx, label, snapshot: JSON.parse(JSON.stringify(extraColumnsConfig[ctx])) };
+        syncFooter();
+        undoTimer = setTimeout(() => {
+            undoState = null;
+            syncFooter();
+        }, 10000);
+    };
+
+    const scheduleRefresh = (ctx) => {
+        dirtyContexts.add(ctx);
+        runInternal(() => syncOpenExtraColumnsUi());
+        if (!fromSettings) {
+            clearTimeout(liveRefreshTimer);
+            liveRefreshTimer = setTimeout(() => {
+                const pending = Array.from(dirtyContexts);
+                dirtyContexts.clear();
+                for (const c of pending) refreshExtraColumnsForContext(c);
+            }, 60);
+        }
+    };
+
+    const modalWidth = 560;
+    const modalContainer = document.createElement("div");
+    let hostEl = modalContainer;
+    let overlay = null;
+
+    if (isFloating) {
+        const effW = Math.min(modalWidth, Math.max(300, window.innerWidth - 20));
+        let left = Math.max(10, window.innerWidth - effW - 36);
+        let top = 92;
+        try {
+            const saved = JSON.parse(localStorage.getItem(STORAGE_KEY_EXTRA_COLS_WINDOW_POS) || 'null');
+            if (saved && typeof saved.x === 'number' && typeof saved.y === 'number') {
+                left = Math.max(10, Math.min(saved.x, window.innerWidth - effW - 10));
+                top = Math.max(70, Math.min(saved.y, window.innerHeight - 120));
+            }
+        } catch (_) {}
+
+        modalContainer.id = "sort-play-extra-cols-window";
+        modalContainer.className = "sort-play-extra-cols-modal sort-play-floating-window sort-play-font-scope";
+        modalContainer.style.cssText = `box-sizing:border-box!important;position:fixed;top:${top}px;left:${left}px;z-index:2001;width:min(${modalWidth}px,calc(100vw - 20px))!important;max-width:${modalWidth}px!important;min-width:min(320px,calc(100vw - 20px))!important;min-height:0!important;max-height:min(82vh,calc(100vh - 90px))!important;flex-shrink:0!important;overflow:hidden;background-color:#121212!important;color:var(--spice-text,#fff);border:1px solid rgba(255,255,255,.13);border-radius:16px;display:flex;flex-direction:column;box-shadow:0 18px 54px rgba(0,0,0,.74),0 4px 16px rgba(0,0,0,.48);pointer-events:auto;opacity:0;transform:translateY(-10px);transition:opacity .18s ease,transform .18s ease;`;
+    } else {
+        overlay = document.createElement("div");
+        overlay.id = "sort-play-extra-cols-overlay";
+        overlay.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background-color:rgba(0,0,0,0.7);z-index:2005;display:flex;justify-content:center;align-items:center;backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);opacity:0;transition:opacity .2s ease;";
+        modalContainer.className = "sort-play-extra-cols-modal sort-play-modal-container sort-play-font-scope";
+        modalContainer.style.cssText = `box-sizing:border-box!important;z-index:2006;width:min(${modalWidth}px,94vw)!important;max-width:${modalWidth}px!important;min-width:min(320px,94vw)!important;min-height:0!important;max-height:86vh!important;flex-shrink:0!important;overflow:hidden;background-color:#121212!important;color:var(--spice-text,#fff);border:2px solid #282828;border-radius:16px;display:flex;flex-direction:column;box-shadow:0 16px 48px rgba(0,0,0,.55);`;
+        hostEl = overlay;
+    }
+
+    const shadowRoot = modalContainer.attachShadow({ mode: 'open' });
+
+    const enforceBoundaries = () => {
+        if (!isFloating || isClosing || !modalContainer.isConnected) return;
+        requestAnimationFrame(() => {
+            if (isClosing || !modalContainer.isConnected) return;
+            const vW = window.innerWidth;
+            const vH = window.innerHeight;
+            const w = modalContainer.offsetWidth;
+            const h = modalContainer.offsetHeight;
+            let nL = parseFloat(modalContainer.style.left);
+            let nT = parseFloat(modalContainer.style.top);
+            if (isNaN(nL)) nL = modalContainer.getBoundingClientRect().left;
+            if (isNaN(nT)) nT = modalContainer.getBoundingClientRect().top;
+            const minTop = Math.min(70, Math.max(10, vH - h - 10));
+            nL = Math.max(10, Math.min(nL, vW - w - 10));
+            nT = Math.max(minTop, Math.min(nT, vH - h - 10));
+            modalContainer.style.left = `${nL}px`;
+            modalContainer.style.top = `${nT}px`;
+        });
+    };
+
+    hostEl._cleanup = () => {
+        stopDragAutoScroll();
+        clearExitTimers();
+        scrollResizeObserver?.disconnect();
+        scrollResizeObserver = null;
+        clearTimeout(liveRefreshTimer);
+        clearTimeout(undoTimer);
+        clearTimeout(widthResetTimer);
+        abortController.abort();
+    };
+
+    const onClose = () => {
+        if (isClosing) return;
+        isClosing = true;
+        hostEl._cleanup?.();
+        runInternal(() => syncOpenExtraColumnsUi());
+        const pending = Array.from(dirtyContexts);
+        dirtyContexts.clear();
+        for (const ctx of pending) refreshExtraColumnsForContext(ctx);
+        hostEl.style.pointerEvents = "none";
+        hostEl.style.opacity = "0";
+        if (isFloating) modalContainer.style.transform = "translateY(-8px)";
+        setTimeout(() => hostEl.remove(), 200);
+    };
+
+    if (!isFloating) preventDragCloseModal(abortController.signal);
+    window.addEventListener("resize", enforceBoundaries, { signal: abortController.signal });
+
+    document.addEventListener("keydown", (e) => {
+        if (e.key !== "Escape") return;
+        if (document.getElementById('sort-play-simple-input-overlay') || document.getElementById('sort-play-column-selector')) return;
+        if (isFloating && document.querySelector('.sort-play-modal-container')) return;
+        e.preventDefault();
+        e.stopPropagation();
+        onClose();
+    }, { capture: true, signal: abortController.signal });
+
+    const getUniformAlign = (cols) => {
+        if (!cols?.length) return null;
+        const first = cols[0].align || 'center';
+        return cols.every(c => (c.align || 'center') === first) ? first : null;
+    };
+
+    const renderTypeOptionsHtml = (selectedType, ctx) => {
+        const allowPlayCount = ctx === 'playlist';
+        return TYPE_GROUPS.map(g => {
+            const opts = g.types
+                .filter(t => allowPlayCount || t !== 'playCount')
+                .map(t => `<option value="${t}" ${selectedType === t ? 'selected' : ''}>${escapeHtml(EXTRA_COLUMN_TYPES[t].fullLabel)}</option>`)
+                .join('');
+            return opts ? `<optgroup label="${g.label}">${opts}</optgroup>` : '';
+        }).join('');
+    };
+
+    const renderFormatOptionsHtml = (col) => {
+        const opts = EXTRA_COLUMN_FORMAT_OPTIONS[col.type];
+        if (!opts) return '';
+        const eff = getExtraColumnEffectiveFormat(col.type, col.format || null);
+        return opts.map(o => `<option value="${escapeHtml(o.value)}" ${eff === o.value ? 'selected' : ''}>${escapeHtml(o.label)}</option>`).join('');
+    };
+
+    shadowRoot.innerHTML = `
+        <style>
+            :host{font-family:'SpotifyMixUI',sans-serif!important;color:#fff;display:flex;flex-direction:column;width:100%;min-height:0;flex:1}
+            *,*::before,*::after{box-sizing:border-box;font-family:'SpotifyMixUI',sans-serif!important}
+            .ec-header{padding:14px 18px 8px;background:#121212;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;${isFloating ? 'cursor:move;user-select:none' : ''}}
+            .ec-title{font-size:17px;font-weight:700;color:#fff;margin:0;line-height:1.2;letter-spacing:-.01em}
+            .ec-close-btn{background:none;border:none;color:#9e9e9e;cursor:pointer;padding:4px;display:flex;border-radius:50%;flex-shrink:0;transition:color .15s,background .15s}
+            .ec-close-btn:hover{color:#fff;background:rgba(255,255,255,.08)}
+            .ec-close-btn svg{width:20px;height:20px}
+            .ec-tabs-rail{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:4px 12px 0;background:#121212;border-bottom:1px solid #2b2b2b;flex-shrink:0;position:relative}
+            .ec-tab{position:relative;display:flex;align-items:center;justify-content:center;gap:9px;padding:9px 10px;border-radius:10px 10px 0 0;border:1px solid transparent;border-bottom:none;background:transparent;color:#8c8c8c;cursor:pointer;user-select:none;outline:none;transition:color .15s,background-color .15s;min-width:0}
+            .ec-tab:not(.active):hover{color:#dcdcdc;background:rgba(255,255,255,.045)}
+            .ec-tab:focus-visible{box-shadow:inset 0 0 0 1.5px rgba(30,215,96,.65)}
+            .ec-tab.active{background:#1b1b1b;color:#fff;border-color:#2b2b2b;border-bottom:1px solid #1b1b1b;margin-bottom:-1px;z-index:2}
+            .ec-tab.active::before,.ec-tab.active::after{content:"";position:absolute;bottom:-1px;width:9px;height:9px;pointer-events:none}
+            .ec-tab.active::before{left:-9px;background:radial-gradient(circle at 0 0,transparent 7.75px,#2b2b2b 8.15px,#2b2b2b 8.85px,#1b1b1b 9.25px)}
+            .ec-tab.active::after{right:-9px;background:radial-gradient(circle at 100% 0,transparent 7.75px,#2b2b2b 8.15px,#2b2b2b 8.85px,#1b1b1b 9.25px)}
+            .ec-tab-main{display:inline-flex;align-items:center;gap:3px;min-width:0;overflow:hidden;transform:translateY(1px)}
+            .ec-tab-label{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+            .ec-tab-count{font-size:11.5px;font-weight:600;line-height:1.15;font-variant-numeric:tabular-nums;color:#585858;flex-shrink:0;white-space:nowrap;transition:color .15s}
+            .ec-tab-count::before{content:"•";margin-right:3px;font-weight:400}
+            .ec-tab-count.is-on{color:#767676}
+            .ec-tab:not(.active):hover .ec-tab-count{color:#767676}
+            .ec-tab:not(.active):hover .ec-tab-count.is-on{color:#a6a6a6}
+            .ec-tab.active .ec-tab-count{color:#666}
+            .ec-tab.active .ec-tab-count.is-on{color:#a8a8a8}
+            .ec-tab-count:empty{display:none}
+            .ec-pane{--ec-align-offset:77px;--ec-sb-w:0px;background:#1b1b1b;flex:1 1 auto;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+            .ec-scope-bar{padding:10px 18px 10px;display:flex;align-items:center;flex-shrink:0}
+            .ec-scope-text{font-size:11.5px;color:#8e8e8e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+            .ec-toolbar{padding:2px 18px 10px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,.05)}
+            .ec-toolbar-left,.ec-toolbar-right{display:flex;align-items:center;gap:6px}
+            .ec-btn{border:none;border-radius:16px;padding:5px 11px;font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:5px;transition:background .15s,color .15s,border-color .15s,opacity .15s;white-space:nowrap}
+            .ec-btn svg{width:12px;height:12px;flex-shrink:0}
+            .ec-btn-primary{background:#1ed760;color:#000}
+            .ec-btn-primary:hover{background:#3be377}
+            .ec-btn-ghost{background:#262626;color:#dcdcdc;border:1px solid #383838}
+            .ec-btn-ghost:hover:not(:disabled){background:#313131;color:#fff;border-color:#525252}
+            .ec-btn-ghost:disabled{opacity:.38;cursor:default}
+            .ec-btn-ghost.is-done{opacity:1;color:#1ed760;border-color:rgba(30,215,96,.45);background:rgba(30,215,96,.12)}
+            .ec-align-all-wrap{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:#929292;font-weight:600;margin-right:calc(var(--ec-align-offset) + var(--ec-sb-w))}
+            .ec-align-seg{display:inline-flex;align-items:center;background:#161616;border:1px solid #343434;border-radius:6px;padding:2px;gap:1px;flex-shrink:0}
+            .ec-seg-btn{background:transparent;border:none;color:#8a8a8a;width:22px;height:21px;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;transition:background .12s,color .12s}
+            .ec-seg-btn:hover:not(:disabled){color:#fff;background:rgba(255,255,255,.08)}
+            .ec-seg-btn.active{background:rgba(30,215,96,.22);color:#1ed760}
+            .ec-seg-btn:disabled{opacity:.28;cursor:default}
+            .ec-list-scroll{flex:1 1 auto;min-height:0;overflow-y:auto;padding:8px 14px 0 18px;display:flex;flex-direction:column;scrollbar-gutter:stable;scrollbar-width:auto!important;scrollbar-color:auto!important}
+            .ec-list-scroll::-webkit-scrollbar{width:4px!important;height:4px!important;background-color:transparent!important;display:block!important}
+            .ec-list-scroll::-webkit-scrollbar-button{display:none!important;height:0!important;width:0!important;background-color:transparent!important}
+            .ec-list-scroll::-webkit-scrollbar-thumb{background-color:#535353!important;border-radius:20px!important;border:none!important}
+            .ec-list-scroll::-webkit-scrollbar-thumb:hover{background-color:#727272!important}
+            .ec-list-scroll::-webkit-scrollbar-track{background:transparent!important;border:none!important;box-shadow:none!important;margin:8px 0!important}
+            .ec-list-scroll::-webkit-scrollbar-corner{background:transparent!important}
+            .ec-list{display:flex;flex-direction:column;gap:6px;position:relative;transition:opacity .16s}
+            .ec-list.ec-list-dim{opacity:.52}
+            .ec-card{background:#232323;border:1px solid #303030;border-radius:9px;padding:7px 8px;display:flex;flex-direction:column;transition:background .15s,border-color .15s,opacity .15s}
+            .ec-card:hover{background:#272727;border-color:#424242}
+            .ec-card-off{opacity:.54}
+            .ec-card.ec-dragging{opacity:.42;border-style:dashed;border-color:#1ed760}
+            .ec-card.ec-exiting{pointer-events:none;overflow:hidden}
+            .ec-drop-line{height:2px;background:#1ed760;border-radius:2px;margin:-2px 4px;pointer-events:none;box-shadow:0 0 8px rgba(30,215,96,.7)}
+            .ec-card-main{display:flex;align-items:center;gap:6px}
+            .ec-drag-handle{color:#6f6f6f;cursor:grab;display:flex;align-items:center;justify-content:center;padding:3px 1px;touch-action:none;user-select:none;flex-shrink:0;border-radius:4px;transition:color .12s,background .12s,opacity .12s}
+            .ec-drag-handle:hover:not(.is-disabled){color:#fff;background:rgba(255,255,255,.06)}
+            .ec-drag-handle:active:not(.is-disabled){cursor:grabbing}
+            .ec-drag-handle.is-disabled{opacity:.28;cursor:default}
+            .ec-nudge-col{display:flex;flex-direction:column;gap:1px;flex-shrink:0;opacity:.45;transition:opacity .15s}
+            .ec-card:hover .ec-nudge-col,.ec-card:focus-within .ec-nudge-col{opacity:1}
+            .ec-nudge-btn{background:transparent;border:none;color:#888;font-size:8px;line-height:1;padding:2px;cursor:pointer;border-radius:3px}
+            .ec-nudge-btn:hover:not(:disabled){color:#fff;background:rgba(255,255,255,.1)}
+            .ec-nudge-btn:disabled{opacity:.22;cursor:default}
+            .ec-card-controls{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:center;gap:6px;flex:1;min-width:0}
+            .ec-select{appearance:none;-webkit-appearance:none;color-scheme:dark;background:#171717 url("${selectDropdownIconSvgDataUri}") right 7px center/12px 12px no-repeat;border:1px solid #3a3a3a;color:#f2f2f2;padding:5px 24px 5px 8px;border-radius:6px;font-size:12px;width:100%;min-width:0;cursor:pointer;outline:none;text-overflow:ellipsis;transition:border-color .15s,background-color .15s}
+            .ec-select:hover,.ec-select:focus{border-color:#686868;background-color:#1c1c1c}
+            .ec-select option,.ec-select optgroup{background:#1c1c1c;color:#fff}
+            .ec-del-btn{background:transparent;border:none;color:#7e7e7e;width:24px;height:24px;border-radius:50%;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;transition:color .15s,background .15s}
+            .ec-del-btn svg{width:14px;height:14px}
+            .ec-del-btn:hover{color:#ff6b6b;background:rgba(255,107,107,.14)}
+            .ec-add-row-sticky{position:sticky;bottom:0;padding:6px 0 10px;background:#1b1b1b;z-index:3;flex-shrink:0;transition:box-shadow .16s}
+            .ec-add-row-sticky[hidden]{display:none}
+            .ec-list-scroll.is-overflow .ec-add-row-sticky{box-shadow:0 -12px 14px -4px #1b1b1b}
+            .ec-add-row-btn{width:100%;height:36px;border-radius:9px;border:1px dashed rgba(255,255,255,.16);background:rgba(255,255,255,.02);color:#a6a6a6;font-size:12.5px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:background .15s,border-color .15s,color .15s}
+            .ec-add-row-btn svg{width:14px;height:14px;flex-shrink:0}
+            .ec-add-row-btn:hover{border-color:rgba(30,215,96,.6);background:rgba(30,215,96,.09);color:#1ed760}
+            .ec-add-row-btn:active{transform:scale(.995)}
+            .ec-empty{padding:26px 14px;margin-bottom:10px;text-align:center;background:rgba(255,255,255,.02);border:1px dashed #353535;border-radius:10px;display:flex;flex-direction:column;align-items:center;gap:12px}
+            .ec-empty-title{font-size:13px;color:#b0b0b0}
+            .ec-empty-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+            .ec-notices{padding:8px 18px 10px;display:flex;flex-direction:column;gap:6px;flex-shrink:0;border-top:1px solid rgba(255,255,255,.06);background:#1b1b1b}
+            .ec-notices:empty{display:none}
+            .ec-notice{font-size:11.5px;border-radius:7px;padding:6px 10px;display:flex;align-items:center;justify-content:space-between;gap:8px;line-height:1.35}
+            .ec-notice-info{color:#a8a8a8;background:rgba(255,255,255,.04);border:1px solid #2d2d2d}
+            .ec-notice-warn{color:#ffd566;background:rgba(255,193,7,.1);border:1px solid rgba(255,193,7,.28)}
+            .ec-link-btn{background:transparent;border:none;color:#1ed760;font-size:11.5px;font-weight:700;cursor:pointer;text-decoration:underline;padding:0;flex-shrink:0}
+            .ec-link-btn:hover{color:#3be377}
+            .switch{position:relative;display:inline-block;width:32px;height:18px;flex-shrink:0}
+            .switch.xs{width:26px;height:15px}
+            .switch input{opacity:0;width:0;height:0;position:absolute}
+            .sliderx{position:absolute;cursor:pointer;inset:0;background:#444;border-radius:20px;transition:background .18s}
+            .sliderx:before{position:absolute;content:"";height:12px;width:12px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:transform .18s}
+            .switch.xs .sliderx:before{height:9px;width:9px;left:3px;bottom:3px}
+            input:checked+.sliderx{background:#1db954}
+            input:checked+.sliderx:before{transform:translateX(14px)}
+            .switch.xs input:checked+.sliderx:before{transform:translateX(11px)}
+            .ec-footer{padding:11px 18px;border-top:1px solid #2a2a2a;background:#161616;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-shrink:0}
+            #ec-undo-slot{flex:1;min-width:0}
+            .ec-hint{font-size:11px;color:#868686;line-height:1.35;display:block}
+            .ec-undo-btn{background:rgba(30,215,96,.14);border:1px solid rgba(30,215,96,.45);color:#1ed760;border-radius:16px;padding:4px 11px;font-size:11.5px;font-weight:600;cursor:pointer;transition:background .15s,color .15s}
+            .ec-undo-btn:hover{background:rgba(30,215,96,.26);color:#fff}
+            .ec-done-btn{background:#1ed760;color:#000;border:none;padding:7px 20px;border-radius:18px;font-weight:700;cursor:pointer;font-size:13px;flex-shrink:0;transition:background .15s}
+            .ec-done-btn:hover{background:#3be377}
+            .ec-close-btn,.ec-btn,.ec-seg-btn,.ec-nudge-btn,.ec-del-btn,.ec-add-row-btn,.ec-link-btn,.ec-undo-btn,.ec-done-btn{outline:none}
+            .ec-close-btn:focus-visible,.ec-btn:focus-visible,.ec-seg-btn:focus-visible,.ec-nudge-btn:focus-visible,.ec-del-btn:focus-visible,.ec-add-row-btn:focus-visible,.ec-link-btn:focus-visible,.ec-undo-btn:focus-visible,.ec-done-btn:focus-visible,.switch input:focus-visible+.sliderx{box-shadow:0 0 0 1.5px rgba(30,215,96,.7)}
+            @media (max-width:460px){.ec-header,.ec-scope-bar,.ec-toolbar,.ec-notices,.ec-footer{padding-left:12px;padding-right:12px}.ec-list-scroll{padding-left:12px;padding-right:8px}.ec-tabs-rail{padding:4px 8px 0;gap:5px}.ec-tab{padding:7px 5px;gap:5px}.ec-tab-main{gap:2px}.ec-tab-label{font-size:10px;letter-spacing:.02em}.ec-tab-count{font-size:10px}.ec-tab-count::before{margin-right:2px}.switch.xs{width:24px;height:14px}.switch.xs .sliderx:before{height:8px;width:8px}.switch.xs input:checked+.sliderx:before{transform:translateX(10px)}.ec-pane{--ec-align-offset:0px}.ec-toolbar{flex-wrap:wrap}.ec-card-main{flex-wrap:wrap}.ec-card-controls{grid-template-columns:minmax(0,1fr)}}
+        </style>
+        <div class="ec-header" ${isFloating ? 'title="Drag to move"' : ''}>
+            <h2 class="ec-title">Extra Columns</h2>
+            <button type="button" class="ec-close-btn" id="ec-close-x" aria-label="Close" title="Close">${closeIcon24Svg}</button>
+        </div>
+        <div class="ec-tabs-rail" role="tablist">
+            ${TABS.map(t => `
+                <div class="ec-tab" role="tab" tabindex="0" data-tab="${t.id}" aria-selected="false">
+                    <span class="ec-tab-main">
+                        <span class="ec-tab-label">${t.label}</span>
+                        <span class="ec-tab-count" data-tab-count="${t.id}"></span>
+                    </span>
+                    <label class="switch xs ec-tab-toggle-wrap" title="Toggle Extra Columns for ${t.emptyLabel}">
+                        <input type="checkbox" class="ec-tab-toggle" data-tab="${t.id}">
+                        <span class="sliderx"></span>
+                    </label>
+                </div>
+            `).join('')}
+        </div>
+        <div class="ec-pane" id="ec-pane">
+            <div class="ec-scope-bar"><span class="ec-scope-text" id="ec-scope-text"></span></div>
+            <div class="ec-toolbar">
+                <div class="ec-toolbar-left">
+                    <button type="button" class="ec-btn ec-btn-ghost" id="ec-reset-widths">${resetIconSvg}<span>Reset Widths</span></button>
+                </div>
+                <div class="ec-toolbar-right">
+                    <div class="ec-align-all-wrap">
+                        <span>Align all</span>
+                        <div class="ec-align-seg" role="group" aria-label="Align All Columns">
+                            <button type="button" class="ec-seg-btn ec-align-all" data-align="left" title="Align All Left">${alignLeftIconSvg}</button>
+                            <button type="button" class="ec-seg-btn ec-align-all" data-align="center" title="Align All Center">${alignCenterIconSvg}</button>
+                            <button type="button" class="ec-seg-btn ec-align-all" data-align="right" title="Align All Right">${alignRightIconSvg}</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="ec-list-scroll" id="ec-list-scroll">
+                <div class="ec-list" id="ec-cards-list"></div>
+                <div class="ec-add-row-sticky" id="ec-add-row-wrap" hidden>
+                    <button type="button" class="ec-add-row-btn" id="ec-add-row-btn">${plusIcon16Svg}<span>Add Column</span></button>
+                </div>
+            </div>
+            <div class="ec-notices" id="ec-notices"></div>
+        </div>
+        <div class="ec-footer">
+            <div id="ec-undo-slot"></div>
+            <button type="button" class="ec-done-btn" id="ec-done-btn">Done</button>
+        </div>
+    `;
+
+    const paneEl = shadowRoot.getElementById('ec-pane');
+    const toolbarEl = shadowRoot.querySelector('.ec-toolbar');
+    const scopeTextEl = shadowRoot.getElementById('ec-scope-text');
+    const resetWidthsBtn = shadowRoot.getElementById('ec-reset-widths');
+    const alignAllBtns = Array.from(shadowRoot.querySelectorAll('.ec-align-all'));
+    const listScrollEl = shadowRoot.getElementById('ec-list-scroll');
+    const cardsListEl = shadowRoot.getElementById('ec-cards-list');
+    const addRowWrapEl = shadowRoot.getElementById('ec-add-row-wrap');
+    const addRowBtn = shadowRoot.getElementById('ec-add-row-btn');
+    const noticesEl = shadowRoot.getElementById('ec-notices');
+    const undoSlotEl = shadowRoot.getElementById('ec-undo-slot');
+
+    const syncScrollbarOffset = () => {
+        if (!listScrollEl || !paneEl || !cardsListEl || !toolbarEl || isClosing) return;
+        const paneRect = paneEl.getBoundingClientRect();
+        const listRect = cardsListEl.getBoundingClientRect();
+        if (paneRect.width > 0 && listRect.width > 0) {
+            const toolbarPadR = parseFloat(getComputedStyle(toolbarEl).paddingRight) || 0;
+            const extraRight = Math.max(0, (paneRect.right - listRect.right) - toolbarPadR);
+            paneEl.style.setProperty('--ec-sb-w', `${extraRight.toFixed(2)}px`);
+        }
+        listScrollEl.classList.toggle('is-overflow', listScrollEl.scrollHeight > listScrollEl.clientHeight + 1);
+    };
+
+    const syncTabs = () => {
+        shadowRoot.querySelectorAll('.ec-tab').forEach(tabEl => {
+            const tid = tabEl.dataset.tab;
+            const cfg = extraColumnsConfig[tid] || { enabled: false, columns: [] };
+            const cols = Array.isArray(cfg.columns) ? cfg.columns : [];
+            const enabledCount = cols.filter(c => c.enabled).length;
+            const isOn = cfg.enabled !== false && enabledCount > 0;
+            const isActive = tid === activeTab;
+            tabEl.classList.toggle('active', isActive);
+            tabEl.setAttribute('aria-selected', String(isActive));
+            const countEl = tabEl.querySelector('.ec-tab-count');
+            if (countEl) {
+                countEl.textContent = enabledCount > 0 ? String(enabledCount) : '';
+                countEl.classList.toggle('is-on', isOn);
+                countEl.title = enabledCount > 0 ? `${enabledCount} ${enabledCount === 1 ? 'column' : 'columns'} ${isOn ? 'active' : 'enabled (tab off)'}` : '';
+            }
+            const chk = tabEl.querySelector('.ec-tab-toggle');
+            if (chk && chk.checked !== isOn) chk.checked = isOn;
+        });
+    };
+
+    const syncScopeAndToolbar = () => {
+        const tabMeta = TABS.find(t => t.id === activeTab);
+        const cols = extraColumnsConfig[activeTab]?.columns || [];
+        const uniformAlign = getUniformAlign(cols);
+        scopeTextEl.textContent = tabMeta?.sub || '';
+
+        alignAllBtns.forEach(btn => {
+            btn.disabled = cols.length === 0;
+            btn.classList.toggle('active', uniformAlign === btn.dataset.align);
+        });
+
+        const hasCustom = hasCustomExtraColumnWidths(activeTab);
+        if (widthResetFeedback && hasCustom) {
+            widthResetFeedback = false;
+            clearTimeout(widthResetTimer);
+        }
+        const labelSpan = resetWidthsBtn.querySelector('span');
+        if (widthResetFeedback) {
+            if (labelSpan) labelSpan.textContent = 'Widths Reset';
+            resetWidthsBtn.classList.add('is-done');
+            resetWidthsBtn.disabled = true;
+            resetWidthsBtn.title = 'Column widths reset to default';
+        } else {
+            if (labelSpan) labelSpan.textContent = 'Reset Widths';
+            resetWidthsBtn.classList.remove('is-done');
+            resetWidthsBtn.disabled = !hasCustom;
+            resetWidthsBtn.title = hasCustom
+                ? 'Reset custom column widths for this tab back to default'
+                : "Column widths are already at default — drag dividers in Spotify's tracklist header to resize";
+        }
+    };
+
+    const syncNotices = () => {
+        const ctxCfg = extraColumnsConfig[activeTab] || { enabled: false, columns: [] };
+        const cols = Array.isArray(ctxCfg.columns) ? ctxCfg.columns : [];
+        const isCtxActive = ctxCfg.enabled !== false && cols.some(c => c.enabled);
+        const activeCount = isCtxActive ? cols.filter(c => c.enabled).length : 0;
+        const crowdWarn = (activeTab === 'playlist' && activeCount > 5) || (activeTab === 'album' && activeCount > 4) || (activeTab === 'artist' && activeCount > 2);
+        const missingLfmNames = [];
+        if (!loadLastFmUsername() && isCtxActive) {
+            for (const c of cols) {
+                if (c.enabled && (c.type === 'personalScrobbles' || c.type === 'lastScrobbled')) {
+                    const label = EXTRA_COLUMN_TYPES[c.type]?.fullLabel;
+                    if (label && !missingLfmNames.includes(label)) missingLfmNames.push(label);
+                }
+            }
+        }
+
+        const parts = [];
+        if (missingLfmNames.length > 0) {
+            parts.push(`<div class="ec-notice ec-notice-warn"><span>Last.fm username required for ${escapeHtml(missingLfmNames.join(' & '))}.</span><button type="button" class="ec-link-btn" id="ec-set-lfm-btn">Set Username</button></div>`);
+        }
+        if (crowdWarn) {
+            parts.push(`<div class="ec-notice ec-notice-info"><span>Rightmost columns auto-hide first on narrow windows.</span></div>`);
+        }
+        noticesEl.innerHTML = parts.join('');
+        noticesEl.querySelector('#ec-set-lfm-btn')?.addEventListener('click', () => {
+            showLastFmUsernameModal(() => {
+                scheduleRefresh(activeTab);
+                syncNotices();
+            });
+        });
+    };
+
+    const syncFooter = () => {
+        if (undoState && undoState.ctx === activeTab) {
+            undoSlotEl.innerHTML = `<button type="button" class="ec-undo-btn" id="ec-undo-btn">↶ Undo ${escapeHtml(undoState.label)}</button>`;
+            undoSlotEl.querySelector('#ec-undo-btn')?.addEventListener('click', () => {
+                if (!undoState || undoState.ctx !== activeTab) return;
+                const prevIds = (extraColumnsConfig[activeTab]?.columns || []).map(c => ({ id: c.id, type: c.type }));
+                extraColumnsConfig[activeTab] = JSON.parse(JSON.stringify(undoState.snapshot));
+                undoState = null;
+                clearTimeout(undoTimer);
+                syncLegacyFromExtraColumns();
+                saveSettings();
+                if (activeTab === 'playlist') {
+                    prevIds.forEach(old => {
+                        const kept = getExtraColumnById('playlist', old.id);
+                        if (!kept || !kept.enabled || kept.type !== old.type) handleExtraColumnConfigChanged(old.id, false, old.type);
+                    });
+                }
+                scheduleRefresh(activeTab);
+                syncAll({ forceRebuild: true });
+                enforceBoundaries();
+            });
+        } else {
+            undoSlotEl.innerHTML = `<span class="ec-hint">Tip: Drag dividers in Spotify's tracklist header to resize columns, or double-click to reset.</span>`;
+        }
+    };
+
+    const flipCards = (prevTops) => {
+        if (!prevTops?.size) return;
+        cardsListEl.querySelectorAll('.ec-card:not(.ec-exiting)').forEach(el => {
+            const prevTop = prevTops.get(el.dataset.colId);
+            if (prevTop === undefined) return;
+            const dy = prevTop - el.getBoundingClientRect().top;
+            if (Math.abs(dy) > 1) {
+                el.animate(
+                    [{ transform: `translateY(${dy}px)` }, { transform: 'translateY(0)' }],
+                    { duration: 180, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }
+                );
+            }
+        });
+    };
+
+    const captureCardTops = () => {
+        const map = new Map();
+        cardsListEl.querySelectorAll('.ec-card:not(.ec-exiting)').forEach(el => {
+            map.set(el.dataset.colId, el.getBoundingClientRect().top);
+        });
+        return map;
+    };
+
+    const startCardDrag = (e, card) => {
+        if (e.button !== 0 || !card || (extraColumnsConfig[activeTab]?.columns?.length || 0) <= 1) return;
+        e.preventDefault();
+        const draggedId = card.dataset.colId;
+        card.classList.add('ec-dragging');
+        const dropLine = document.createElement('div');
+        dropLine.className = 'ec-drop-line';
+        let targetBeforeEl = null;
+        let lastClientY = e.clientY;
+
+        const updateDropPos = (clientY) => {
+            lastClientY = clientY;
+            const siblings = Array.from(cardsListEl.querySelectorAll('.ec-card:not(.ec-exiting)')).filter(el => el !== card);
+            targetBeforeEl = null;
+            for (const sib of siblings) {
+                const r = sib.getBoundingClientRect();
+                if (clientY < r.top + r.height / 2) {
+                    targetBeforeEl = sib;
+                    break;
+                }
+            }
+            if (targetBeforeEl) cardsListEl.insertBefore(dropLine, targetBeforeEl);
+            else cardsListEl.appendChild(dropLine);
+        };
+
+        const runAutoScroll = () => {
+            dragAutoScrollRaf = null;
+            if (isClosing || !card.classList.contains('ec-dragging')) return;
+            const sr = listScrollEl.getBoundingClientRect();
+            const zone = 34;
+            let delta = 0;
+            if (lastClientY < sr.top + zone) delta = -Math.ceil(((sr.top + zone - lastClientY) / zone) * 8);
+            else if (lastClientY > sr.bottom - zone) delta = Math.ceil(((lastClientY - (sr.bottom - zone)) / zone) * 8);
+            if (delta !== 0) {
+                listScrollEl.scrollTop += delta;
+                updateDropPos(lastClientY);
+                dragAutoScrollRaf = requestAnimationFrame(runAutoScroll);
+            }
+        };
+
+        updateDropPos(e.clientY);
+
+        const onMove = (ev) => {
+            updateDropPos(ev.clientY);
+            if (!dragAutoScrollRaf) dragAutoScrollRaf = requestAnimationFrame(runAutoScroll);
+        };
+
+        const onUp = () => {
+            window.removeEventListener('pointermove', onMove, true);
+            window.removeEventListener('pointerup', onUp, true);
+            window.removeEventListener('pointercancel', onUp, true);
+            stopDragAutoScroll();
+            card.classList.remove('ec-dragging');
+            dropLine.remove();
+            if (isClosing) return;
+            const prevIds = (extraColumnsConfig[activeTab]?.columns || []).map(c => c.id);
+            const ids = prevIds.filter(id => id !== draggedId);
+            if (targetBeforeEl) {
+                const targetIdx = ids.indexOf(targetBeforeEl.dataset.colId);
+                if (targetIdx !== -1) ids.splice(targetIdx, 0, draggedId);
+                else ids.push(draggedId);
+            } else {
+                ids.push(draggedId);
+            }
+            if (ids.every((id, idx) => id === prevIds[idx])) return;
+            const prevTops = captureCardTops();
+            clearUndoIfCtx(activeTab);
+            runInternal(() => reorderExtraColumns(activeTab, ids, true));
+            scheduleRefresh(activeTab);
+            syncCards();
+            flipCards(prevTops);
+        };
+
+        window.addEventListener('pointermove', onMove, { capture: true, signal: abortController.signal });
+        window.addEventListener('pointerup', onUp, { capture: true, signal: abortController.signal });
+        window.addEventListener('pointercancel', onUp, { capture: true, signal: abortController.signal });
+    };
+
+    const patchCardElement = (cardEl, col, idx, total) => {
+        const align = col.align === 'left' || col.align === 'right' ? col.align : 'center';
+        cardEl.dataset.idx = String(idx);
+        cardEl.classList.toggle('ec-card-off', !col.enabled);
+
+        const handle = cardEl.querySelector('.ec-drag-handle');
+        if (handle) {
+            handle.classList.toggle('is-disabled', total <= 1);
+            handle.title = total <= 1 ? '' : 'Drag to reorder';
+        }
+        const upBtn = cardEl.querySelector('.ec-nudge-btn[data-nudge="-1"]');
+        const downBtn = cardEl.querySelector('.ec-nudge-btn[data-nudge="1"]');
+        if (upBtn) upBtn.disabled = idx === 0;
+        if (downBtn) downBtn.disabled = idx === total - 1;
+
+        const typeSel = cardEl.querySelector('.ec-type-select');
+        if (typeSel && typeSel.value !== col.type) typeSel.value = col.type;
+
+        const controlsEl = cardEl.querySelector('.ec-card-controls');
+        let fmtSel = controlsEl.querySelector('.ec-fmt-select');
+        const hasFmt = !!EXTRA_COLUMN_FORMAT_OPTIONS[col.type];
+        if (hasFmt) {
+            if (!fmtSel) {
+                fmtSel = document.createElement('select');
+                fmtSel.className = 'ec-select ec-fmt-select';
+                fmtSel.title = 'Display Format';
+                fmtSel.addEventListener('change', () => {
+                    clearUndoIfCtx(activeTab);
+                    runInternal(() => setExtraColumnFormat(activeTab, cardEl.dataset.colId, fmtSel.value, true));
+                    scheduleRefresh(activeTab);
+                    syncAll();
+                });
+                controlsEl.appendChild(fmtSel);
+            }
+            if (fmtSel.dataset.fmtType !== col.type) {
+                fmtSel.dataset.fmtType = col.type;
+                fmtSel.innerHTML = renderFormatOptionsHtml(col);
+            }
+            const effFmt = getExtraColumnEffectiveFormat(col.type, col.format || null);
+            if (fmtSel.value !== effFmt) fmtSel.value = effFmt;
+        } else if (fmtSel) {
+            fmtSel.remove();
+        }
+
+        cardEl.querySelectorAll('.ec-seg-btn').forEach(b => {
+            b.classList.toggle('active', b.dataset.align === align);
+        });
+
+        const toggleWrap = cardEl.querySelector('.ec-card-toggle-wrap');
+        if (toggleWrap) toggleWrap.title = col.enabled ? 'Hide column' : 'Show column';
+        const toggleInput = cardEl.querySelector('.ec-col-toggle');
+        if (toggleInput && toggleInput.checked !== !!col.enabled) toggleInput.checked = !!col.enabled;
+    };
+
+    const createCardElement = (col, idx, total) => {
+        const cardEl = document.createElement('div');
+        cardEl.className = 'ec-card';
+        cardEl.dataset.colId = col.id;
+        cardEl.innerHTML = `
+            <div class="ec-card-main">
+                <div class="ec-drag-handle" title="Drag to reorder">${dragGripIconSvg}</div>
+                <div class="ec-nudge-col">
+                    <button type="button" class="ec-nudge-btn" data-nudge="-1" title="Move Up">▲</button>
+                    <button type="button" class="ec-nudge-btn" data-nudge="1" title="Move Down">▼</button>
+                </div>
+                <div class="ec-card-controls">
+                    <select class="ec-select ec-type-select" title="Column Data Type">${renderTypeOptionsHtml(col.type, activeTab)}</select>
+                </div>
+                <div class="ec-align-seg" role="group" aria-label="Column Alignment">
+                    <button type="button" class="ec-seg-btn" data-align="left" title="Align Left">${alignLeftIconSvg}</button>
+                    <button type="button" class="ec-seg-btn" data-align="center" title="Align Center">${alignCenterIconSvg}</button>
+                    <button type="button" class="ec-seg-btn" data-align="right" title="Align Right">${alignRightIconSvg}</button>
+                </div>
+                <label class="switch ec-card-toggle-wrap">
+                    <input type="checkbox" class="ec-col-toggle">
+                    <span class="sliderx"></span>
+                </label>
+                <button type="button" class="ec-del-btn" title="Remove Column">${closeIcon16Svg}</button>
+            </div>
+        `;
+
+        cardEl.querySelector('.ec-drag-handle').addEventListener('pointerdown', (e) => startCardDrag(e, cardEl));
+
+        cardEl.querySelectorAll('.ec-nudge-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const id = cardEl.dataset.colId;
+                const delta = Number(btn.dataset.nudge);
+                const ids = (extraColumnsConfig[activeTab]?.columns || []).map(c => c.id);
+                const i = ids.indexOf(id);
+                const target = i + delta;
+                if (i < 0 || target < 0 || target >= ids.length) return;
+                const prevTops = captureCardTops();
+                [ids[i], ids[target]] = [ids[target], ids[i]];
+                clearUndoIfCtx(activeTab);
+                runInternal(() => reorderExtraColumns(activeTab, ids, true));
+                scheduleRefresh(activeTab);
+                syncCards();
+                flipCards(prevTops);
+                if (btn.disabled) {
+                    cardEl.querySelector(`.ec-nudge-btn[data-nudge="${-delta}"]`)?.focus();
+                }
+            });
+        });
+
+        cardEl.querySelector('.ec-type-select').addEventListener('change', (e) => {
+            clearUndoIfCtx(activeTab);
+            runInternal(() => setExtraColumnType(activeTab, cardEl.dataset.colId, e.target.value, null, true));
+            scheduleRefresh(activeTab);
+            syncAll();
+            enforceBoundaries();
+        });
+
+        cardEl.querySelectorAll('.ec-seg-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                clearUndoIfCtx(activeTab);
+                runInternal(() => setExtraColumnAlign(activeTab, cardEl.dataset.colId, btn.dataset.align, true));
+                scheduleRefresh(activeTab);
+                syncAll();
+            });
+        });
+
+        cardEl.querySelector('.ec-col-toggle').addEventListener('change', (e) => {
+            clearUndoIfCtx(activeTab);
+            runInternal(() => setExtraColumnEnabled(activeTab, cardEl.dataset.colId, e.target.checked, true));
+            scheduleRefresh(activeTab);
+            syncAll();
+            enforceBoundaries();
+        });
+
+        cardEl.querySelector('.ec-del-btn').addEventListener('click', () => {
+            const colId = cardEl.dataset.colId;
+            const colObj = getExtraColumnById(activeTab, colId);
+            const countBefore = (extraColumnsConfig[activeTab]?.columns || []).length;
+            const prevAddRect = countBefore === 1 ? addRowBtn.getBoundingClientRect() : null;
+            pushUndo(activeTab, `Remove "${colObj ? getExtraColumnLabel(colObj.type, colObj.format) : 'Column'}"`);
+            runInternal(() => removeExtraColumn(activeTab, colId, true));
+            scheduleRefresh(activeTab);
+
+            if (countBefore <= 1) {
+                syncAll();
+                const emptyAddBtn = cardsListEl.querySelector('#ec-empty-add');
+                if (prevAddRect && emptyAddBtn) {
+                    const nextRect = emptyAddBtn.getBoundingClientRect();
+                    const dy = prevAddRect.top - nextRect.top;
+                    if (Math.abs(dy) > 1) {
+                        emptyAddBtn.animate(
+                            [{ transform: `translateY(${dy}px)`, opacity: 0.7 }, { transform: 'translateY(0)', opacity: 1 }],
+                            { duration: 220, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }
+                        );
+                    }
+                }
+                enforceBoundaries();
+                return;
+            }
+
+            const startH = cardEl.offsetHeight;
+            cardEl.classList.add('ec-exiting');
+            cardEl.animate(
+                [
+                    { height: `${startH}px`, opacity: 1, marginBottom: '0px', paddingTop: '7px', paddingBottom: '7px', borderWidth: '1px' },
+                    { height: '0px', opacity: 0, marginBottom: '-6px', paddingTop: '0px', paddingBottom: '0px', borderWidth: '0px' }
+                ],
+                { duration: 150, easing: 'ease-out', fill: 'forwards' }
+            );
+            syncTabs();
+            syncScopeAndToolbar();
+            syncNotices();
+            const ctxCfg = extraColumnsConfig[activeTab];
+            const remaining = ctxCfg?.columns || [];
+            const isCtxActive = ctxCfg?.enabled !== false && remaining.some(c => c.enabled);
+            cardsListEl.classList.toggle('ec-list-dim', !isCtxActive && remaining.length > 0);
+            cardsListEl.querySelectorAll('.ec-card:not(.ec-exiting)').forEach((el, i) => {
+                const c = remaining.find(x => x.id === el.dataset.colId);
+                if (c) patchCardElement(el, c, i, remaining.length);
+            });
+            const t = setTimeout(() => {
+                activeExitTimers.delete(t);
+                if (cardEl.isConnected) cardEl.remove();
+                syncScrollbarOffset();
+                enforceBoundaries();
+            }, 155);
+            activeExitTimers.add(t);
+        });
+
+        patchCardElement(cardEl, col, idx, total);
+        return cardEl;
+    };
+
+    const addNewColumnWithAnimation = (sourceBtn = null) => {
+        const wasEmpty = (extraColumnsConfig[activeTab]?.columns || []).length === 0;
+        const prevBtnRect = sourceBtn?.getBoundingClientRect?.() || (wasEmpty ? cardsListEl.querySelector('#ec-empty-add')?.getBoundingClientRect?.() : addRowBtn.getBoundingClientRect());
+        clearUndoIfCtx(activeTab);
+        const created = runInternal(() => addExtraColumn(activeTab, null, -1, null, null, true));
+        scheduleRefresh(activeTab);
+        syncAll({ animateAddedId: created?.id || null });
+
+        const isOverflow = listScrollEl.scrollHeight > listScrollEl.clientHeight + 1;
+        if (prevBtnRect && (!isOverflow || wasEmpty)) {
+            const nextRect = addRowBtn.getBoundingClientRect();
+            const dy = prevBtnRect.top - nextRect.top;
+            if (Math.abs(dy) > 1) {
+                addRowBtn.animate(
+                    [{ transform: `translateY(${dy}px)`, opacity: wasEmpty ? 0.65 : 1 }, { transform: 'translateY(0)', opacity: 1 }],
+                    { duration: wasEmpty ? 240 : 190, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }
+                );
+            }
+        }
+        if (isOverflow) {
+            requestAnimationFrame(() => {
+                listScrollEl.scrollTo({ top: listScrollEl.scrollHeight, behavior: 'smooth' });
+            });
+        }
+        enforceBoundaries();
+    };
+
+    const syncCards = ({ animateAddedId = null, forceRebuild = false } = {}) => {
+        const ctxCfg = extraColumnsConfig[activeTab] || { enabled: false, columns: [] };
+        const cols = Array.isArray(ctxCfg.columns) ? ctxCfg.columns : [];
+        const isCtxActive = ctxCfg.enabled !== false && cols.some(c => c.enabled);
+        const tabMeta = TABS.find(t => t.id === activeTab);
+
+        clearExitTimers();
+        if (forceRebuild) {
+            cardsListEl.innerHTML = '';
+        } else {
+            cardsListEl.querySelectorAll('.ec-card.ec-exiting').forEach(el => el.remove());
+        }
+
+        cardsListEl.classList.toggle('ec-list-dim', !isCtxActive && cols.length > 0);
+
+        if (cols.length === 0) {
+            addRowWrapEl.hidden = true;
+            const existingEmpty = cardsListEl.querySelector('.ec-empty');
+            if (!existingEmpty || existingEmpty.dataset.tab !== activeTab) {
+                cardsListEl.innerHTML = `
+                    <div class="ec-empty" data-tab="${activeTab}">
+                        <div class="ec-empty-title">No extra columns configured for ${escapeHtml(tabMeta.emptyLabel)}</div>
+                        <div class="ec-empty-actions">
+                            <button type="button" class="ec-btn ec-btn-primary" id="ec-empty-add">+ Add Column</button>
+                        </div>
+                    </div>
+                `;
+                const emptyAddBtn = cardsListEl.querySelector('#ec-empty-add');
+                emptyAddBtn?.addEventListener('click', () => addNewColumnWithAnimation(emptyAddBtn));
+            }
+            requestAnimationFrame(syncScrollbarOffset);
+            return;
+        }
+
+        cardsListEl.querySelector('.ec-empty')?.remove();
+        addRowWrapEl.hidden = false;
+
+        const existingMap = new Map();
+        cardsListEl.querySelectorAll('.ec-card:not(.ec-exiting)').forEach(el => {
+            existingMap.set(el.dataset.colId, el);
+        });
+
+        const colIds = new Set(cols.map(c => c.id));
+        for (const [id, el] of existingMap.entries()) {
+            if (!colIds.has(id)) {
+                el.remove();
+                existingMap.delete(id);
+            }
+        }
+
+        let prevNode = null;
+        cols.forEach((col, idx) => {
+            let cardEl = existingMap.get(col.id);
+            const isNew = !cardEl;
+            if (isNew) cardEl = createCardElement(col, idx, cols.length);
+            else patchCardElement(cardEl, col, idx, cols.length);
+
+            const expectedNext = prevNode ? prevNode.nextSibling : cardsListEl.firstChild;
+            if (cardEl !== expectedNext) cardsListEl.insertBefore(cardEl, expectedNext);
+            prevNode = cardEl;
+
+            if (isNew && animateAddedId === col.id) {
+                cardEl.animate(
+                    [{ opacity: 0, transform: 'translateY(-8px)' }, { opacity: 1, transform: 'translateY(0)' }],
+                    { duration: 210, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }
+                );
+            }
+        });
+
+        requestAnimationFrame(syncScrollbarOffset);
+    };
+
+    const syncAll = (opts = {}) => {
+        syncTabs();
+        syncScopeAndToolbar();
+        syncCards(opts);
+        syncNotices();
+        syncFooter();
+    };
+
+    const switchTab = (nextTab) => {
+        if (!validTabs.includes(nextTab) || nextTab === activeTab) return;
+        activeTab = nextTab;
+        widthResetFeedback = false;
+        clearTimeout(widthResetTimer);
+        listScrollEl.scrollTop = 0;
+        syncAll({ forceRebuild: true });
+        enforceBoundaries();
+    };
+
+    shadowRoot.getElementById('ec-close-x').addEventListener('click', onClose);
+    shadowRoot.getElementById('ec-done-btn').addEventListener('click', onClose);
+
+    shadowRoot.querySelectorAll('.ec-tab').forEach(tabEl => {
+        tabEl.addEventListener('click', () => switchTab(tabEl.dataset.tab));
+        tabEl.addEventListener('keydown', (e) => {
+            if (e.target.closest('.ec-tab-toggle-wrap')) return;
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                switchTab(tabEl.dataset.tab);
+            }
+        });
+    });
+
+    shadowRoot.querySelectorAll('.ec-tab-toggle-wrap').forEach(lbl => {
+        lbl.addEventListener('click', (e) => e.stopPropagation());
+    });
+
+    shadowRoot.querySelectorAll('.ec-tab-toggle').forEach(chk => {
+        chk.addEventListener('change', (e) => {
+            e.stopPropagation();
+            const tid = chk.dataset.tab;
+            const prevLen = (extraColumnsConfig[tid]?.columns || []).length;
+            const prevEmptyRect = (tid === activeTab && prevLen === 0 && chk.checked)
+                ? cardsListEl.querySelector('#ec-empty-add')?.getBoundingClientRect?.()
+                : null;
+            runInternal(() => setExtraColumnsContextEnabled(tid, chk.checked, true));
+            const nextCols = extraColumnsConfig[tid]?.columns || [];
+            if (nextCols.length !== prevLen) clearUndoIfCtx(tid);
+            scheduleRefresh(tid);
+            syncTabs();
+            if (tid === activeTab) {
+                const addedId = (prevLen === 0 && nextCols.length === 1) ? nextCols[0].id : null;
+                syncScopeAndToolbar();
+                syncCards({ animateAddedId: addedId });
+                syncNotices();
+                if (prevEmptyRect && addedId) {
+                    const nextRect = addRowBtn.getBoundingClientRect();
+                    const dy = prevEmptyRect.top - nextRect.top;
+                    if (Math.abs(dy) > 1) {
+                        addRowBtn.animate(
+                            [{ transform: `translateY(${dy}px)`, opacity: 0.65 }, { transform: 'translateY(0)', opacity: 1 }],
+                            { duration: 240, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }
+                        );
+                    }
+                }
+                enforceBoundaries();
+            }
+        });
+    });
+
+    addRowBtn.addEventListener('click', () => addNewColumnWithAnimation(addRowBtn));
+
+    alignAllBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            clearUndoIfCtx(activeTab);
+            runInternal(() => setContextExtraColumnsAlign(activeTab, btn.dataset.align, true));
+            scheduleRefresh(activeTab);
+            syncAll();
+        });
+    });
+
+    resetWidthsBtn.addEventListener('click', () => {
+        if (resetWidthsBtn.disabled) return;
+        resetExtraColumnWidths(activeTab);
+        widthResetFeedback = true;
+        clearTimeout(widthResetTimer);
+        syncScopeAndToolbar();
+        widthResetTimer = setTimeout(() => {
+            if (!isClosing && widthResetFeedback) {
+                widthResetFeedback = false;
+                syncScopeAndToolbar();
+            }
+        }, 1400);
+    });
+
+    if (isFloating) {
+        const header = shadowRoot.querySelector('.ec-header');
+        header?.addEventListener('mousedown', (e) => {
+            if (e.button !== 0 || e.target.closest('button')) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const startX = e.clientX;
+            const startY = e.clientY;
+            const rect = modalContainer.getBoundingClientRect();
+            const startLeft = rect.left;
+            const startTop = rect.top;
+            modalContainer.style.transition = 'none';
+            modalContainer.style.transform = 'none';
+
+            const onMove = (ev) => {
+                ev.preventDefault();
+                const vW = window.innerWidth;
+                const vH = window.innerHeight;
+                const r = modalContainer.getBoundingClientRect();
+                const minTop = Math.min(70, Math.max(10, vH - r.height - 10));
+                const nextLeft = Math.max(10, Math.min(startLeft + (ev.clientX - startX), vW - r.width - 10));
+                const nextTop = Math.max(minTop, Math.min(startTop + (ev.clientY - startY), vH - r.height - 10));
+                modalContainer.style.left = `${nextLeft}px`;
+                modalContainer.style.top = `${nextTop}px`;
+            };
+
+            const onUp = () => {
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+                modalContainer.style.transition = 'opacity .18s ease,transform .18s ease';
+                const r = modalContainer.getBoundingClientRect();
+                localStorage.setItem(STORAGE_KEY_EXTRA_COLS_WINDOW_POS, JSON.stringify({ x: Math.round(r.left), y: Math.round(r.top) }));
+            };
+
+            document.addEventListener('mousemove', onMove, { signal: abortController.signal });
+            document.addEventListener('mouseup', onUp, { signal: abortController.signal });
+        });
+    }
+
+    hostEl._syncFromExternal = () => {
+        if (isInternalUpdate || isClosing) return;
+        syncAll();
+        enforceBoundaries();
+    };
+
+    if (typeof ResizeObserver !== 'undefined') {
+        scrollResizeObserver = new ResizeObserver(() => syncScrollbarOffset());
+        scrollResizeObserver.observe(listScrollEl);
+    }
+
+    if (isFloating) {
+        document.body.appendChild(modalContainer);
+        syncAll({ forceRebuild: true });
+        enforceBoundaries();
+        requestAnimationFrame(() => {
+            modalContainer.style.opacity = "1";
+            modalContainer.style.transform = "translateY(0)";
+            syncScrollbarOffset();
+        });
+    } else {
+        document.body.appendChild(overlay);
+        overlay.appendChild(modalContainer);
+        syncAll({ forceRebuild: true });
+        requestAnimationFrame(() => {
+            overlay.style.opacity = "1";
+            syncScrollbarOffset();
+        });
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) onClose();
+        });
+    }
+  }
+
   function showSupportModal() {
     const existingOverlay = document.getElementById("sort-play-support-overlay");
     if (existingOverlay) {
@@ -17681,7 +18864,7 @@
       .setting-row { padding: 5px 0; align-items: center; }
       .setting-row .col.description { float: left; padding-right: 10px; width: auto; color: #c1c1c1; margin: 0; }
       .setting-row .col.action { display: flex; float: right; align-items: center; justify-content: flex-end; text-align: right; gap: 8px; position: relative; }
-      select { padding: 2px 8px; border-radius: 15px; border: 1px solid #434343; background: #282828; color: white; cursor: pointer; font-size: 13px; max-width: 130px; height: auto; outline: none; }
+      select { padding: 2px 8px; border-radius: 15px; border: 1px solid #434343; background: #282828; color: white; cursor: pointer; font-size: 13px; max-width: 130px; height: auto; outline: none; field-sizing: content; }
       .switch { position: relative; display: inline-block; width: 40px; height: 24px; flex-shrink: 0; }
       .switch input { opacity: 0; width: 0; height: 0; }
       .sliderx { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #484848; border-radius: 24px; transition: .2s; }
@@ -17689,9 +18872,13 @@
       input:checked + .sliderx { background-color: #1DB954; }
       input:checked + .sliderx:before { transform: translateX(16px); }
       .tooltip-container { position: relative; display: inline-block; vertical-align: middle; margin-left: 4px; }
-      .custom-tooltip { display: none; visibility: hidden; position: absolute; z-index: 1; background-color: #373737; color: white; padding: 8px 12px; border-radius: 4px; font-size: 14px; max-width: min(240px, 75vw); width: max-content; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); line-height: 1.4; word-wrap: break-word; text-align: left; }
-      .custom-tooltip::after { content: ""; position: absolute; top: 100%; left: 50%; margin-left: -5px; border-width: 5px; border-style: solid; border-color: #373737 transparent transparent transparent; }
-      .tooltip-container:hover .custom-tooltip { display: block; visibility: visible; }
+      .custom-tooltip { visibility: hidden; pointer-events: none; position: absolute; z-index: 50; background-color: #373737; color: white; padding: 8px 12px; border-radius: 6px; font-size: 13px; max-width: min(260px, 75vw); width: max-content; bottom: 100%; left: 50%; transform: translateX(calc(-50% + var(--tt-shift, 0px))); margin-bottom: 6px; box-shadow: 0 4px 14px rgba(0,0,0,0.45); line-height: 1.4; word-wrap: break-word; text-align: left; }
+      .custom-tooltip::after { content: ""; position: absolute; top: 100%; left: calc(50% - var(--tt-shift, 0px)); margin-left: -5px; border-width: 5px; border-style: solid; border-color: #373737 transparent transparent transparent; }
+      .custom-tooltip.wide { max-width: min(340px, 80vw); }
+      .custom-tooltip strong { color: #1ED760; font-weight: 700; }
+      .custom-tooltip.flip-bottom { bottom: auto; top: 100%; margin-bottom: 0; margin-top: 6px; }
+      .custom-tooltip.flip-bottom::after { top: auto; bottom: 100%; border-color: transparent transparent #373737 transparent; }
+      .tooltip-container:hover .custom-tooltip { visibility: visible; }
       .category-header { font-size: 13px; font-weight: 700; color: rgb(255 255 255 / 50%); text-transform: uppercase; letter-spacing: 1px; padding-bottom: 8px; border-bottom: 1px solid rgb(255 255 255 / 8%); margin-top: 10px; margin-bottom: 5px; }
       .category-header:first-child { margin-top: 8px; }
     </style>
@@ -17743,6 +18930,23 @@
                         <option value="60">Last 60 Days</option>
                         <option value="90">Last 90 Days</option>
                         <option value="150">Last 150 Days</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="setting-row" id="followedReleasesDateModeSetting">
+                <label class="col description">
+                    Release Date Mode
+                    <span class="tooltip-container">
+                        ${infoIconSvg}
+                        <span class="custom-tooltip wide">Choose how track release dates are checked:<br><br>• <strong>Standard (Fast)</strong>: Uses Spotify's album release date.<br>• <strong>True Date (Filter &amp; Sort)</strong>: Checks original debut dates and excludes older reissues or singles outside your window.<br>• <strong>True Date (Sort Only)</strong>: Keeps all tracks and moves older debuts lower.</span>
+                    </span>
+                </label>
+                <div class="col action">
+                    <select id="followedReleasesDateModeSelect" style="max-width: 190px;">
+                        <option value="standard">Standard (Fast)</option>
+                        <option value="trueFilterSort">True Date (Filter &amp; Sort)</option>
+                        <option value="trueSortOnly">True Date (Sort Only)</option>
                     </select>
                 </div>
             </div>
@@ -17875,6 +19079,36 @@
     });
     modalContainer.querySelector("#closeDedicatedSettingsModal").addEventListener("click", closeModal);
 
+    const dsScrollBody = modalContainer.querySelector(".sp-ds-body");
+    modalContainer.querySelectorAll(".tooltip-container").forEach(container => {
+        container.addEventListener("mouseenter", () => {
+            const tooltip = container.querySelector(".custom-tooltip");
+            if (!tooltip || !dsScrollBody) return;
+            tooltip.classList.remove("flip-bottom");
+            tooltip.style.setProperty("--tt-shift", "0px");
+            const tRect = tooltip.getBoundingClientRect();
+            const cRect = dsScrollBody.getBoundingClientRect();
+            if (tRect.top < cRect.top + 6) {
+                tooltip.classList.add("flip-bottom");
+            }
+            let shift = 0;
+            if (tRect.left < cRect.left + 8) {
+                shift = Math.ceil(cRect.left + 8 - tRect.left);
+            } else if (tRect.right > cRect.right - 8) {
+                shift = -Math.ceil(tRect.right - (cRect.right - 8));
+            }
+            const maxShift = Math.max(0, Math.floor(tRect.width / 2 - 14));
+            shift = Math.max(-maxShift, Math.min(maxShift, shift));
+            if (shift !== 0) tooltip.style.setProperty("--tt-shift", `${shift}px`);
+        });
+        container.addEventListener("mouseleave", () => {
+            const tooltip = container.querySelector(".custom-tooltip");
+            if (!tooltip) return;
+            tooltip.classList.remove("flip-bottom");
+            tooltip.style.setProperty("--tt-shift", "0px");
+        });
+    });
+
     const configFollowedReleasesFilterBtn = modalContainer.querySelector("#configFollowedReleasesFilterBtn");
     if (configFollowedReleasesFilterBtn) {
         configFollowedReleasesFilterBtn.addEventListener("mouseenter", () => configFollowedReleasesFilterBtn.style.backgroundColor = "rgba(255, 255, 255, 0.1)");
@@ -17898,6 +19132,7 @@
     const discoveryPlaylistSizeSelect = modalContainer.querySelector("#discoveryPlaylistSizeSelect");
     const discoveryStrictAlbumExclusionToggle = modalContainer.querySelector("#discoveryStrictAlbumExclusionToggle");
     const newReleasesLimitSelect = modalContainer.querySelector("#newReleasesLimitSelect");
+    const followedReleasesDateModeSelect = modalContainer.querySelector("#followedReleasesDateModeSelect");
     const followedReleasesLimitSelect = modalContainer.querySelector("#followedReleasesLimitSelect");
 
     setDedicatedCoversToggle.addEventListener("change", () => {
@@ -17926,6 +19161,12 @@
     newReleasesLimitSelect.addEventListener("change", () => {
         const val = newReleasesLimitSelect.value;
         newReleasesDaysLimit = val.startsWith('release-') ? val : parseInt(val, 10);
+        saveSettings();
+    });
+
+    followedReleasesDateModeSelect.value = followedReleasesConfig.releaseDateMode || 'standard';
+    followedReleasesDateModeSelect.addEventListener("change", () => {
+        followedReleasesConfig.releaseDateMode = followedReleasesDateModeSelect.value;
         saveSettings();
     });
     
@@ -19900,7 +21141,7 @@
               let result = null;
               if (!isCountryOnly(lower) && isWhitelistedGenre(lower, genreMap)) {
                   const normalized = normalizeGenre(lower);
-                  if (normalized && !MOOD_DESCRIPTORS_SET.has(normalized)) {
+                  if (normalized && !isPureMoodDescriptorForFilter(normalized)) {
                       result = normalized;
                   }
               }
@@ -23160,7 +24401,7 @@
       if (val === undefined || val === null || val === "N/A" || val === -1) return null;
 
       switch (type) {
-          case 'playCount': return formatPlayCount(val, format);
+          case 'playCount': return formatPlayCount(val, format, true);
           case 'releaseDate': return formatReleaseDate(val, format);
           case 'trueReleaseDate': return formatReleaseDate(val, format);
           case 'popularity': return formatPopularity(val, format);
@@ -25185,7 +26426,8 @@ shadowRoot.innerHTML = `
         if (cached && typeof cached === 'object' && cached.date !== undefined) {
             return { 
                 ...track, 
-                trueReleaseDate: cached.date, 
+                trueReleaseDate: cached.date,
+                trueReleaseDatePrecision: cached.precision || inferDatePrecision(cached.date),
                 trueTrackNumber: cached.trackNumber !== undefined ? cached.trackNumber : track.trackNumber,
                 trueDiscNumber: cached.discNumber !== undefined ? cached.discNumber : (track.discNumber || 1),
                 trueAlbumId: cached.albumId || track.albumId || track.album?.id || track.track?.album?.id || "",
@@ -25197,12 +26439,13 @@ shadowRoot.innerHTML = `
 
     let targetIsrc = track.track?.external_ids?.isrc || track.external_ids?.isrc;
     let targetDate = track.releaseDate || track.album?.release_date || track.track?.album?.release_date;
+    let targetPrecision = track.releaseDatePrecision || track.album?.release_date_precision || track.track?.album?.release_date_precision || inferDatePrecision(targetDate);
     let targetPlaycount = (track.playCount && track.playCount !== "N/A") ? Number(track.playCount) : 0;
-    let targetDuration = track.durationMs || track.durationMilis || track.track?.duration_ms || 0;
+    let targetDuration = track.durationMs || track.durationMilis || track.duration_ms || track.track?.duration_ms || 0;
     
-    let albumType = track.albumType || track.album_type || track.track?.album?.album_type || 'album';
+    let albumType = track.albumType || track.album_type || track.album?.album_type || track.track?.album?.album_type || 'album';
     let albumName = track.albumName || track.album?.name || track.track?.album?.name || "";
-    let trackNumber = track.trackNumber || track.track?.track_number || 0;
+    let trackNumber = track.trackNumber || track.track_number || track.track?.track_number || 0;
     let albumId = track.albumId || track.album?.id || track.track?.album?.id || "";
 
     if (!targetIsrc || !targetDate) {
@@ -25211,8 +26454,13 @@ shadowRoot.innerHTML = `
             const coreMeta = metaMap.get(track.uri);
             if (coreMeta) {
                 if (!targetIsrc) targetIsrc = coreMeta.isrc;
-                if (!targetDate) targetDate = coreMeta.releaseDate;
-                if (!track.albumType) albumType = coreMeta.albumType;
+                if (!targetDate) {
+                    targetDate = coreMeta.releaseDate;
+                    targetPrecision = coreMeta.datePrecision || inferDatePrecision(coreMeta.releaseDate);
+                } else if (!targetPrecision && coreMeta.datePrecision) {
+                    targetPrecision = coreMeta.datePrecision;
+                }
+                if (!track.albumType && !track.album?.album_type) albumType = coreMeta.albumType;
             }
         } catch(e) {}
         
@@ -25221,14 +26469,19 @@ shadowRoot.innerHTML = `
                 const meta = await fetchInternalTrackMetadata(trackId);
                 if (meta) {
                     if (!targetIsrc) targetIsrc = meta.external_ids?.isrc;
-                    if (!targetDate) targetDate = meta.album?.release_date;
-                    if (!track.albumType) albumType = meta.albumType || meta.album?.album_type || 'album';
+                    if (!targetDate) {
+                        targetDate = meta.album?.release_date;
+                        targetPrecision = meta.album?.release_date_precision || inferDatePrecision(meta.album?.release_date);
+                    } else if (!targetPrecision && meta.album?.release_date_precision) {
+                        targetPrecision = meta.album.release_date_precision;
+                    }
+                    if (!track.albumType && !track.album?.album_type) albumType = meta.albumType || meta.album?.album_type || 'album';
                 }
             } catch(e) {}
         }
     }
 
-    if (!targetPlaycount) {
+    if (!targetPlaycount && !track._playCountChecked) {
         try {
             const pcRes = await fetchPlayCountsBatchNew([track.uri]);
             targetPlaycount = pcRes.get(track.uri) || 0;
@@ -25307,9 +26560,9 @@ shadowRoot.innerHTML = `
     });
 
     let bestDate = isTargetTrustable ? targetDate : null;
-    let bestTime = (isTargetTrustable && targetDate) ? new Date(targetDate).getTime() : Infinity;
+    let bestPrecision = isTargetTrustable ? targetPrecision : null;
     let bestTrackNumber = trackNumber;
-    let bestDiscNumber = track.discNumber || 1;
+    let bestDiscNumber = track.discNumber || track.disc_number || 1;
     let bestAlbumName = albumName;
     let bestAlbumId = albumId;
 
@@ -25328,7 +26581,14 @@ shadowRoot.innerHTML = `
                     name: item.name,
                     duration_ms: item.duration_ms,
                     artists: item.artists,
-                    album: { name: item.album?.name, release_date: coreData?.releaseDate || null, uri: item.album?.uri, id: item.album?.id, albumType: coreData?.albumType || 'album' },
+                    album: {
+                        name: item.album?.name,
+                        release_date: coreData?.releaseDate || null,
+                        release_date_precision: coreData?.datePrecision || inferDatePrecision(coreData?.releaseDate),
+                        uri: item.album?.uri,
+                        id: item.album?.id,
+                        albumType: coreData?.albumType || 'album'
+                    },
                     external_ids: { isrc: coreData?.isrc || null },
                     trackNumber: item.trackNumber,
                     discNumber: item.discNumber || 1
@@ -25344,6 +26604,7 @@ shadowRoot.innerHTML = `
                     if (m) {
                         if (!m.album) m.album = {};
                         m.album.albumType = m.albumType || m.album.album_type || 'album';
+                        if (!m.album.release_date_precision) m.album.release_date_precision = inferDatePrecision(m.album.release_date);
                         metaMap.set(m.id, m); 
                     }
                 });
@@ -25417,10 +26678,10 @@ shadowRoot.innerHTML = `
             }
             
             if (isrcMatch || playMatch || softMatch) {
-                const mTime = new Date(meta.album.release_date).getTime();
-                if (!isNaN(mTime) && mTime < bestTime) {
-                    bestTime = mTime;
+                const candPrec = meta.album.release_date_precision || inferDatePrecision(meta.album.release_date);
+                if (isStrictlyEarlierDate(meta.album.release_date, candPrec, bestDate, bestPrecision)) {
                     bestDate = meta.album.release_date;
+                    bestPrecision = candPrec;
                     if (meta.trackNumber !== undefined) bestTrackNumber = meta.trackNumber;
                     if (meta.discNumber !== undefined) bestDiscNumber = meta.discNumber;
                     if (meta.album.name) bestAlbumName = meta.album.name;
@@ -25433,15 +26694,15 @@ shadowRoot.innerHTML = `
 
     if (!bestDate) {
         bestDate = targetDate;
-        bestTime = targetDate ? new Date(targetDate).getTime() : Infinity;
+        bestPrecision = targetPrecision;
         bestTrackNumber = trackNumber;
         bestAlbumName = albumName;
         bestAlbumId = albumId;
     }
 
-    await idb.set('trueReleaseDates', trackId, { date: bestDate, trackNumber: bestTrackNumber, discNumber: bestDiscNumber, albumName: bestAlbumName, albumId: bestAlbumId });
+    await idb.set('trueReleaseDates', trackId, { date: bestDate, precision: bestPrecision, trackNumber: bestTrackNumber, discNumber: bestDiscNumber, albumName: bestAlbumName, albumId: bestAlbumId });
 
-    return { ...track, trueReleaseDate: bestDate, trueTrackNumber: bestTrackNumber, trueDiscNumber: bestDiscNumber, trueAlbumName: bestAlbumName, trueAlbumId: bestAlbumId, _exactAlbumIdFound: true };
+    return { ...track, trueReleaseDate: bestDate, trueReleaseDatePrecision: bestPrecision, trueTrackNumber: bestTrackNumber, trueDiscNumber: bestDiscNumber, trueAlbumName: bestAlbumName, trueAlbumId: bestAlbumId, _exactAlbumIdFound: true };
   }
   
   async function getTrackDetailsWithReleaseDateForFilter(track) {
@@ -28709,7 +29970,7 @@ shadowRoot.innerHTML = `
         const renderTrackRowHtml = (track, isKept, familyId, candidateType, keeperTrack = null) => {
             const { title, artist, album, uri, isrc, isExplicit, durationMs, duration, rawPlays, isLocal, coverUrl, needsCoverLoad, trackLink, albumLink, isUnavailable } = getAuditTrackInfo(track);
             const keeperIsrc = keeperTrack ? (keeperTrack.isrc || keeperTrack.track?.external_ids?.isrc || keeperTrack.external_ids?.isrc || null) : null;
-            const plays = formatPlayCount(rawPlays, "rounded_abbreviated");
+            const plays = formatPlayCount(rawPlays, "rounded_abbreviated", !isUnavailable && !isLocal);
             
             const releaseDate = track.trueReleaseDate || track.releaseDate || track.track?.album?.release_date || null;
             const year = formatReleaseDate(releaseDate, "YYYY");
@@ -28770,7 +30031,7 @@ shadowRoot.innerHTML = `
                 playsTitle = `Shared Spotify stream count: ${Number(rawPlays).toLocaleString()}`;
             } else if (isPlaysDiff) {
                 playsClass = "plays-diff";
-                playsTitle = `Different stream count (Candidate: ${plays} vs Kept: ${formatPlayCount(rawKeeperPlays, "rounded_abbreviated")})`;
+                playsTitle = `Different stream count (Candidate: ${plays} vs Kept: ${formatPlayCount(rawKeeperPlays, "rounded_abbreviated", isTrackItemPlayable(keeperTrack) && !Spicetify.URI.isLocal(keeperTrack?.uri || ''))})`;
             }
 
             const durK = keeperTrack ? (keeperTrack.durationMs || keeperTrack.durationMilis || keeperTrack.track?.duration_ms || 0) : 0;
@@ -31095,7 +32356,8 @@ shadowRoot.innerHTML = `
                 } else if (col.id === "durationMs") {
                     row += `<td class="center-text" data-col="durationMs">${formatDuration(track.durationMs)}</td>`;
                 } else if (col.id === "playCount") {
-                    row += `<td class="center-text" data-col="playCount">${track.playCount !== "N/A" && track.playCount != null ? Number(track.playCount).toLocaleString() : "N/A"}</td>`;
+                    const pcVal = getPlayCountSortValue(track);
+                    row += `<td class="center-text" data-col="playCount">${pcVal === null ? "N/A" : (pcVal === 0 ? "&lt;1,000" : Number(pcVal).toLocaleString())}</td>`;
                 } else if (col.id === "popularity") {
                     row += `<td class="center-text" data-col="popularity">${track.popularity !== null ? track.popularity : "N/A"}</td>`;
                 } else if (col.id === "scrobbles") {
@@ -31238,13 +32500,19 @@ shadowRoot.innerHTML = `
                 return direction === 'ascending' ? valueA.localeCompare(valueB) : valueB.localeCompare(valueA);
             }
 
-            let numA = Number(valueA);
-            let numB = Number(valueB);
-            
-            if (valueA === "N/A" || valueA === null || valueA === undefined || isNaN(numA)) numA = direction === 'ascending' ? Infinity : -Infinity;
-            if (valueB === "N/A" || valueB === null || valueB === undefined || isNaN(numB)) numB = direction === 'ascending' ? Infinity : -Infinity;
+            if (sortKey === 'playCount') {
+                return compareNullableNumeric(getPlayCountSortValue(a), getPlayCountSortValue(b), direction === 'ascending');
+            }
 
-            return direction === 'ascending' ? numA - numB : numB - numA;
+            const parseSortNum = (val) => {
+                if (val === "N/A" || val === null || val === undefined) return null;
+                const n = Number(val);
+                if (!Number.isFinite(n)) return null;
+                if ((sortKey === 'scrobbles' || sortKey === 'personalScrobbles') && n < 0) return null;
+                if (sortKey === 'features.tempo' && n <= 0) return null;
+                return n;
+            };
+            return compareNullableNumeric(parseSortNum(valueA), parseSortNum(valueB), direction === 'ascending');
         });
         return sortedTracks;
     }
@@ -34860,19 +36128,7 @@ shadowRoot.innerHTML = `
     let sortedTracks;
     switch (sortType) {
         case "playCount":
-            sortedTracks = uniqueTracks.sort((a, b) => {
-                const valA = (a.playCount === "N/A" || a.playCount == null) ? -1 : Number(a.playCount);
-                const valB = (b.playCount === "N/A" || b.playCount == null) ? -1 : Number(b.playCount);
-                return valB - valA;
-            });
-            break;
         case "popularity":
-            sortedTracks = uniqueTracks.sort((a, b) => {
-                const valA = (a.popularity == null) ? -1 : a.popularity;
-                const valB = (b.popularity == null) ? -1 : b.popularity;
-                return valB - valA;
-            });
-            break;
         case "artistMonthlyListeners":
         case "releaseDate":
         case "trueReleaseDate":
@@ -34882,21 +36138,19 @@ shadowRoot.innerHTML = `
         case "scrobbles":
         case "personalScrobbles": {
             const tracksWithScrobbles = await handleScrobblesSorting(uniqueTracks, sortType, () => {});
+            const validNonNeg = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0) ? v : null;
             if (sortType === 'personalScrobbles') {
                 sortedTracks = tracksWithScrobbles.sort((a, b) => {
-                    const valA = typeof a.personalScrobbles === 'number' ? a.personalScrobbles : -1;
-                    const valB = typeof b.personalScrobbles === 'number' ? b.personalScrobbles : -1;
-                    if (valA !== valB) return isAscending ? valA - valB : valB - valA;
-                    const globA = typeof a.scrobbles === 'number' ? a.scrobbles : -1;
-                    const globB = typeof b.scrobbles === 'number' ? b.scrobbles : -1;
-                    if (globA !== globB) return isAscending ? globA - globB : globB - globA;
+                    const cmp = compareNullableNumeric(validNonNeg(a.personalScrobbles), validNonNeg(b.personalScrobbles), isAscending);
+                    if (cmp !== 0) return cmp;
+                    const globCmp = compareNullableNumeric(validNonNeg(a.scrobbles), validNonNeg(b.scrobbles), isAscending);
+                    if (globCmp !== 0) return globCmp;
                     return (a._origIndex ?? 0) - (b._origIndex ?? 0);
                 });
             } else {
                 sortedTracks = tracksWithScrobbles.sort((a, b) => {
-                    const valA = typeof a.scrobbles === 'number' ? a.scrobbles : -1;
-                    const valB = typeof b.scrobbles === 'number' ? b.scrobbles : -1;
-                    if (valA !== valB) return isAscending ? valA - valB : valB - valA;
+                    const cmp = compareNullableNumeric(validNonNeg(a.scrobbles), validNonNeg(b.scrobbles), isAscending);
+                    if (cmp !== 0) return cmp;
                     return (a._origIndex ?? 0) - (b._origIndex ?? 0);
                 });
             }
@@ -34925,15 +36179,12 @@ shadowRoot.innerHTML = `
         case 'danceability':
         case 'valence':
         case 'acousticness':
-        case 'instrumentalness':
-            const validFeatureTracks = uniqueTracks.filter(track => track[sortType] !== null && track[sortType] !== undefined);
-            const invalidFeatureTracks = uniqueTracks.filter(track => track[sortType] === null || track[sortType] === undefined);
+        case 'instrumentalness': {
+            const isValidFeat = (track) => typeof track[sortType] === 'number' && Number.isFinite(track[sortType]) && (sortType !== 'tempo' || track[sortType] > 0);
+            const validFeatureTracks = uniqueTracks.filter(isValidFeat);
+            const invalidFeatureTracks = uniqueTracks.filter(t => !isValidFeat(t));
             
-            validFeatureTracks.sort((a, b) => {
-                const valA = a[sortType] || 0;
-                const valB = b[sortType] || 0;
-                return valB - valA;
-            });
+            validFeatureTracks.sort((a, b) => isAscending ? a[sortType] - b[sortType] : b[sortType] - a[sortType]);
             
             sortedTracks = [...validFeatureTracks, ...invalidFeatureTracks];
             
@@ -34941,6 +36192,7 @@ shadowRoot.innerHTML = `
                  showNotification(`${invalidFeatureTracks.length} tracks missing ${sortType} data.`, 'warning');
             }
             break;
+        }
         case 'key': {
             const withKeyValues = uniqueTracks.map(track => ({ track, keyValue: getCamelotSortValue(track) }));
             const validKeyTracks = withKeyValues.filter(item => item.keyValue !== null);
@@ -35045,8 +36297,9 @@ shadowRoot.innerHTML = `
     };
   }
   
-  const isJobDue = (job, currentTime) => {
+  const isJobDue = (job, currentTime, brokenTypesSet = null) => {
     if (job.isDeleted) return false;
+    if (brokenTypesSet && job.dedicatedType && brokenTypesSet.has(job.dedicatedType)) return false;
     const lastRun = job.lastRun || 0;
     const schedule = job.schedule;
 
@@ -35059,15 +36312,29 @@ shadowRoot.innerHTML = `
     }
 
     if (typeof schedule === 'string' && schedule.startsWith('release-')) {
-        const daysSinceLastRun = (currentTime - lastRun) / (1000 * 60 * 60 * 24);
+        const getReleaseWeekFridayMs = (ts) => {
+            const d = new Date(ts);
+            const daysSinceFri = (d.getDay() + 2) % 7;
+            return new Date(d.getFullYear(), d.getMonth(), d.getDate() - daysSinceFri, 0, 0, 0, 0).getTime();
+        };
+        const currentFridayMs = getReleaseWeekFridayMs(currentTime);
+
+        if (!job.lastRun) {
+            if (new Date(currentTime).getDay() === 5) return true;
+            const createdFridayMs = getReleaseWeekFridayMs(job.createdAt || currentTime);
+            return Math.round((currentFridayMs - createdFridayMs) / 604800000) >= 1;
+        }
+
+        const lastRunFridayMs = getReleaseWeekFridayMs(job.lastRun);
+        const weeksElapsed = Math.round((currentFridayMs - lastRunFridayMs) / 604800000);
 
         switch (schedule) {
             case 'release-weekly':
-                return daysSinceLastRun > 6;
+                return weeksElapsed >= 1;
             case 'release-every-two-weeks':
-                return daysSinceLastRun > 13;
+                return weeksElapsed >= 2;
             case 'release-monthly':
-                return daysSinceLastRun > 27;
+                return weeksElapsed >= 4;
             default:
                 return false;
         }
@@ -35289,38 +36556,7 @@ shadowRoot.innerHTML = `
         });
     });
 
-    const isJobDue = (job, currentTime) => {
-        if (brokenTypes.has(job.dedicatedType)) return false;
-
-        const lastRun = job.lastRun || 0;
-        const schedule = job.schedule;
-
-        if (schedule === 'manual') return false;
-
-        if (typeof schedule === 'number') {
-            return currentTime > lastRun + schedule;
-        }
-
-        if (typeof schedule === 'string' && schedule.startsWith('release-')) {
-            const nowDate = new Date(currentTime);
-            const lastRunDate = new Date(lastRun);
-
-            if (nowDate.getDay() !== 5) return false;
-            if (lastRunDate.toDateString() === nowDate.toDateString()) return false;
-
-            const daysSinceLastRun = (currentTime - lastRun) / (1000 * 60 * 60 * 24);
-
-            switch (schedule) {
-                case 'release-weekly': return daysSinceLastRun > 6;
-                case 'release-every-two-weeks': return daysSinceLastRun > 13;
-                case 'release-monthly': return daysSinceLastRun > 27;
-                default: return false;
-            }
-        }
-        return false;
-    };
-
-    const jobsToRun = jobs.filter(job => isJobDue(job, now));
+    const jobsToRun = jobs.filter(job => isJobDue(job, now, brokenTypes));
     const totalJobs = jobsToRun.length;
 
     if (totalJobs > 0) {
@@ -35397,11 +36633,11 @@ shadowRoot.innerHTML = `
         if (isSchedulerRunning) return;
         isSchedulerRunning = true;
         try {
-            await checkAndRunJobs();
+            await checkAndRunDedicatedJobs();
             
             await new Promise(resolve => setTimeout(resolve, 2000));
             
-            await checkAndRunDedicatedJobs();
+            await checkAndRunJobs();
         } catch (e) {
             console.error("[Sort-Play] Scheduler error:", e);
         } finally {
@@ -38979,8 +40215,8 @@ shadowRoot.innerHTML = `
     const renderJobList = () => {
         const jobs = getJobs();
         const scheduleMap = {
-            10800000: 'Every 3 Hours', 21600000: 'Every 6 Hours',
-            86400000: 'Daily', 604800000: 'Weekly', 2592000000: 'Monthly',
+            10800000: 'Every 3 Hours', 21600000: 'Every 6 Hours', 43200000: 'Every 12 Hours',
+            86400000: 'Daily', 172800000: 'Every 2 Days', 604800000: 'Weekly', 2592000000: 'Monthly',
             'release-weekly': 'Weekly (on Friday)',
             'release-every-two-weeks': 'Every Two Weeks (on Friday)',
             'release-monthly': 'Monthly (on a Friday)',
@@ -41997,28 +43233,28 @@ shadowRoot.innerHTML = `
     }
   };
 
-  async function getLastfmGenres(artist, track, skipArtist = false) {
+  async function getLastfmGenres(artist, track, skipArtist = false, skipTrack = false) {
     const cacheKey = `${artist}-${track}`;
     let cached = lastfmCache.get(cacheKey);
     
-    if (cached && (skipArtist || cached._artist_fetched)) {
+    if (cached && (skipArtist || cached._artist_fetched) && (skipTrack || cached._track_fetched)) {
         return cached;
     }
 
     const baseTrackKey = `${(artist || '').toLowerCase().trim()}|${(track || '').toLowerCase().trim()}`;
-    const fullInFlightKey = `${baseTrackKey}|0`;
-    const inFlightTrackKey = `${baseTrackKey}|${skipArtist ? 1 : 0}`;
+    const fullInFlightKey = `${baseTrackKey}|0|0`;
+    const inFlightTrackKey = `${baseTrackKey}|${skipArtist ? 1 : 0}|${skipTrack ? 1 : 0}`;
 
     if (pendingLfmTrackGenresFetches.has(fullInFlightKey)) {
         return await pendingLfmTrackGenresFetches.get(fullInFlightKey);
     }
-    if (skipArtist && pendingLfmTrackGenresFetches.has(inFlightTrackKey)) {
+    if (pendingLfmTrackGenresFetches.has(inFlightTrackKey)) {
         return await pendingLfmTrackGenresFetches.get(inFlightTrackKey);
     }
 
     const fetchPromise = (async () => {
         const currentCached = lastfmCache.get(cacheKey);
-        if (currentCached && (skipArtist || currentCached._artist_fetched)) {
+        if (currentCached && (skipArtist || currentCached._artist_fetched) && (skipTrack || currentCached._track_fetched)) {
             return currentCached;
         }
 
@@ -42038,7 +43274,7 @@ shadowRoot.innerHTML = `
 
             const promises = [];
 
-            if (!result._track_fetched) {
+            if (!skipTrack && !result._track_fetched) {
                 promises.push((async () => {
                     const params = new URLSearchParams({ method: 'track.getInfo', artist, track, format: 'json' });
                     return fetchLfmWithGateway(params).then(async r => ({ type: 'track', res: r }));
@@ -42051,7 +43287,7 @@ shadowRoot.innerHTML = `
                     cachedArtistTags = lastfmArtistTagsCache.get(artist);
                 } else {
                     const dbCached = await idb.get('lastfmArtistTags', artist, CACHE_EXPIRE_GENRES);
-                    if (dbCached) {
+                    if (dbCached !== null && dbCached !== undefined) {
                         cachedArtistTags = dbCached;
                         lastfmArtistTagsCache.set(artist, dbCached);
                     } else {
@@ -42069,15 +43305,14 @@ shadowRoot.innerHTML = `
                                     const artistData = await safeJson(artistResponse);
                                     if (artistData && artistData.error && artistData.error !== 6) {
                                         throw new Error(`Last.fm API error: ${artistData.message}`);
-                                    } else if (artistData?.artist?.tags?.tag) {
-                                        const rawTags = artistData.artist.tags.tag
-                                            .map(tag => tag.name.toLowerCase())
-                                            .filter(g => !/^\d+$/.test(g));
-                                        lastfmArtistRawTagsCache.set(artist, rawTags);
-                                        tags = synthesizeLastfmSplitTags(rawTags);
-                                        lastfmArtistTagsCache.set(artist, tags);
-                                        idb.set('lastfmArtistTags', artist, tags);
                                     }
+                                    const rawTags = Array.isArray(artistData?.artist?.tags?.tag)
+                                        ? artistData.artist.tags.tag.map(tag => tag.name.toLowerCase()).filter(g => !/^\d+$/.test(g))
+                                        : [];
+                                    lastfmArtistRawTagsCache.set(artist, rawTags);
+                                    tags = synthesizeLastfmSplitTags(rawTags);
+                                    lastfmArtistTagsCache.set(artist, tags);
+                                    idb.set('lastfmArtistTags', artist, tags);
                                 }
                                 return tags;
                             })();
@@ -42116,7 +43351,7 @@ shadowRoot.innerHTML = `
                 }
             }
 
-            if (cachedArtistTags) {
+            if (cachedArtistTags !== null && cachedArtistTags !== undefined) {
                 result.artist_genres = synthesizeLastfmSplitTags(cachedArtistTags, lastfmArtistRawTagsCache.get(artist));
                 result._artist_fetched = true;
             }
@@ -42211,44 +43446,43 @@ shadowRoot.innerHTML = `
   }
 
   async function getGenresFromTurso(identifiers, type = 'ids') {
-    if (identifiers.length === 0) return new Map();
-  
-    const results = new Map();
-    const BATCH_SIZE = 200; 
-    
-    const cleanIds = type === 'ids' 
-        ? identifiers.map(uri => uri.split(':').pop()) 
-        : identifiers;
-  
-    for (let i = 0; i < cleanIds.length; i += BATCH_SIZE) {
-      const batch = cleanIds.slice(i, i + BATCH_SIZE);
-      
-      const payload = type === 'isrcs' ? { isrcs: batch } : { ids: batch };
+    if (!identifiers || identifiers.length === 0) return new Map();
 
-      try {
-        const response = await fetch(`${TURSO_GATEWAY_URL}/genres/read`, {
+    const results = new Map();
+    const BATCH_SIZE = 200;
+    const cleanIds = [...new Set((type === 'ids' ? identifiers.map(uri => uri.split(':').pop()) : identifiers).filter(Boolean))];
+    if (cleanIds.length === 0) return results;
+
+    const batches = [];
+    for (let i = 0; i < cleanIds.length; i += BATCH_SIZE) {
+      batches.push(cleanIds.slice(i, i + BATCH_SIZE));
+    }
+
+    let idx = 0;
+    const worker = async () => {
+      while (idx < batches.length) {
+        const batch = batches[idx++];
+        const payload = type === 'isrcs' ? { isrcs: batch } : { ids: batch };
+        try {
+          const response = await fetch(`${TURSO_GATEWAY_URL}/genres/read`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
-        });
-        
-        if (!response.ok) {
+          });
+          if (!response.ok) {
             const errorText = await response.text();
             console.error(`Gateway error (${response.status}):`, errorText);
             continue;
+          }
+          const data = await response.json();
+          for (const key in data) results.set(key, data[key]);
+        } catch (error) {
+          console.error(`Error fetching genres from Turso gateway (${type}):`, error);
         }
-        
-        const data = await response.json();
-        
-        for (const key in data) {
-          results.set(key, data[key]);
-        }
-      } catch (error) {
-        console.error(`Error fetching genres from Turso gateway (${type}):`, error);
       }
-    }
+    };
+
+    await Promise.all(Array.from({ length: Math.min(5, batches.length) }, worker));
     return results;
   }
   
@@ -42312,30 +43546,46 @@ shadowRoot.innerHTML = `
     }
   }
 
-  async function getArtistEveryNoiseFromTurso(artistIds) {
-    if (!artistIds || artistIds.length === 0) return new Map();
+  async function getArtistGenresFromTurso(artistIds, { includeEveryNoise = true, includeLastfm = false } = {}) {
+    if (!artistIds || artistIds.length === 0 || (!includeEveryNoise && !includeLastfm)) return new Map();
     const results = new Map();
     const BATCH_SIZE = 200;
-    const cleanIds = artistIds.map(id => id.includes(':') ? id.split(':').pop() : id).filter(Boolean);
+    const cleanIds = [...new Set(artistIds.map(id => id?.includes(':') ? id.split(':').pop() : id).filter(Boolean))];
+    if (cleanIds.length === 0) return results;
 
+    const batches = [];
     for (let i = 0; i < cleanIds.length; i += BATCH_SIZE) {
-      const batch = cleanIds.slice(i, i + BATCH_SIZE);
-      try {
-        const response = await fetch(`${TURSO_GATEWAY_URL}/artists/read`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ids: batch })
-        });
-        if (!response.ok) continue;
-        const data = await response.json();
-        for (const id in data) {
-          results.set(id, data[id]);
-        }
-      } catch (e) {
-        console.warn("[Sort-Play] Failed to fetch artist EveryNoise from Turso:", e);
-      }
+      batches.push(cleanIds.slice(i, i + BATCH_SIZE));
     }
+
+    let idx = 0;
+    const worker = async () => {
+      while (idx < batches.length) {
+        const batch = batches[idx++];
+        try {
+          const payload = includeLastfm
+            ? { ids: batch, include_everynoise: includeEveryNoise, include_lastfm: true }
+            : { ids: batch };
+          const response = await fetch(`${TURSO_GATEWAY_URL}/artists/read`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          if (!response.ok) continue;
+          const data = await response.json();
+          for (const id in data) results.set(id, data[id]);
+        } catch (e) {
+          console.warn("[Sort-Play] Failed to fetch artist genres from Turso:", e);
+        }
+      }
+    };
+
+    await Promise.all(Array.from({ length: Math.min(5, batches.length) }, worker));
     return results;
+  }
+
+  async function getArtistEveryNoiseFromTurso(artistIds) {
+    return getArtistGenresFromTurso(artistIds, { includeEveryNoise: true, includeLastfm: false });
   }
 
   async function saveArtistEveryNoiseToTurso(artistDataList) {
@@ -42359,6 +43609,265 @@ shadowRoot.innerHTML = `
         console.warn("[Sort-Play] Failed to save artist EveryNoise to Turso:", e);
       }
     }
+  }
+
+  async function saveArtistLastfmToTurso(artistDataList) {
+    if (!artistDataList || artistDataList.length === 0) return;
+    const BATCH_SIZE = 200;
+
+    for (let i = 0; i < artistDataList.length; i += BATCH_SIZE) {
+      const batch = artistDataList.slice(i, i + BATCH_SIZE).map(item => ({
+        artist_id: item.artist_id.includes(':') ? item.artist_id.split(':').pop() : item.artist_id,
+        genres: JSON.stringify(item.genres || []),
+        updated_at: Math.floor(Date.now() / 86400000)
+      }));
+
+      try {
+        await fetch(`${TURSO_GATEWAY_URL}/artists/lastfm`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(batch)
+        });
+      } catch (e) {
+        console.warn("[Sort-Play] Failed to save artist Last.fm to Turso:", e);
+      }
+    }
+  }
+
+  async function fetchEveryNoiseArtistGenres(artistIds, onProgress = null, preFetchedTursoMap = null) {
+    const uniqueIds = [...new Set((artistIds || []).filter(Boolean))];
+    if (uniqueIds.length === 0) {
+      onProgress?.(100);
+      return everyNoiseCache;
+    }
+
+    const missingInMem = uniqueIds.filter(id => !everyNoiseCache.has(id));
+    if (missingInMem.length > 0) {
+      const cachedIdb = await idb.getMany('everyNoiseArtistTags', missingInMem, CACHE_EXPIRE_EVERYNOISE);
+      cachedIdb.forEach((val, key) => {
+        if (val !== null && val !== undefined) everyNoiseCache.set(key, val);
+      });
+    }
+
+    const inFlight = uniqueIds.filter(id => !everyNoiseCache.has(id) && pendingEveryNoiseFetches.has(id));
+    if (inFlight.length > 0) {
+      await Promise.allSettled(inFlight.map(id => pendingEveryNoiseFetches.get(id)));
+    }
+
+    const missingInIdb = uniqueIds.filter(id => !everyNoiseCache.has(id));
+    if (missingInIdb.length > 0) {
+      const tursoEnResults = preFetchedTursoMap || await getArtistEveryNoiseFromTurso(missingInIdb);
+      const idbEntriesFromTurso = [];
+      missingInIdb.forEach(id => {
+        const val = tursoEnResults.get(id);
+        if (val && Array.isArray(val.genres)) {
+          everyNoiseCache.set(id, val.genres);
+          idbEntriesFromTurso.push({ key: id, val: val.genres });
+        }
+      });
+      if (idbEntriesFromTurso.length > 0 && idb.setMany) {
+        await idb.setMany('everyNoiseArtistTags', idbEntriesFromTurso);
+      }
+    }
+
+    const missingEverywhere = uniqueIds.filter(id => !everyNoiseCache.has(id));
+    if (missingEverywhere.length > 0) {
+      const artistsToSaveTurso = [];
+      const idbEntriesFromGw = [];
+      const chunks = [];
+      for (let i = 0; i < missingEverywhere.length; i += 50) {
+        chunks.push(missingEverywhere.slice(i, i + 50));
+      }
+
+      let processedCount = 0;
+      let chunkIndex = 0;
+      const CONCURRENCY = Math.min(6, chunks.length);
+
+      const processChunk = async (batch) => {
+        const sortedBatch = [...batch].sort();
+        const idsString = sortedBatch.join(',');
+        let data = null;
+
+        for (let attempt = 0; attempt < 2; attempt++) {
+          try {
+            const res = await fetch(`${EVERYNOISE_GATEWAY_URL}${idsString}`, { signal: AbortSignal.timeout(16000) });
+            if (res.ok) {
+              data = await res.json();
+              break;
+            }
+          } catch (_) {
+            if (attempt === 0) await new Promise(r => setTimeout(r, 250));
+          }
+        }
+
+        sortedBatch.forEach(artistId => {
+          if (data !== null) {
+            const rawGenres = (sortedBatch.length === 1 && Array.isArray(data)) ? data : ((typeof data === 'object' && !Array.isArray(data) && data[artistId]) || []);
+            everyNoiseCache.set(artistId, rawGenres);
+            idbEntriesFromGw.push({ key: artistId, val: rawGenres });
+            artistsToSaveTurso.push({ artist_id: artistId, genres: rawGenres });
+          } else {
+            everyNoiseCache.set(artistId, []);
+          }
+        });
+
+        processedCount += sortedBatch.length;
+        onProgress?.(Math.round((processedCount / missingEverywhere.length) * 100));
+      };
+
+      const worker = async () => {
+        while (chunkIndex < chunks.length) {
+          const batch = chunks[chunkIndex++];
+          const batchPromise = processChunk(batch);
+          batch.forEach(id => pendingEveryNoiseFetches.set(id, batchPromise));
+          try {
+            await batchPromise;
+          } finally {
+            batch.forEach(id => pendingEveryNoiseFetches.delete(id));
+          }
+        }
+      };
+
+      await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
+
+      if (idbEntriesFromGw.length > 0 && idb.setMany) {
+        await idb.setMany('everyNoiseArtistTags', idbEntriesFromGw);
+      }
+      if (artistsToSaveTurso.length > 0) {
+        saveArtistEveryNoiseToTurso(artistsToSaveTurso).catch(() => {});
+      }
+    }
+
+    onProgress?.(100);
+    return everyNoiseCache;
+  }
+
+  async function fetchLastfmArtistGenres(artistEntries, onProgress = null, preFetchedTursoMap = null) {
+    const deduped = new Map();
+    (artistEntries || []).forEach(entry => {
+      const name = entry?.name?.trim();
+      if (!name || name === 'Unknown Artist') return;
+      if (!deduped.has(name)) {
+        deduped.set(name, { name, id: entry.id || null, sampleTrackId: entry.sampleTrackId || null });
+      } else {
+        const cur = deduped.get(name);
+        if (!cur.id && entry.id) cur.id = entry.id;
+        if (!cur.sampleTrackId && entry.sampleTrackId) cur.sampleTrackId = entry.sampleTrackId;
+      }
+    });
+
+    const uniqueEntries = Array.from(deduped.values());
+    if (uniqueEntries.length === 0) {
+      onProgress?.(100);
+      return lastfmArtistTagsCache;
+    }
+
+    const missingInMem = uniqueEntries.filter(e => !lastfmArtistTagsCache.has(e.name));
+    if (missingInMem.length > 0) {
+      const cachedIdb = await idb.getMany('lastfmArtistTags', missingInMem.map(e => e.name), CACHE_EXPIRE_GENRES);
+      cachedIdb.forEach((val, key) => {
+        if (val !== null && val !== undefined) lastfmArtistTagsCache.set(key, val);
+      });
+    }
+
+    const inFlight = uniqueEntries.filter(e => !lastfmArtistTagsCache.has(e.name) && pendingLfmArtistFetches.has(e.name.toLowerCase()));
+    if (inFlight.length > 0) {
+      await Promise.allSettled(inFlight.map(e => pendingLfmArtistFetches.get(e.name.toLowerCase())));
+    }
+
+    const idbToSave = [];
+    const tursoLastfmToSave = [];
+
+    const missingAfterIdb = uniqueEntries.filter(e => !lastfmArtistTagsCache.has(e.name));
+    const withArtistId = missingAfterIdb.filter(e => e.id);
+    if (withArtistId.length > 0) {
+      const tursoArtistResults = preFetchedTursoMap || await getArtistGenresFromTurso(withArtistId.map(e => e.id), { includeEveryNoise: false, includeLastfm: true });
+      withArtistId.forEach(entry => {
+        const val = tursoArtistResults.get(entry.id);
+        if (val && Array.isArray(val.lastfm_genres)) {
+          const tags = synthesizeLastfmSplitTags(val.lastfm_genres);
+          lastfmArtistTagsCache.set(entry.name, tags);
+          idbToSave.push({ key: entry.name, val: tags });
+        }
+      });
+    }
+
+    const missingAfterArtistTurso = uniqueEntries.filter(e => !lastfmArtistTagsCache.has(e.name));
+    const sampleTrackEntries = missingAfterArtistTurso.filter(e => e.sampleTrackId);
+    if (sampleTrackEntries.length > 0) {
+      const trackTursoMap = await getGenresFromTurso(sampleTrackEntries.map(e => e.sampleTrackId), 'ids');
+      sampleTrackEntries.forEach(entry => {
+        const row = trackTursoMap.get(`spotify:track:${entry.sampleTrackId}`);
+        if (row && Array.isArray(row.lastfm_artist_genres) && row.lastfm_artist_genres.length > 0) {
+          const tags = synthesizeLastfmSplitTags(row.lastfm_artist_genres);
+          lastfmArtistTagsCache.set(entry.name, tags);
+          idbToSave.push({ key: entry.name, val: tags });
+          if (entry.id) tursoLastfmToSave.push({ artist_id: entry.id, genres: tags });
+        }
+      });
+    }
+
+    const missingEverywhere = uniqueEntries.filter(e => !lastfmArtistTagsCache.has(e.name));
+    if (missingEverywhere.length > 0) {
+      if (L_F_M_Key_Pool.length === 0) await fetchLastFmKeys();
+      const validKeys = Math.max(1, L_F_M_Key_Pool.length - revokedLfmKeys.size);
+      const concurrency = Math.min(100, Math.max(5, validKeys * 3));
+      let idx = 0;
+      let done = 0;
+
+      const fetchOne = async (entry) => {
+        const normKey = entry.name.toLowerCase();
+        let p = pendingLfmArtistFetches.get(normKey);
+        if (!p) {
+          p = (async () => {
+            const params = new URLSearchParams({ method: 'artist.getInfo', artist: entry.name, format: 'json' });
+            const res = await fetchLfmWithGateway(params);
+            if (!res.ok && res.status !== 404) throw new Error(`Last.fm artist network error: ${res.status}`);
+            let tags = [];
+            if (res.ok) {
+              const txt = await res.text();
+              const data = txt ? JSON.parse(txt) : null;
+              if (data && data.error && data.error !== 6) throw new Error(`Last.fm API error: ${data.message}`);
+              const rawTags = Array.isArray(data?.artist?.tags?.tag)
+                ? data.artist.tags.tag.map(tag => tag.name.toLowerCase()).filter(g => !/^\d+$/.test(g))
+                : [];
+              lastfmArtistRawTagsCache.set(entry.name, rawTags);
+              tags = synthesizeLastfmSplitTags(rawTags);
+              lastfmArtistTagsCache.set(entry.name, tags);
+              idbToSave.push({ key: entry.name, val: tags });
+              if (entry.id) tursoLastfmToSave.push({ artist_id: entry.id, genres: tags });
+            }
+            return tags;
+          })();
+          pendingLfmArtistFetches.set(normKey, p);
+          p.finally(() => pendingLfmArtistFetches.delete(normKey)).catch(() => {});
+        }
+        try {
+          await p;
+        } catch (_) {}
+      };
+
+      const worker = async () => {
+        while (idx < missingEverywhere.length) {
+          const entry = missingEverywhere[idx++];
+          await fetchOne(entry);
+          done++;
+          onProgress?.(Math.round((done / missingEverywhere.length) * 100));
+        }
+      };
+
+      await Promise.all(Array.from({ length: Math.min(concurrency, missingEverywhere.length) }, worker));
+    }
+
+    if (idbToSave.length > 0 && idb.setMany) {
+      await idb.setMany('lastfmArtistTags', idbToSave);
+    }
+    if (tursoLastfmToSave.length > 0) {
+      saveArtistLastfmToTurso(tursoLastfmToSave).catch(() => {});
+    }
+
+    onProgress?.(100);
+    return lastfmArtistTagsCache;
   }
 
   async function fetchAllTrackGenres(tracks, updateProgressCallback = null, onGenresReadyCallback = null, requestedSources = null) {
@@ -42917,7 +44426,7 @@ shadowRoot.innerHTML = `
           const needsLfmArtist = reqSources.lastfm_artist && !existingData?._lfm_artist_checked;
 
           if (needsLfmTrack || needsLfmArtist) {
-            const lastfmGenresData = await getLastfmGenres(trackDetails.artists[0].name, trackDetails.name, !needsLfmArtist);
+            const lastfmGenresData = await getLastfmGenres(trackDetails.artists[0].name, trackDetails.name, !needsLfmArtist, !needsLfmTrack);
             if (lastfmGenresData === null) {
               isCompleteSuccess = false;
             } else {
@@ -43001,7 +44510,35 @@ shadowRoot.innerHTML = `
             const lfmMissing = lfmArr.filter(name => !lastfmArtistTagsCache.has(name));
             if (lfmMissing.length > 0) {
               const cached = await idb.getMany('lastfmArtistTags', lfmMissing, CACHE_EXPIRE_GENRES);
-              cached.forEach((val, key) => lastfmArtistTagsCache.set(key, val));
+              cached.forEach((val, key) => {
+                if (val !== null && val !== undefined) lastfmArtistTagsCache.set(key, val);
+              });
+            }
+            if (reqSources.lastfm_artist) {
+              const primaryIdByName = new Map();
+              tracksNeedingExternalFetch.forEach(item => {
+                const trk = item.originalTrack;
+                const name = trk?.artistName || trk?.artists?.[0]?.name;
+                const aId = trk?.artistUris?.[0]?.split(':')[2] || trk?.artists?.[0]?.id || trk?.artists?.[0]?.uri?.split(':')[2];
+                if (name && aId && !lastfmArtistTagsCache.has(name) && !primaryIdByName.has(name)) {
+                  primaryIdByName.set(name, aId);
+                }
+              });
+              if (primaryIdByName.size > 0) {
+                const tursoLfm = await getArtistGenresFromTurso(Array.from(primaryIdByName.values()), { includeEveryNoise: false, includeLastfm: true });
+                const idbWarm = [];
+                primaryIdByName.forEach((aId, name) => {
+                  const val = tursoLfm.get(aId);
+                  if (val && Array.isArray(val.lastfm_genres)) {
+                    const tags = synthesizeLastfmSplitTags(val.lastfm_genres);
+                    lastfmArtistTagsCache.set(name, tags);
+                    idbWarm.push({ key: name, val: tags });
+                  }
+                });
+                if (idbWarm.length > 0 && idb.setMany) {
+                  await idb.setMany('lastfmArtistTags', idbWarm);
+                }
+              }
             }
           }
 
@@ -43305,7 +44842,7 @@ shadowRoot.innerHTML = `
     "library", "seen live", "radio", "stream"
   ];
 
-  const GENRE_FILTER_ALLOWED_MOOD_GENRES = new Set(["club", "epic"]);
+  const GENRE_FILTER_ALLOWED_MOOD_GENRES = new Set(["club", "epic", "rain", "ethereal"]);
 
   const CURATED_LFM_MULTIWORD_MODIFIERS = [
     "female fronted", "male fronted", "old school", "old skool", "new school",
@@ -44090,68 +45627,82 @@ shadowRoot.innerHTML = `
       align-items: center;
       gap: 5px;
     }
-    .sort-play-column, .sort-play-second-column {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      white-space: nowrap;
-      text-overflow: ellipsis;
-      width: 90px;
-      color: var(--spice-text);
-    }
-    .main-trackList-row .sort-play-playcount {
-        color: var(--spice-text);
-        font-size: 13px;
-        margin-left: 10px;
-    }
-    .main-trackList-row .sort-play-loading {
-        color: var(--spice-subtext);
-        font-size: 13px;
-        margin-left: 10px;
-    }
-    .main-trackList-row .sort-play-playcount,
-    .main-trackList-row .sort-play-loading {
-        display: block;
-        text-align: center;
-        margin: auto;
-    }
-      div.main-trackList-trackList[data-sp-grid="artist"] .main-trackList-trackListHeaderRow .main-trackList-rowSectionVariable:nth-child(3),
-      div.main-trackList-trackList[aria-label="popular tracks"] .main-trackList-trackListHeaderRow .main-trackList-rowSectionVariable:nth-child(3),
-      div.main-trackList-trackList[aria-label="Popular tracks"] .main-trackList-trackListHeaderRow .main-trackList-rowSectionVariable:nth-child(3) {
-        justify-content: center;
-    }
-    div.main-trackList-trackList[data-sp-grid="artist"] .main-trackList-trackListRow .main-trackList-rowSectionVariable:nth-child(3),
-    div.main-trackList-trackList[aria-label="popular tracks"] .main-trackList-trackListRow .main-trackList-rowSectionVariable:nth-child(3),
-    div.main-trackList-trackList[aria-label="Popular tracks"] .main-trackList-trackListRow .main-trackList-rowSectionVariable:nth-child(3) {
-        justify-content: center;
-    }
-    #sort-play-now-playing-data {
-        cursor: pointer;
-    }
-    #sort-play-now-playing-data:hover .sort-play-np-value {
-        text-decoration: underline;
-    }
-    button:where(.likeControl-wrapper-npv > .sort-play-like-button) { margin-inline-start: var(--sp-npv-like-ml, 10px); }
-    .sort-play-genre-container:empty { display: none !important; }
-    .sort-play-track-info:has(> .sort-play-genre-container:not(:empty)) { line-height: 15px; }
-    .sort-play-track-info:has(> .sort-play-genre-container:not(:empty)):has([data-testid="context-item-info-quality"]) { gap: 0px !important; row-gap: 0px !important; line-height: 13px !important; }
-    .sort-play-track-info:has(> .sort-play-genre-container:not(:empty)):has([data-testid="context-item-info-quality"]) [data-encore-id="text"] { line-height: 14px !important; }
-    .sort-play-track-info:has(> .sort-play-genre-container:not(:empty)):has([data-testid="context-item-info-quality"]) [data-testid="context-item-info-quality"], .sort-play-track-info:has(> .sort-play-genre-container:not(:empty)):has([data-testid="context-item-info-quality"]) [data-testid="context-item-info-quality"] button { line-height: 13px !important; padding-top: 0px !important; padding-bottom: 0px !important; min-height: 0px !important; height: auto !important; }
-    .sort-play-track-info:has(> .sort-play-genre-container:not(:empty)):has([data-testid="context-item-info-quality"]) .sort-play-np-container > span { line-height: 14px !important; }
-    .sort-play-track-info:has(> .sort-play-genre-container:not(:empty)):has([data-testid="context-item-info-quality"]) > .sort-play-genre-container { line-height: 14px !important; margin-top: 0px !important; }
-    .sort-play-column-header {
-        cursor: pointer !important;
-        background: transparent !important;
-        border: none !important;
-        padding: 0 !important;
-        margin: 0 !important;
-        outline: none !important;
-        box-shadow: none !important;
-        transform: none !important;
-    }
-    .sort-play-column-header:hover span {
-        color: #fff !important;
-    }
+    div[data-sp-grid] .main-trackList-trackListHeaderRow,div[data-sp-grid] .main-trackList-trackListRowGrid,div[data-sp-grid] .main-trackList-trackListRow,div[data-sp-grid] [role="row"]:has([role="columnheader"]),div[data-sp-grid] [role="row"]>div:has([role="gridcell"]),div[data-sp-grid] [role="row"]:has(>[role="gridcell"]){grid-template-columns:var(--sp-grid-template)!important;column-gap:var(--sp-grid-gap,16px)!important}
+    div[data-sp-grid] .main-trackList-trackListRowGrid>.main-trackList-rowSectionEnd,div[data-sp-grid] .main-trackList-trackListHeaderRow>.main-trackList-rowSectionEnd{grid-column:last!important}
+    div[data-sp-grid="rec"] [role="row"]>div:has([role="gridcell"])>:first-child,div[data-sp-grid="rec"] [role="row"]:has(>[role="gridcell"])>:first-child,div[data-sp-grid="rec"] .main-trackList-trackListRow>:first-child{grid-column:1 / 3!important}
+    [data-sp-overflow-hidden="true"]{display:none!important}
+    .sp-col-resizing{user-select:none!important}
+    .sp-extra-col-header,.sp-extra-col-cell,.sort-play-column,.sort-play-second-column{display:flex;align-items:center;justify-content:center;width:100%;min-width:0;position:relative;box-sizing:border-box}
+    .sp-extra-col-header{height:100%;padding-inline:0;overflow:visible!important}
+    .sp-extra-col-header>:not(:last-child){margin-inline-end:0!important}
+    .sp-extra-col-cell{color:var(--text-subdued,var(--spice-subtext,#b3b3b3));overflow:visible;padding-inline:0}
+    .sp-extra-col-cell:not([data-sp-align="left"]):not([data-sp-align="right"]) .sp-extra-col-val{margin-inline-start:calc(8px - var(--sp-grid-gap,16px));margin-inline-end:16px;max-width:calc(100% + var(--sp-grid-gap,16px) - 24px)}
+    .sp-extra-col-header[data-sp-align="left"],.sp-extra-col-cell[data-sp-align="left"]{padding-inline:0 12px}
+    .sp-extra-col-cell[data-sp-align="left"]{overflow:hidden;justify-content:flex-start}
+    .sp-extra-col-cell[data-sp-align="left"] .sp-extra-col-val{text-align:left}
+    .sp-extra-col-cell[data-sp-align="right"]{justify-content:flex-end}
+    .sp-extra-col-cell[data-sp-align="right"] .sp-extra-col-val{text-align:right;margin-inline-start:calc(8px - var(--sp-grid-gap,16px));margin-inline-end:calc(var(--sp-grid-gap,16px) + 4px);max-width:calc(100% - 12px)}
+    .sp-extra-col-cell[data-sp-numeric="true"] .sp-extra-col-val{font-variant-numeric:tabular-nums}
+    .sp-extra-col-cell:has(.sort-play-failed-cell),.sp-extra-col-val:has(.sort-play-failed-cell){overflow:visible!important}
+    .sp-extra-col-val{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:400;color:inherit;text-align:center}
+    .sp-extra-col-val.sp-col-clickable{cursor:pointer}
+    .sp-extra-col-val.sp-col-clickable:hover{text-decoration:underline;color:var(--spice-text,#fff)}
+    div[data-sp-grid] [data-sp-before-extra="true"]{position:relative}
+    div[data-sp-grid] [data-sp-before-extra="true"]>.main-trackList-column{overflow:hidden;min-width:0}
+    div[data-sp-grid] [data-sp-before-extra="true"]>.main-trackList-rowSeperator{flex-shrink:0;z-index:3;user-select:none;touch-action:none}
+    .sp-col-resizer{position:absolute!important;inset-inline-start:auto;inset-inline-end:0!important;top:50%;transform:translateY(-50%);width:8px;height:50%;cursor:col-resize;z-index:3;user-select:none;touch-action:none;margin-inline-start:0!important}
+    .sp-artist-header-row [role="columnheader"]{position:relative;height:100%;min-width:0;box-sizing:border-box;overflow:visible!important}
+    .sp-artist-header-row [role="columnheader"]>:not(:last-child){margin-inline-end:0!important}
+    .main-trackList-trackListHeader:hover .sp-col-resizer,.main-trackList-trackListHeader:focus-within .sp-col-resizer,.sp-col-resizing .sp-col-resizer,.sp-col-resizing .main-trackList-rowSeperator{background:linear-gradient(rgba(var(--spice-rgb-text,255,255,255),.3),rgba(var(--spice-rgb-text,255,255,255),.3)) 50%/1px 100% no-repeat}
+    .sp-col-resizer:hover,.sp-col-resizer.sp-resizer-active,.main-trackList-rowSeperator.sp-resizer-active{background:linear-gradient(rgba(var(--spice-rgb-text,255,255,255),.75),rgba(var(--spice-rgb-text,255,255,255),.75)) 50%/1.5px 100% no-repeat!important}
+    .sp-artist-header-wrapper{position:static;margin:0 0 8px;padding:0;height:auto;border-bottom:none}
+    .sp-artist-header-row{display:grid!important;height:36px;padding:0 16px;align-items:center;box-sizing:border-box;color:var(--text-subdued,var(--spice-subtext,#b3b3b3))}
+    .sp-artist-plays-hdr{display:block;width:11ch;max-width:100%;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums;color:inherit}
+    #sort-play-now-playing-data{cursor:pointer}
+    #sort-play-now-playing-data:hover .sort-play-np-value{text-decoration:underline}
+    button:where(.likeControl-wrapper-npv > .sort-play-like-button){margin-inline-start:var(--sp-npv-like-ml,10px)}
+    .sort-play-genre-container:empty{display:none!important}
+    .sort-play-track-info:has(> .sort-play-genre-container:not(:empty)){line-height:15px}
+    .sort-play-track-info:has(> .sort-play-genre-container:not(:empty)):has([data-testid="context-item-info-quality"]){gap:0px!important;row-gap:0px!important;line-height:13px!important}
+    .sort-play-track-info:has(> .sort-play-genre-container:not(:empty)):has([data-testid="context-item-info-quality"]) [data-encore-id="text"]{line-height:14px!important}
+    .sort-play-track-info:has(> .sort-play-genre-container:not(:empty)):has([data-testid="context-item-info-quality"]) [data-testid="context-item-info-quality"],.sort-play-track-info:has(> .sort-play-genre-container:not(:empty)):has([data-testid="context-item-info-quality"]) [data-testid="context-item-info-quality"] button{line-height:13px!important;padding-top:0px!important;padding-bottom:0px!important;min-height:0px!important;height:auto!important}
+    .sort-play-track-info:has(> .sort-play-genre-container:not(:empty)):has([data-testid="context-item-info-quality"]) .sort-play-np-container > span{line-height:14px!important}
+    .sort-play-track-info:has(> .sort-play-genre-container:not(:empty)):has([data-testid="context-item-info-quality"]) > .sort-play-genre-container{line-height:14px!important;margin-top:0px!important}
+    .sort-play-column-header{grid-row:1;grid-column:2;justify-self:center;cursor:pointer!important;background:transparent!important;border:none!important;padding:0!important;margin:0!important;outline:none!important;box-shadow:none!important;transform:none!important;display:inline-flex;align-items:center;justify-content:center;gap:4px;color:var(--text-subdued,#b3b3b3)!important;font-size:.875rem;font-weight:400;text-align:start;max-width:100%;min-width:0;transition:color .15s ease}
+    .sort-play-column-header:hover .sort-play-col-title,.sort-play-column-header:hover>span:not(.sort-play-sort-arrow),.sp-extra-col-header.sp-col-menu-open .sort-play-col-title{color:var(--text-base,#fff)!important}
+    .sort-play-col-title{text-align:start}
+    .sort-play-col-header-wrap{position:relative;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,auto) minmax(0,1fr);align-items:center;width:100%;height:100%;min-width:0;overflow:hidden}
+    .sp-extra-col-header.sp-hdr-tight-hover>.sort-play-col-header-wrap{grid-template-columns:var(--sp-hdr-lock-left,0px) fit-content(max(0px,calc(100% - var(--sp-hdr-lock-left,0px) - 16px))) 16px}
+    .sp-extra-col-header.sp-hdr-tight-hover .sort-play-column-header{justify-self:start;justify-content:flex-start}
+    .sort-play-sort-arrow{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;width:16px;height:16px;color:var(--text-bright-accent,#1ed760)}
+    .sort-play-sort-arrow:empty{display:none}
+    .sort-play-sort-arrow svg{width:16px;height:16px;fill:currentColor;display:block}
+    .sort-play-col-menu-btn{grid-row:1;grid-column:3;justify-self:start;display:none;position:relative;width:16px;min-width:0;height:22px;padding:0 0 0 2px;margin:0;border:none;background:transparent;color:var(--text-subdued,#b3b3b3);cursor:pointer;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .16s ease,color .15s ease;outline:none;z-index:2}
+    .sp-sortable-col .sort-play-col-menu-btn{display:inline-flex}
+    .sp-sortable-col:hover .sort-play-col-menu-btn,.sp-sortable-col.sp-col-menu-open .sort-play-col-menu-btn,.sp-sortable-col.sp-col-loading .sort-play-col-menu-btn{opacity:1;pointer-events:auto}
+    .sort-play-col-menu-btn:hover,.sp-sortable-col.sp-col-menu-open .sort-play-col-menu-btn{color:#fff}
+    .sp-col-dots-svg{width:14px;height:14px;display:block;overflow:visible;transition:opacity .15s ease,transform .15s ease}
+    .sp-col-dots-group{transform-origin:8px 8px}
+    .sp-col-dot{transition:transform .28s cubic-bezier(.34,1.56,.64,1)}
+    .sp-sortable-col.sp-col-loading .sp-col-dots-group{animation:spColDotsSpin .9s linear infinite}
+    .sp-sortable-col.sp-col-loading .sp-col-dot-1{transform:translate(0px,-0.1px)}
+    .sp-sortable-col.sp-col-loading .sp-col-dot-2{transform:translate(3.98px,2.3px)}
+    .sp-sortable-col.sp-col-loading .sp-col-dot-3{transform:translate(-3.98px,-2.2px)}
+    .sp-col-abort-svg{position:absolute;left:calc(50% + 1px);top:50%;width:12px;height:12px;transform:translate(-50%,-50%) scale(.6);opacity:0;pointer-events:none;transition:opacity .14s ease,transform .14s ease}
+    .sp-sortable-col.sp-col-loading .sort-play-col-menu-btn:hover .sp-col-dots-svg,.sp-sortable-col.sp-col-loading .sort-play-col-menu-btn.sp-col-aborting .sp-col-dots-svg{opacity:.14}
+    .sp-sortable-col.sp-col-loading .sort-play-col-menu-btn:hover .sp-col-abort-svg,.sp-sortable-col.sp-col-loading .sort-play-col-menu-btn.sp-col-aborting .sp-col-abort-svg{opacity:1;transform:translate(-50%,-50%) scale(1)}
+    .sp-extra-col-header:not([data-sp-align="left"]):not([data-sp-align="right"])>.sort-play-col-header-wrap{flex:1 1 0%;width:auto;margin-inline-start:calc(8px - var(--sp-grid-gap,16px));margin-inline-end:16px!important}
+    .sp-extra-col-header:not([data-sp-align="left"]):not([data-sp-align="right"]).sp-hdr-tight-hover>.sort-play-col-header-wrap{margin-inline-end:10px!important}
+    .sp-extra-col-header[data-sp-align="left"]>.sort-play-col-header-wrap{grid-template-columns:minmax(0,auto) minmax(0,1fr)}
+    .sp-extra-col-header[data-sp-align="left"] .sort-play-column-header{grid-column:1;justify-self:start;justify-content:flex-start}
+    .sp-extra-col-header[data-sp-align="left"] .sort-play-col-menu-btn{grid-column:2;justify-self:start}
+    .sp-extra-col-header[data-sp-align="left"].sp-hdr-tight-hover>.sort-play-col-header-wrap{grid-template-columns:minmax(0,1fr) 16px}
+    .sp-extra-col-header[data-sp-align="right"]>.sort-play-col-header-wrap{flex:1 1 0%;width:auto;margin-inline-start:calc(8px - var(--sp-grid-gap,16px));margin-inline-end:calc(var(--sp-grid-gap,16px) + 4px)!important;grid-template-columns:minmax(0,1fr) minmax(0,auto)}
+    .sp-extra-col-header[data-sp-align="right"] .sort-play-column-header,.sp-extra-col-header[data-sp-align="right"].sp-hdr-tight-hover .sort-play-column-header{grid-column:2;justify-self:end;justify-content:flex-end;flex-direction:row-reverse}
+    .sp-extra-col-header[data-sp-align="right"] .sort-play-col-menu-btn{grid-column:1;justify-self:end;padding:0 2px 0 0}
+    .sp-extra-col-header[data-sp-align="right"] .sp-col-abort-svg{left:calc(50% - 1px)}
+    .sp-extra-col-header[data-sp-align="right"].sp-hdr-tight-hover>.sort-play-col-header-wrap{grid-template-columns:16px minmax(0,1fr)}
+    @keyframes spColDotsSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
   `;
   document.head.appendChild(styleElement);
 
@@ -44402,7 +45953,7 @@ shadowRoot.innerHTML = `
     }
   }
 
-  const fetchPlaylistContents = async (uri) => (await PlaylistAPI.getContents(uri)).items;
+  const fetchPlaylistContents = async (uri) => (await getRawPlaylistContents(uri)).items;
 
   const parsePlaylistAPITrack = (track) => ({
     uri: track.uri,
@@ -44933,6 +46484,7 @@ shadowRoot.innerHTML = `
                 durationMs: t.duration.totalMilliseconds,
                 playcount: rawPlaycount,
                 playCount: rawPlaycount > 0 ? rawPlaycount : "N/A",
+                _playCountFromGql: true,
                 popularity: null,
                 releaseDate: releaseDate,
                 addedAt: null,
@@ -45726,7 +47278,7 @@ shadowRoot.innerHTML = `
     });
   }
 
-  async function getUnifiedAlbumData(albumId, retries = 10, retryDelay = 2000) {
+  async function getUnifiedAlbumData(albumId, retries = 3, retryDelay = 1000, isCancelled = () => false) {
     if (albumDataCache[albumId] && albumReleaseDateCache[albumId] !== undefined) {
       return { playCounts: albumDataCache[albumId], releaseDate: albumReleaseDateCache[albumId] };
     }
@@ -45736,6 +47288,10 @@ shadowRoot.innerHTML = `
         const { Locale, GraphQL } = Spicetify;
 
         for (let attempt = 1; attempt <= retries; attempt++) {
+          if (isCancelled()) {
+            resolve({ playCounts: [], releaseDate: null });
+            return;
+          }
           try {
             const promise = GraphQL.Request(GraphQL.Definitions.getAlbum, {
               uri: `spotify:album:${albumId}`,
@@ -45748,16 +47304,32 @@ shadowRoot.innerHTML = `
               new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 10000))
             ]);
 
-            if (!res.data?.albumUnion) {
+            if (isCancelled()) {
+              resolve({ playCounts: [], releaseDate: null });
+              return;
+            }
+
+            if (!res?.data?.albumUnion) {
+              if (res?.data && (!Array.isArray(res.errors) || res.errors.length === 0)) {
+                albumDataCache[albumId] = [];
+                albumReleaseDateCache[albumId] = null;
+                resolve({ playCounts: [], releaseDate: null });
+                return;
+              }
               throw new Error(`No albumUnion in response for album ID: ${albumId}`);
             }
 
             const u = res.data.albumUnion;
             
-            let releaseDate = 0;
+            let releaseDate = null;
             if (u.date) {
-              if (u.date.isoString) releaseDate = new Date(u.date.isoString).getTime();
-              else if (u.date.year) releaseDate = new Date(u.date.year.toString()).getTime();
+              if (u.date.isoString) {
+                const ts = new Date(u.date.isoString).getTime();
+                if (Number.isFinite(ts)) releaseDate = ts;
+              } else if (u.date.year) {
+                const ts = new Date(u.date.year.toString()).getTime();
+                if (Number.isFinite(ts)) releaseDate = ts;
+              }
             }
             albumReleaseDateCache[albumId] = releaseDate;
 
@@ -45773,7 +47345,9 @@ shadowRoot.innerHTML = `
               const pCount = parseInt(track.playcount, 10) || 0;
               const tId = track.uri.split(":")[2];
               
-              entriesToSave.push({ key: tId, val: { date: releaseDate, trackNumber: tNum, discNumber: dNum } });
+              if (releaseDate !== null) {
+                entriesToSave.push({ key: tId, val: { date: releaseDate, trackNumber: tNum, discNumber: dNum } });
+              }
 
               albumTracks.push({
                 uri: track.uri,
@@ -45795,7 +47369,7 @@ shadowRoot.innerHTML = `
             resolve({ playCounts: albumTracks, releaseDate });
             return;
           } catch (error) {
-            if (attempt < retries) {
+            if (attempt < retries && !isCancelled()) {
               await new Promise(r => setTimeout(r, retryDelay));
               retryDelay *= 2;
             } else {
@@ -45817,8 +47391,8 @@ shadowRoot.innerHTML = `
     }
   }
 
-  async function getPlayCountsForAlbum(albumId) {
-    const data = await getUnifiedAlbumData(albumId);
+  async function getPlayCountsForAlbum(albumId, isCancelled = () => false) {
+    const data = await getUnifiedAlbumData(albumId, 3, 1000, isCancelled);
     return data.playCounts || [];
   }
 
@@ -45827,7 +47401,7 @@ shadowRoot.innerHTML = `
     return data.releaseDate;
   }
 
-  async function getTrackDetailsWithPlayCount(track, retries = 10, retryDelay = 1000) {
+  async function getTrackDetailsWithPlayCount(track, retries = 3, retryDelay = 1000, skipBatchNew = false) {
     const trackId = track.trackId || track.id || track.track?.id;
     const albumId = track.albumId || track.album?.id || track.track?.album?.id;
 
@@ -45853,15 +47427,17 @@ shadowRoot.innerHTML = `
       let playCount = "N/A";
       let trackNumber = track.trackNumber || track.track?.track_number || track.track?.trackNumber || 0;
 
-      try {
-          const resMap = await fetchPlayCountsBatchNew([`spotify:track:${trackId}`]);
-          const pc = resMap.get(`spotify:track:${trackId}`);
-          if (pc !== undefined) {
-              playCount = pc;
-              await idb.set('playCounts', trackId, playCount);
-          }
-      } catch (e) {
-          console.warn("[Sort-Play] New playcount fetch failed for single track", e);
+      if (!skipBatchNew) {
+        try {
+            const resMap = await fetchPlayCountsBatchNew([`spotify:track:${trackId}`]);
+            const pc = resMap.get(`spotify:track:${trackId}`);
+            if (pc !== undefined) {
+                playCount = pc;
+                await idb.set('playCounts', trackId, playCount);
+            }
+        } catch (e) {
+            console.warn("[Sort-Play] New playcount fetch failed for single track", e);
+        }
       }
 
       if (playCount === "N/A" && albumId) {
@@ -45919,7 +47495,7 @@ shadowRoot.innerHTML = `
     }
   }
 
-  async function enrichTracksWithPlayCounts(tracks, updateProgress = () => {}) {
+  async function enrichTracksWithPlayCounts(tracks, updateProgress = () => {}, isCancelled = () => false) {
     const tracksWithIds = tracks.map(t => {
         const isLocal = Spicetify.URI.isLocal(t.uri);
         const id = isLocal ? null : (t.trackId || t.id || t.track?.id || (t.uri ? t.uri.split(':')[2] : null));
@@ -45927,8 +47503,9 @@ shadowRoot.innerHTML = `
         return { ...t, _tempId: id, _tempAlbumId: albumId, _isLocal: isLocal };
     });
 
-    const trackIdsToCheck = tracksWithIds.map(t => t._tempId).filter(Boolean);
+    const trackIdsToCheck = [...new Set(tracksWithIds.map(t => t._tempId).filter(Boolean))];
     const cachedPlayCounts = await idb.getMany('playCounts', trackIdsToCheck, CACHE_EXPIRE_PLAYCOUNTS);
+    if (isCancelled()) return tracks;
 
     const playCountMap = new Map(); 
     const missingUris = [];
@@ -45954,6 +47531,7 @@ shadowRoot.innerHTML = `
             let processedTracks = 0;
             
             for (let i = 0; i < uniqueMissingUris.length; i += BATCH_SIZE) {
+                if (isCancelled()) return tracks;
                 const batch = uniqueMissingUris.slice(i, i + BATCH_SIZE);
                 const batchResults = await fetchPlayCountsBatchNew(batch);
                 const entriesToSave = [];
@@ -45967,6 +47545,7 @@ shadowRoot.innerHTML = `
                 if (idb.setMany && entriesToSave.length > 0) {
                     await idb.setMany('playCounts', entriesToSave);
                 }
+                if (isCancelled()) return tracks;
                 
                 processedTracks += batch.length;
                 if (updateProgress) {
@@ -45981,6 +47560,7 @@ shadowRoot.innerHTML = `
             console.warn("[Sort-Play] New playcount fetch method failed, falling back to album parsing", e);
         }
 
+        if (isCancelled()) return tracks;
         const stillMissingTracks = missingTracks.filter(track => !playCountMap.has(track._tempId));
 
         if (stillMissingTracks.length > 0) {
@@ -46009,10 +47589,10 @@ shadowRoot.innerHTML = `
                 }
 
                 async function worker(queue) {
-                    while (queue.length > 0) {
+                    while (queue.length > 0 && !isCancelled()) {
                         const albumId = queue.shift();
                         try {
-                            const albumTracks = await getPlayCountsForAlbum(albumId);
+                            const albumTracks = await getPlayCountsForAlbum(albumId, isCancelled);
                             
                             albumTracks.forEach(t => {
                                 const tId = t.uri.split(":")[2];
@@ -46038,6 +47618,7 @@ shadowRoot.innerHTML = `
             }
         }
 
+        if (isCancelled()) return tracks;
         const finalMissingTracks = stillMissingTracks.filter(track => !playCountMap.has(track._tempId));
         if (finalMissingTracks.length > 0 && Spicetify.GraphQL.Definitions.getTrack) {
             const GQL_CONCURRENCY = 10;
@@ -46046,7 +47627,7 @@ shadowRoot.innerHTML = `
             let currentIndex = 0;
             async function gqlWorker() {
                 const entriesToSave = [];
-                while (currentIndex < gqlQueue.length) {
+                while (currentIndex < gqlQueue.length && !isCancelled()) {
                     const track = gqlQueue[currentIndex++];
                     const uri = `spotify:track:${track._tempId}`;
                     try {
@@ -46188,9 +47769,10 @@ shadowRoot.innerHTML = `
       });
   }
   
-  async function processReleaseDatesConcurrently(tracks, updateProgress = () => {}, fetchFunction = getTrackDetailsWithReleaseDate) {
-    const trackIds = tracks.map(t => t.trackId || (t.uri ? t.uri.split(':')[2] : null)).filter(Boolean);
+  async function processReleaseDatesConcurrently(tracks, updateProgress = () => {}, fetchFunction = getTrackDetailsWithReleaseDate, isCancelled = () => false) {
+    const trackIds = [...new Set(tracks.map(t => t.trackId || (t.uri ? t.uri.split(':')[2] : null)).filter(Boolean))];
     const cachedMap = await idb.getMany('releaseDates', trackIds, CACHE_EXPIRE_RELEASE_DATE);
+    if (isCancelled()) return tracks;
     
     const missingUris = [];
     const results = new Array(tracks.length);
@@ -46217,14 +47799,17 @@ shadowRoot.innerHTML = `
         let processedCount = 0;
         
         for (let i = 0; i < missingUris.length; i += BATCH_SIZE) {
+            if (isCancelled()) return results;
             const batch = missingUris.slice(i, i + BATCH_SIZE);
             const urisToFetch = batch.map(b => b.track.uri);
             
             try {
                 const fetchedMetaMap = await fetchCoreMetadataBatch(urisToFetch);
+                if (isCancelled()) return results;
                 const entriesToSave = [];
                 
                 for (const item of batch) {
+                    if (isCancelled()) break;
                     const { track, index, trackId } = item;
                     const meta = fetchedMetaMap.get(track.uri);
                     
@@ -46243,9 +47828,11 @@ shadowRoot.innerHTML = `
                 if (idb.setMany && entriesToSave.length > 0) {
                     await idb.setMany('releaseDates', entriesToSave);
                 }
+                if (isCancelled()) return results;
             } catch (e) {
                 console.warn("[Sort-Play] Batch core metadata fetch failed, falling back", e);
                 for (const item of batch) {
+                    if (isCancelled()) return results;
                     results[item.index] = await fetchFunction(item.track);
                 }
             }
@@ -46264,7 +47851,8 @@ shadowRoot.innerHTML = `
     tracks,
     updateProgress,
     totalProgressSteps = 1,
-    skipNetworkForIds = new Set()
+    skipNetworkForIds = new Set(),
+    isCancelled = () => false
   ) {
     const trackIds = tracks.map((track) => {
         if (Spicetify.URI.isLocal(track.uri)) return null;
@@ -46273,6 +47861,7 @@ shadowRoot.innerHTML = `
     const uniqueTrackIds = [...new Set(trackIds)];
     
     const cachedMetadata = await idb.getMany('trackMetadata', uniqueTrackIds, CACHE_EXPIRE_METADATA);
+    if (isCancelled()) return tracks;
     
     const missingIds = uniqueTrackIds.filter(id => {
         if (skipNetworkForIds.has(id)) return false;
@@ -46289,7 +47878,9 @@ shadowRoot.innerHTML = `
         let delay = 800;
 
         for (let attempt = 0; attempt <= maxRetries; attempt++) {
+            if (isCancelled()) return null;
             data = await fetchInternalTrackMetadata(id);
+            if (isCancelled()) return null;
             
             if (data && (data.popularity === null || data.popularity === undefined) && attempt < maxRetries) {
                 data = null; 
@@ -46300,7 +47891,8 @@ shadowRoot.innerHTML = `
             if (attempt < maxRetries) {
                 const jitter = Math.floor(Math.random() * 300);
                 await new Promise(r => setTimeout(r, delay + jitter));
-                delay *= 1.5; 
+                if (isCancelled()) return null;
+                delay *= 1.5;
             }
         }
 
@@ -46334,7 +47926,7 @@ shadowRoot.innerHTML = `
     const entriesToSave = [];
 
     const worker = async () => {
-        while (currentIndex < missingIds.length) {
+        while (currentIndex < missingIds.length && !isCancelled()) {
             const id = missingIds[currentIndex++];
             const result = await processInternalItem(id);
             
@@ -46485,6 +48077,97 @@ shadowRoot.innerHTML = `
     }
   }
   
+  async function _fetchLastFmBackslashTrackInfo(artistName, trackName, username = null, noRedirect = false) {
+    const trendPromise = fetchLastFmTrend(artistName, trackName, noRedirect, true);
+    const userScrobblePromise = username ? (async () => {
+      const scrobbleParams = new URLSearchParams({
+        method: 'user.getTrackScrobbles',
+        user: username,
+        artist: artistName,
+        track: trackName,
+        limit: '1',
+        format: 'json'
+      });
+      if (lastFmAutocorrect && !noRedirect) scrobbleParams.set('autocorrect', '1');
+      else if (noRedirect) scrobbleParams.set('autocorrect', '0');
+
+      const res = await fetchLfmWithGateway(scrobbleParams);
+      const text = await res.text();
+      if (!text || text.trim() === '') throw new Error("Received empty response from Last.fm");
+      const data = JSON.parse(text);
+      if (data?.error === 17) return data;
+      if (!res.ok && (!data || data.error !== 6)) {
+        throw new Error(`Last.fm API request failed with status ${res.status}`);
+      }
+      return data;
+    })() : Promise.resolve(null);
+
+    const [trendData, userData] = await Promise.all([trendPromise, userScrobblePromise]);
+    if (userData?.error === 17) return userData;
+
+    const hasStats = typeof trendData?.playcount === 'number' || typeof trendData?.listeners === 'number';
+    if (!hasStats) return { error: 6, message: 'Track not found' };
+
+    const rawTracks = userData?.trackscrobbles?.track;
+    const sampleTrack = Array.isArray(rawTracks) ? rawTracks[0] : rawTracks;
+    const canonicalArtist = sampleTrack?.artist?.['#text'] || artistName;
+    const canonicalTrack = sampleTrack?.name || trackName;
+
+    const trackObj = {
+      name: canonicalTrack,
+      url: sampleTrack?.url || buildLastFmWebUrl(canonicalArtist, canonicalTrack, noRedirect),
+      listeners: String(trendData.listeners ?? 0),
+      playcount: String(trendData.playcount ?? 0),
+      artist: {
+        name: canonicalArtist,
+        url: buildLastFmWebUrl(canonicalArtist, null, noRedirect)
+      },
+      toptags: { tag: [] },
+      _fromBackslashFallback: true
+    };
+
+    if (username && userData?.trackscrobbles) {
+      const parsedTotal = parseInt(userData.trackscrobbles['@attr']?.total, 10);
+      trackObj.userplaycount = String(isNaN(parsedTotal) ? 0 : parsedTotal);
+    }
+    if (sampleTrack?.album?.['#text'] || Array.isArray(sampleTrack?.image)) {
+      trackObj.album = {
+        title: sampleTrack?.album?.['#text'] || '',
+        image: Array.isArray(sampleTrack?.image) ? sampleTrack.image : []
+      };
+    }
+    return { track: trackObj };
+  }
+
+  async function _fetchLastFmBackslashArtistInfo(artistName, noRedirect = false) {
+    if (!artistName) return null;
+    const params = new URLSearchParams({
+      method: 'artist.search',
+      artist: artistName,
+      limit: '10',
+      format: 'json'
+    });
+    const res = await fetchLfmWithGateway(params);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const rawList = data?.results?.artistmatches?.artist;
+    const list = Array.isArray(rawList) ? rawList : (rawList ? [rawList] : []);
+    const targetNorm = artistName.trim().toLowerCase();
+    const match = list.find(a => (a?.name || '').trim().toLowerCase() === targetNorm);
+    if (!match) return null;
+    return {
+      name: match.name,
+      url: match.url || buildLastFmWebUrl(match.name, null, noRedirect),
+      stats: {
+        listeners: match.listeners || '0',
+        playcount: null
+      },
+      tags: { tag: [] },
+      image: Array.isArray(match.image) ? match.image : [],
+      _fromBackslashFallback: true
+    };
+  }
+
   async function _fetchLastFmTrackInfoCore(artistName, trackName, username = null, useFallback = false, noRedirect = false) {
     const inFlightKey = `${(artistName || '').toLowerCase().trim()}|${(trackName || '').toLowerCase().trim()}|${(username || '').toLowerCase().trim()}|${useFallback ? 1 : 0}|${noRedirect ? 1 : 0}`;
     if (inFlightLfmTrackInfo.has(inFlightKey)) {
@@ -46494,6 +48177,7 @@ shadowRoot.innerHTML = `
     const requestPromise = (async () => {
       const maxRetries = 5;
       let delay = 1000;
+      const hasBackslash = Boolean(artistName?.includes('\\') || trackName?.includes('\\'));
 
       for (let retries = 0; retries < maxRetries; retries++) {
         try {
@@ -46521,7 +48205,7 @@ shadowRoot.innerHTML = `
               throw new Error(`Last.fm API request failed with status ${response.status}`);
           }
 
-          if (data.error === 6 && useFallback && !noRedirect) {
+          if (data.error === 6 && useFallback && !noRedirect && !hasBackslash) {
             params.set('autocorrect', lastFmAutocorrect ? '0' : '1');
             const responseRetry = await fetchLfmWithGateway(params);
             const textRetry = await responseRetry.text();
@@ -46530,6 +48214,11 @@ shadowRoot.innerHTML = `
               if (!dataRetry.error) data = dataRetry;
             }
           }
+
+          if (data.error === 6 && hasBackslash) {
+            return await _fetchLastFmBackslashTrackInfo(artistName, trackName, username, noRedirect);
+          }
+
           return data;
         } catch (error) {
           if (retries === maxRetries - 1) throw error;
@@ -48124,6 +49813,7 @@ shadowRoot.innerHTML = `
     if (columnSelector) {
         columnSelector.remove();
     }
+    document.querySelectorAll('.sp-col-menu-open').forEach(el => el.classList.remove('sp-col-menu-open'));
     if (window.columnSelectorAbortController) {
         window.columnSelectorAbortController.abort();
         window.columnSelectorAbortController = null;
@@ -48581,9 +50271,10 @@ shadowRoot.innerHTML = `
     return results;
   }
 
-  async function processTrueReleaseDatesConcurrently(tracks, updateProgress = () => {}) {
+  async function processTrueReleaseDatesConcurrently(tracks, updateProgress = () => {}, isCancelled = () => false) {
     const trackIds = tracks.map(t => t.trackId || (t.uri ? t.uri.split(':')[2] : null)).filter(Boolean);
     const cachedMap = await idb.getMany('trueReleaseDates', trackIds, CACHE_EXPIRE_RELEASE_DATE);
+    if (isCancelled()) return tracks;
 
     const missingTracks = [];
     const results = new Array(tracks.length);
@@ -48605,7 +50296,8 @@ shadowRoot.innerHTML = `
             const finalDiscNum = cached.discNumber !== undefined ? cached.discNumber : (track.discNumber || 1);
             results[index] = { 
                 ...track, 
-                trueReleaseDate: cached.date, 
+                trueReleaseDate: cached.date,
+                trueReleaseDatePrecision: cached.precision || inferDatePrecision(cached.date),
                 trueTrackNumber: finalTrackNum,
                 trueDiscNumber: finalDiscNum,
                 trueAlbumName: cached.albumName !== undefined ? cached.albumName : (track.albumName || ""),
@@ -48621,22 +50313,36 @@ shadowRoot.innerHTML = `
         let processedCount = 0;
 
         for (let i = 0; i < missingTracks.length; i += BATCH_SIZE) {
+            if (isCancelled()) return results;
             const batch = missingTracks.slice(i, i + BATCH_SIZE);
             const urisToFetch = batch.map(b => b.track.uri);
+            const playCountUrisToFetch = batch
+                .filter(b => !(b.track.playCount && b.track.playCount !== "N/A" && Number(b.track.playCount) > 0) && !b.track._playCountChecked)
+                .map(b => b.track.uri);
             
             let fetchedMetaMap = new Map();
-            try {
-                fetchedMetaMap = await fetchCoreMetadataBatch(urisToFetch);
-            } catch (e) {
-                console.warn("[Sort-Play] Batch core meta fetch failed in true dates", e);
-            }
+            let fetchedPlaysMap = new Map();
+            let playCountBatchOk = false;
+
+            const [metaRes, playsRes] = await Promise.all([
+                fetchCoreMetadataBatch(urisToFetch).catch(e => {
+                    console.warn("[Sort-Play] Batch core meta fetch failed in true dates", e);
+                    return new Map();
+                }),
+                playCountUrisToFetch.length > 0
+                    ? fetchPlayCountsBatchNew(playCountUrisToFetch).then(m => { playCountBatchOk = true; return m; }).catch(() => new Map())
+                    : Promise.resolve(new Map())
+            ]);
+            if (isCancelled()) return results;
+            fetchedMetaMap = metaRes;
+            fetchedPlaysMap = playsRes;
 
             const CONCURRENCY_LIMIT = 10;
             const queue = [...batch];
             let currentIndex = 0;
             
             const workers = Array(Math.min(CONCURRENCY_LIMIT, queue.length)).fill(null).map(async () => {
-                while (currentIndex < queue.length) {
+                while (currentIndex < queue.length && !isCancelled()) {
                     const { track, index } = queue[currentIndex++];
                     
                     const meta = fetchedMetaMap.get(track.uri);
@@ -48645,6 +50351,13 @@ shadowRoot.innerHTML = `
                         if (!track.track.external_ids) track.track.external_ids = {};
                         if (meta.isrc && !track.track.external_ids.isrc) track.track.external_ids.isrc = meta.isrc;
                         if (meta.releaseDate && !track.releaseDate) track.releaseDate = meta.releaseDate;
+                        if (meta.datePrecision && !track.releaseDatePrecision) track.releaseDatePrecision = meta.datePrecision;
+                        if (meta.albumType && !track.albumType && !track.album?.album_type) track.albumType = meta.albumType;
+                    }
+                    if (playCountBatchOk && !track._playCountChecked && !(track.playCount && track.playCount !== "N/A" && Number(track.playCount) > 0)) {
+                        const pc = fetchedPlaysMap.get(track.uri) || 0;
+                        if (pc > 0) track.playCount = pc;
+                        track._playCountChecked = true;
                     }
 
                     results[index] = await getTrackDetailsWithTrueReleaseDate(track);
@@ -48665,6 +50378,7 @@ shadowRoot.innerHTML = `
   }
 
   async function removeTracksFromPlaylist(playlistUri, itemsToRemove, maxRetries = 5, initialDelay = 1000) {
+    playlistRawItemsCache.delete(playlistUri);
     const REMOVE_BATCH_SIZE = 1500;
     for (let i = 0; i < itemsToRemove.length; i += REMOVE_BATCH_SIZE) {
         const batch = itemsToRemove.slice(i, i + REMOVE_BATCH_SIZE);
@@ -48750,12 +50464,14 @@ shadowRoot.innerHTML = `
   async function replacePlaylistTracks(playlistId, trackUris, maxRetries = 10, initialDelay = 2000) {
     const validUris = trackUris.filter(uri => typeof uri === 'string' && (uri.startsWith("spotify:track:") || Spicetify.URI.isLocal(uri)));
     const playlistUri = `spotify:playlist:${playlistId}`;
+    playlistRawItemsCache.delete(playlistUri);
+    clearPlaylistViewSort(playlistUri, false);
 
     try {
         if (typeof Spicetify.Platform.PlaylistAPI.clear === 'function') {
             await Spicetify.Platform.PlaylistAPI.clear(playlistUri);
         } else {
-            let content = await Spicetify.Platform.PlaylistAPI.getContents(playlistUri);
+            let content = await getRawPlaylistContents(playlistUri);
             if (content && content.items && content.items.length > 0) {
                 const toRemove = content.items.map(i => ({ uri: i.uri, uid: i.uid }));
                 await removeTracksFromPlaylist(playlistUri, toRemove, maxRetries, initialDelay);
@@ -48775,6 +50491,7 @@ shadowRoot.innerHTML = `
 
   async function addTracksToPlaylist(playlistId, trackUris, maxRetries = 10, initialDelay = 2000) {
     const playlistUri = `spotify:playlist:${playlistId}`;
+    playlistRawItemsCache.delete(playlistUri);
     const validUris = trackUris.filter(uri => typeof uri === "string" && (Spicetify.URI.isLocal(uri) || uri.startsWith("spotify:track:")));
     const ADD_BATCH_SIZE = 1500;
 
@@ -48794,7 +50511,7 @@ shadowRoot.innerHTML = `
                 
                 try {
                     await new Promise(r => setTimeout(r, 2000));
-                    const content = await Spicetify.Platform.PlaylistAPI.getContents(playlistUri);
+                    const content = await getRawPlaylistContents(playlistUri);
                     if (content && content.items) {
                         const currentTrackUris = content.items.map(item => item.uri);
                         const expectedLastUris = currentTrackUris.slice(-batch.length);
@@ -49671,6 +51388,45 @@ shadowRoot.innerHTML = `
     });
   }
 
+  function showAnalysisGenreSettingsModal(currentConfig, onSave) {
+    const descriptionHtml = `
+      <div style="background-color: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 12px; margin-bottom: 5px;">
+        <p style="margin: 0; color: #b3b3b3; font-size: 13px; line-height: 1.4;">
+          <em>Changes apply immediately. Newly enabled sources are fetched on demand.</em>
+        </p>
+      </div>
+    `;
+
+    showSimpleInputModal({
+      title: "Genre Sources",
+      descriptionHtml,
+      saveButtonText: "Done",
+      toggleOptions: [
+        { id: "spotify_track", label: "Spotify (Track Genres)", checked: !!currentConfig.spotify_track },
+        { id: "everynoise_artist", label: "Every Noise (Artist Tags)", checked: !!currentConfig.everynoise_artist },
+        { id: "lastfm_artist", label: "Last.fm (Artist Tags)", checked: !!currentConfig.lastfm_artist }
+      ],
+      numberOption: {
+        id: "artist_limit",
+        label: "Max Artists for External Sources",
+        subtext: "Skip fetching Every Noise & Last.fm when a playlist has more unique artists than this. Set 0 for no limit.",
+        value: currentConfig.artist_limit ?? 0,
+        min: 0,
+        step: 50,
+        placeholder: "0",
+        disableWhenAllFalse: ["everynoise_artist", "lastfm_artist"]
+      },
+      onSave: (results, saveBtn, closeModal) => {
+        if (!results.spotify_track && !results.everynoise_artist && !results.lastfm_artist) {
+          showNotification("Please keep at least one genre source enabled.", true);
+          return;
+        }
+        onSave(results);
+        closeModal();
+      }
+    });
+  }
+
   async function showPlaylistAnalysisModal(tracks, sourceDetails, contextType = 'playlist', updateProgressCallback = null) {
     const existing = document.getElementById("sort-play-analysis-overlay");
     if (existing) {
@@ -49716,19 +51472,206 @@ shadowRoot.innerHTML = `
     }).filter(Boolean);
     const spotifyTrackUris = tracks.map(t => t.uri).filter(uri => uri && uri.startsWith('spotify:track:'));
 
+    const DEFAULT_ANALYSIS_GENRE_CONFIG = { spotify_track: true, everynoise_artist: true, lastfm_artist: true, artist_limit: 0 };
+    let analysisGenreConfig = { ...DEFAULT_ANALYSIS_GENRE_CONFIG };
+    try {
+        const storedCfg = localStorage.getItem(STORAGE_KEY_ANALYSIS_GENRE_SOURCES);
+        if (storedCfg) {
+            const parsed = JSON.parse(storedCfg);
+            if (parsed && typeof parsed === 'object') {
+                analysisGenreConfig = {
+                    spotify_track: parsed.spotify_track !== undefined ? !!parsed.spotify_track : true,
+                    everynoise_artist: parsed.everynoise_artist !== undefined ? !!parsed.everynoise_artist : true,
+                    lastfm_artist: parsed.lastfm_artist !== undefined ? !!parsed.lastfm_artist : true,
+                    artist_limit: Number.isFinite(Number(parsed.artist_limit)) && Number(parsed.artist_limit) > 0 ? Math.floor(Number(parsed.artist_limit)) : 0
+                };
+                if (!analysisGenreConfig.spotify_track && !analysisGenreConfig.everynoise_artist && !analysisGenreConfig.lastfm_artist) {
+                    analysisGenreConfig.spotify_track = true;
+                }
+            }
+        }
+    } catch (_) {}
+
+    const saveAnalysisGenreConfig = (cfg) => {
+        try {
+            localStorage.setItem(STORAGE_KEY_ANALYSIS_GENRE_SOURCES, JSON.stringify(cfg));
+        } catch (_) {}
+    };
+
+    const extractTrackGenreInfo = (t) => {
+        const isLocal = !!(t.uri && Spicetify.URI.isLocal(t.uri));
+        const tid = isLocal ? null : (t.trackId || (t.uri ? t.uri.split(':')[2] : null));
+        const artistIds = isLocal ? [] : extractTrackArtistUris(t).filter(u => u !== VARIOUS_ARTISTS_URI).map(u => u.split(':')[2]).filter(Boolean);
+        const primaryArtistName = (t.artistName || t.artists?.[0]?.name || t.track?.artists?.[0]?.name || '').trim();
+        const namesSet = new Set();
+        if (primaryArtistName && primaryArtistName !== 'Unknown Artist') namesSet.add(primaryArtistName.toLowerCase());
+        const rawArtists = t.artists?.length ? t.artists : (t.track?.artists?.length ? t.track.artists : []);
+        rawArtists.forEach(a => {
+            const n = a?.name?.trim()?.toLowerCase();
+            if (n && n !== 'unknown artist') namesSet.add(n);
+        });
+        if (t.allArtists) {
+            t.allArtists.split(', ').forEach(n => {
+                const trimmed = n.trim().toLowerCase();
+                if (trimmed && trimmed !== 'unknown artist') namesSet.add(trimmed);
+            });
+        }
+        return { uri: t.uri || null, trackId: tid, artistIds, primaryArtistId: artistIds[0] || null, primaryArtistName, artistNamesLower: Array.from(namesSet) };
+    };
+
+    const allPlaylistArtistIdSet = new Set();
+    const primaryArtistEntryMap = new Map();
+    tracks.forEach(t => {
+        const info = extractTrackGenreInfo(t);
+        info.artistIds.forEach(id => allPlaylistArtistIdSet.add(id));
+        if (info.primaryArtistName && info.primaryArtistName !== 'Unknown Artist' && info.primaryArtistName !== 'Various Artists') {
+            if (!primaryArtistEntryMap.has(info.primaryArtistName)) {
+                primaryArtistEntryMap.set(info.primaryArtistName, { name: info.primaryArtistName, id: info.primaryArtistId, sampleTrackId: info.trackId });
+            } else {
+                const cur = primaryArtistEntryMap.get(info.primaryArtistName);
+                if (!cur.id && info.primaryArtistId) cur.id = info.primaryArtistId;
+                if (!cur.sampleTrackId && info.trackId) cur.sampleTrackId = info.trackId;
+            }
+        }
+    });
+    const allPlaylistArtistIds = Array.from(allPlaylistArtistIdSet);
+    const primaryArtistEntries = Array.from(primaryArtistEntryMap.values());
+    const uniqueArtistCount = primaryArtistEntries.length || allPlaylistArtistIds.length;
+
+    let nativeGenresMap = new Map();
+    let spotifyTrackFetched = false;
+    let everyNoiseFetched = false;
+    let lastfmArtistFetched = false;
+    let skippedByLimit = { everynoise_artist: false, lastfm_artist: false };
+    let isFetchingAnalysisGenres = false;
+    let isAnalysisModalClosed = false;
+    let genreLoadingText = "Loading genre sources...";
+
+    const ensureAnalysisGenresFetched = async (targetConfig, { forceIgnoreLimit = false, onProgress = null } = {}) => {
+        skippedByLimit = { everynoise_artist: false, lastfm_artist: false };
+
+        if (targetConfig.spotify_track && spotifyTrackUris.length === 0) spotifyTrackFetched = true;
+        if (targetConfig.everynoise_artist && allPlaylistArtistIds.length === 0) everyNoiseFetched = true;
+        if (targetConfig.lastfm_artist && primaryArtistEntries.length === 0) lastfmArtistFetched = true;
+
+        let wantSpotify = !!targetConfig.spotify_track && !spotifyTrackFetched;
+        let wantEn = !!targetConfig.everynoise_artist && !everyNoiseFetched;
+        let wantLfm = !!targetConfig.lastfm_artist && !lastfmArtistFetched;
+
+        const overLimit = !forceIgnoreLimit && targetConfig.artist_limit > 0 && uniqueArtistCount > targetConfig.artist_limit;
+        if (overLimit && (wantEn || wantLfm)) {
+            await Promise.all([
+                wantEn ? (async () => {
+                    const missingMem = allPlaylistArtistIds.filter(id => !everyNoiseCache.has(id));
+                    if (missingMem.length > 0) {
+                        const cached = await idb.getMany('everyNoiseArtistTags', missingMem, CACHE_EXPIRE_EVERYNOISE);
+                        cached.forEach((val, key) => { if (val !== null && val !== undefined) everyNoiseCache.set(key, val); });
+                    }
+                    if (allPlaylistArtistIds.every(id => everyNoiseCache.has(id))) {
+                        everyNoiseFetched = true;
+                    } else {
+                        skippedByLimit.everynoise_artist = true;
+                    }
+                    wantEn = false;
+                })() : Promise.resolve(),
+                wantLfm ? (async () => {
+                    const missingMem = primaryArtistEntries.filter(e => !lastfmArtistTagsCache.has(e.name));
+                    if (missingMem.length > 0) {
+                        const cached = await idb.getMany('lastfmArtistTags', missingMem.map(e => e.name), CACHE_EXPIRE_GENRES);
+                        cached.forEach((val, key) => { if (val !== null && val !== undefined) lastfmArtistTagsCache.set(key, val); });
+                    }
+                    if (primaryArtistEntries.every(e => lastfmArtistTagsCache.has(e.name))) {
+                        lastfmArtistFetched = true;
+                    } else {
+                        skippedByLimit.lastfm_artist = true;
+                    }
+                    wantLfm = false;
+                })() : Promise.resolve()
+            ]);
+        }
+
+        const activeCount = (wantSpotify ? 1 : 0) + (wantEn ? 1 : 0) + (wantLfm ? 1 : 0);
+        if (activeCount === 0) {
+            onProgress?.(100);
+            return;
+        }
+
+        let pSp = wantSpotify ? 0 : 100;
+        let pEn = wantEn ? 0 : 100;
+        let pLfm = wantLfm ? 0 : 100;
+        const report = () => {
+            const sum = (wantSpotify ? pSp : 0) + (wantEn ? pEn : 0) + (wantLfm ? pLfm : 0);
+            onProgress?.(Math.min(100, Math.round(sum / activeCount)));
+        };
+
+        let preFetchedTursoMap = null;
+        if (wantEn && wantLfm) {
+            await Promise.all([
+                (async () => {
+                    const missingMem = allPlaylistArtistIds.filter(id => !everyNoiseCache.has(id));
+                    if (missingMem.length > 0) {
+                        const cached = await idb.getMany('everyNoiseArtistTags', missingMem, CACHE_EXPIRE_EVERYNOISE);
+                        cached.forEach((val, key) => { if (val !== null && val !== undefined) everyNoiseCache.set(key, val); });
+                    }
+                })(),
+                (async () => {
+                    const missingMem = primaryArtistEntries.filter(e => !lastfmArtistTagsCache.has(e.name));
+                    if (missingMem.length > 0) {
+                        const cached = await idb.getMany('lastfmArtistTags', missingMem.map(e => e.name), CACHE_EXPIRE_GENRES);
+                        cached.forEach((val, key) => { if (val !== null && val !== undefined) lastfmArtistTagsCache.set(key, val); });
+                    }
+                })()
+            ]);
+            const missingEnIds = allPlaylistArtistIds.filter(id => !everyNoiseCache.has(id));
+            const missingLfmIds = primaryArtistEntries.filter(e => !lastfmArtistTagsCache.has(e.name) && e.id).map(e => e.id);
+            if (missingEnIds.length > 0 && missingLfmIds.length > 0) {
+                preFetchedTursoMap = await getArtistGenresFromTurso([...new Set([...missingEnIds, ...missingLfmIds])], { includeEveryNoise: true, includeLastfm: true });
+            }
+        }
+
+        const tasks = [];
+        if (wantSpotify) {
+            tasks.push((async () => {
+                nativeGenresMap = await fetchNativeSpotifyTrackGenresBatch(spotifyTrackUris);
+                spotifyTrackFetched = true;
+                pSp = 100;
+                report();
+            })());
+        }
+        if (wantEn) {
+            tasks.push((async () => {
+                await fetchEveryNoiseArtistGenres(allPlaylistArtistIds, (p) => { pEn = p; report(); }, preFetchedTursoMap);
+                everyNoiseFetched = true;
+                pEn = 100;
+                report();
+            })());
+        }
+        if (wantLfm) {
+            tasks.push((async () => {
+                await fetchLastfmArtistGenres(primaryArtistEntries, (p) => { pLfm = p; report(); }, preFetchedTursoMap);
+                lastfmArtistFetched = true;
+                pLfm = 100;
+                report();
+            })());
+        }
+
+        await Promise.all(tasks);
+        onProgress?.(100);
+    };
+
     const genreMap = await getGenreMapping();
 
-    let pDates = 0, pStats = 0, pPlays = 0;
+    let pDates = 0, pStats = 0, pPlays = 0, pGenres = 0;
     const updateFetchProgress = () => {
-        const avg = Math.floor((pDates + pStats + pPlays) / 3);
+        const avg = Math.floor((pDates + pStats + pPlays + pGenres) / 4);
         updateProgress(`${avg}%`);
     };
     updateFetchProgress();
 
-    const [withDates, statsMap, nativeGenresMap, tracksWithPlays] = await Promise.all([
+    const [withDates, statsMap, , tracksWithPlays] = await Promise.all([
         processReleaseDatesConcurrently(tracks, (p) => { pDates = p; updateFetchProgress(); }, getTrackDetailsWithReleaseDate),
         getBatchTrackStats(trackIds, (p) => { pStats = p; updateFetchProgress(); }),
-        fetchNativeSpotifyTrackGenresBatch(spotifyTrackUris),
+        ensureAnalysisGenresFetched(analysisGenreConfig, { onProgress: (p) => { pGenres = p; updateFetchProgress(); } }),
         enrichTracksWithPlayCounts(tracks, (p) => { pPlays = p; updateFetchProgress(); })
     ]);
 
@@ -49757,9 +51700,10 @@ shadowRoot.innerHTML = `
       const timelinePoints = [];
       const decadeStats = {};
       const camelotCounts = {};
-      const genreCounts = {};
+      let genreCounts = {};
       const artistStatsMap = new Map();
       const albumStatsMap = new Map();
+      const analysisTrackGenreRecords = [];
 
       const featureKeys = ['energy', 'danceability', 'valence', 'acousticness', 'speechiness', 'instrumentalness', 'tempo', 'liveness'];
       const featureSums = Object.fromEntries(featureKeys.map(k => [k, 0]));
@@ -49770,27 +51714,73 @@ shadowRoot.innerHTML = `
       let contextTracks = { workout: [], party: [], focus: [], chill: [], drive: [], morning: [], gaming: [], rainy: [], pregame: [] };
       let totalContextTracks = 0;
 
-      nativeGenresMap.forEach((genres, uri) => {
-        if (genres && genres.length > 0) {
-          const validNative = genres.filter(g => {
-              const name = g.name.toLowerCase();
-              return !/^\d+$/.test(name) && !isCountryOnly(name) && isWhitelistedGenre(name, genreMap);
+      const computeAnalysisGenreData = () => {
+          genreCounts = {};
+          tracksWithGenres = 0;
+          Object.keys(decadeStats).forEach(d => { decadeStats[d].genres = {}; });
+
+          const useSpotify = !!analysisGenreConfig.spotify_track && spotifyTrackFetched;
+          const useEn = !!analysisGenreConfig.everynoise_artist && everyNoiseFetched && !skippedByLimit.everynoise_artist;
+          const useLfm = !!analysisGenreConfig.lastfm_artist && lastfmArtistFetched && !skippedByLimit.lastfm_artist;
+
+          analysisTrackGenreRecords.forEach(rec => {
+              const trackGenres = new Set();
+
+              if (useSpotify && rec.uri) {
+                  const ng = nativeGenresMap.get(rec.uri) || [];
+                  for (const g of ng) {
+                      const raw = (g?.name || '').toLowerCase().trim();
+                      if (!raw || /^\d+$/.test(raw) || isCountryOnly(raw) || isSpotifyTrackExcludedConcept(raw)) continue;
+                      if (!isWhitelistedGenre(raw, genreMap)) continue;
+                      const norm = normalizeGenre(raw);
+                      if (!norm || isCountryOnly(norm) || isPureMoodDescriptorForFilter(norm)) continue;
+                      trackGenres.add(norm);
+                  }
+              }
+
+              if (useEn && rec.artistIds.length > 0) {
+                  for (const aId of rec.artistIds) {
+                      const enTags = everyNoiseCache.get(aId);
+                      if (!Array.isArray(enTags) || enTags.length === 0) continue;
+                      for (const rawTag of enTags) {
+                          const raw = (typeof rawTag === 'string' ? rawTag : (rawTag?.name || '')).toLowerCase().trim();
+                          if (!raw || /^\d+$/.test(raw) || isCountryOnly(raw)) continue;
+                          const norm = normalizeGenre(raw);
+                          if (!norm || isCountryOnly(norm) || isPureMoodDescriptorForFilter(norm)) continue;
+                          trackGenres.add(norm);
+                      }
+                  }
+              }
+
+              if (useLfm && rec.primaryArtistName) {
+                  const lfmTags = lastfmArtistTagsCache.get(rec.primaryArtistName);
+                  if (Array.isArray(lfmTags) && lfmTags.length > 0) {
+                      for (const rawTag of lfmTags) {
+                          const raw = (typeof rawTag === 'string' ? rawTag : (rawTag?.name || '')).toLowerCase().trim();
+                          if (!raw || raw.length < 2 || /^\d+$/.test(raw) || containsYear(raw)) continue;
+                          if (rec.artistNamesLower.some(n => n.length >= 3 ? raw.includes(n) : raw === n)) continue;
+                          const salvaged = salvageAndValidateLastfmTag(raw, genreMap);
+                          for (const s of salvaged) {
+                              const norm = normalizeGenre(s);
+                              if (!norm || isCountryOnly(norm) || isPureMoodDescriptorForFilter(norm)) continue;
+                              trackGenres.add(norm);
+                          }
+                      }
+                  }
+              }
+
+              if (trackGenres.size > 0) {
+                  tracksWithGenres++;
+                  trackGenres.forEach(norm => {
+                      const label = formatGenreTitle(norm);
+                      genreCounts[label] = (genreCounts[label] || 0) + 1;
+                      if (rec.decade !== null && decadeStats[rec.decade]) {
+                          decadeStats[rec.decade].genres[label] = (decadeStats[rec.decade].genres[label] || 0) + 1;
+                      }
+                  });
+              }
           });
-
-          if (validNative.length > 0) {
-            tracksWithGenres++;
-            
-            const normalizedNames = validNative.map(g => normalizeGenre(g.name));
-            
-            const uniqueGenreNames = new Set(normalizedNames);
-
-            uniqueGenreNames.forEach(name => {
-              const titleCased = name.replace(/\b\w/g, l => l.toUpperCase());
-              genreCounts[titleCased] = (genreCounts[titleCased] || 0) + 1;
-            });
-          }
-        }
-      });
+      };
 
       withDates.forEach(track => {
         const tid = track.trackId || (track.uri ? track.uri.split(':')[2] : null);
@@ -49882,6 +51872,7 @@ shadowRoot.innerHTML = `
           }
         }
 
+        let trackDecade = null;
         if (track.releaseDate) {
           const d = new Date(track.releaseDate);
           if (!isNaN(d.getTime())) {
@@ -49892,25 +51883,17 @@ shadowRoot.innerHTML = `
               yearCount++;
 
               const decade = Math.floor(year / 10) * 10;
+              trackDecade = decade;
               if (!decadeStats[decade]) {
                   decadeStats[decade] = { count: 0, artists: {}, genres: {} };
               }
               decadeStats[decade].count++;
-              
               decadeStats[decade].artists[artistName] = (decadeStats[decade].artists[artistName] || 0) + 1;
-              
-              const ng = nativeGenresMap.get(track.uri) || [];
-              const validNative = ng.filter(g => {
-                  const name = g.name.toLowerCase();
-                  return !/^\d+$/.test(name) && !isCountryOnly(name) && isWhitelistedGenre(name, genreMap);
-              });
-              validNative.forEach(g => {
-                  const name = normalizeGenre(g.name).replace(/\b\w/g, l => l.toUpperCase());
-                  decadeStats[decade].genres[name] = (decadeStats[decade].genres[name] || 0) + 1;
-              });
             }
           }
         }
+
+        analysisTrackGenreRecords.push({ ...extractTrackGenreInfo(track), decade: trackDecade });
 
         if (stats && stats.key_raw !== -1 && stats.mode !== -1) {
           let camKey = stats.camelot;
@@ -49925,6 +51908,8 @@ shadowRoot.innerHTML = `
           }
         }
       });
+
+      computeAnalysisGenreData();
 
       const totalHours = Math.floor(totalDuration / 3600000);
       const totalMins = Math.floor((totalDuration % 3600000) / 60000);
@@ -50614,34 +52599,34 @@ shadowRoot.innerHTML = `
                 let spanText = yearSpan > 0 ? `Spans ${yearSpan} Years` : `Released ${oldestTrack.year}`;
 
                 highlightsHtml = `
-                    <div class="sp-chart-axis-anim" style="padding-top: clamp(10px, 1.5vh, 16px); border-top: 1px solid rgba(255,255,255,0.06); display: flex; gap: 12px; flex-shrink: 0; align-items: center;">
-                        <div style="flex: 1; background: rgba(255,255,255,0.02); border-radius: 8px; padding: clamp(6px, 1.5vh, 10px) 14px; display: flex; align-items: center; gap: 12px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);">
-                            <div style="width: 3px; height: 32px; background: ${dominantColorHex}; border-radius: 2px; opacity: 0.4;"></div>
-                            <div style="flex: 1; min-width: 0;">
-                                <div style="font-size: 10px; color: rgba(255,255,255,0.4); font-weight: 800; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px;">Earliest (${oldestTrack.year})</div>
+                    <div class="sp-chart-axis-anim" style="padding-top: clamp(10px, 1.5vh, 16px); border-top: 1px solid rgba(255,255,255,0.06); display: flex; gap: 12px; width: 100%; min-width: 0; flex-shrink: 0; align-items: center;">
+                        <div style="flex: 1 1 0; min-width: 0; overflow: hidden; background: rgba(255,255,255,0.02); border-radius: 8px; padding: clamp(6px, 1.5vh, 10px) 14px; display: flex; align-items: center; gap: 12px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);">
+                            <div style="width: 3px; height: 32px; background: ${dominantColorHex}; border-radius: 2px; opacity: 0.4; flex-shrink: 0;"></div>
+                            <div style="flex: 1; min-width: 0; overflow: hidden;">
+                                <div style="font-size: 10px; color: rgba(255,255,255,0.4); font-weight: 800; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Earliest (${oldestTrack.year})</div>
                                 <div style="font-size: 13px; font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${escapeHtml(oldestTrack.title)}">${escapeHtml(oldestTrack.title)}</div>
                                 <div style="font-size: 11px; color: rgba(255,255,255,0.5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${escapeHtml(oldestTrack.artist)}">${escapeHtml(oldestTrack.artist)}</div>
                             </div>
                         </div>
                         
-                        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 80px;">
-                            <div style="font-size: 10px; font-weight: 800; color: ${lighterDominantColorHex}; text-transform: uppercase; letter-spacing: 0.5px; text-align: center; background: rgba(255,255,255,0.05); padding: 4px 10px; border-radius: 12px;">${spanText}</div>
+                        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0;">
+                            <div style="font-size: 10px; font-weight: 800; color: ${lighterDominantColorHex}; text-transform: uppercase; letter-spacing: 0.5px; text-align: center; background: rgba(255,255,255,0.05); padding: 4px 10px; border-radius: 12px; white-space: nowrap;">${spanText}</div>
                         </div>
 
-                        <div style="flex: 1; background: rgba(255,255,255,0.02); border-radius: 8px; padding: clamp(6px, 1.5vh, 10px) 14px; display: flex; align-items: center; gap: 12px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);">
-                            <div style="flex: 1; min-width: 0; text-align: right;">
-                                <div style="font-size: 10px; color: rgba(255,255,255,0.4); font-weight: 800; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px;">Latest (${newestTrack.year})</div>
+                        <div style="flex: 1 1 0; min-width: 0; overflow: hidden; background: rgba(255,255,255,0.02); border-radius: 8px; padding: clamp(6px, 1.5vh, 10px) 14px; display: flex; align-items: center; gap: 12px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);">
+                            <div style="flex: 1; min-width: 0; overflow: hidden; text-align: right;">
+                                <div style="font-size: 10px; color: rgba(255,255,255,0.4); font-weight: 800; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Latest (${newestTrack.year})</div>
                                 <div style="font-size: 13px; font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${escapeHtml(newestTrack.title)}">${escapeHtml(newestTrack.title)}</div>
                                 <div style="font-size: 11px; color: rgba(255,255,255,0.5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${escapeHtml(newestTrack.artist)}">${escapeHtml(newestTrack.artist)}</div>
                             </div>
-                            <div style="width: 3px; height: 32px; background: ${dominantColorHex}; border-radius: 2px; opacity: 1;"></div>
+                            <div style="width: 3px; height: 32px; background: ${dominantColorHex}; border-radius: 2px; opacity: 1; flex-shrink: 0;"></div>
                         </div>
                     </div>
                 `;
             }
 
             erasHtml = `
-                <div style="display: flex; flex-direction: column; width: 100%; height: 100%; box-sizing: border-box; padding: 10px; gap: clamp(10px, 1.5vh, 20px);">
+                <div style="display: flex; flex-direction: column; width: 100%; height: 100%; min-width: 0; overflow: hidden; box-sizing: border-box; padding: 10px; gap: clamp(10px, 1.5vh, 20px);">
                     <div class="sp-chart-axis-anim" style="display: flex; gap: 4px; height: 28px; width: 100%; flex-shrink: 0;">
                         ${segmentsHtml}
                     </div>
@@ -50741,38 +52726,60 @@ shadowRoot.innerHTML = `
           </div>
       `;
       
-      const sortedGenres = Object.entries(genreCounts).sort((a, b) => b[1] - a[1]).slice(0, 300);
-      let genresHtml = '<div style="color:#888; text-align:center; padding-top:20px;">No genre data</div>';
-      if (sortedGenres.length > 0) {
-        genresHtml = `<div style="display:flex; flex-direction:column; gap:16px; padding: 10px 4px;">` + 
+      const buildGenresContentHtml = () => {
+        if (isFetchingAnalysisGenres) {
+          return `<div class="sp-genre-loading"><div class="sp-genre-spinner"></div><span id="sp-analysis-genre-loading-text">${escapeHtml(genreLoadingText, "")}</span></div>`;
+        }
+
+        const skippedNames = [];
+        if (analysisGenreConfig.everynoise_artist && skippedByLimit.everynoise_artist) skippedNames.push("Every Noise");
+        if (analysisGenreConfig.lastfm_artist && skippedByLimit.lastfm_artist) skippedNames.push("Last.fm");
+
+        const skipBannerHtml = skippedNames.length > 0
+          ? `<div class="sp-genre-skip-banner"><span>${escapeHtml(skippedNames.join(" & "), "")} skipped (${uniqueArtistCount} artists &gt; ${analysisGenreConfig.artist_limit} limit)</span><button id="sp-analysis-load-skipped-btn" type="button">Load anyway</button></div>`
+          : '';
+
+        const sortedGenres = Object.entries(genreCounts).sort((a, b) => b[1] - a[1]).slice(0, 300);
+        if (sortedGenres.length === 0) {
+          if (skipBannerHtml) {
+            return `${skipBannerHtml}<div style="color:rgba(255,255,255,0.45); font-size:12px; text-align:center; padding-top:16px;">Click Load anyway or enable Spotify (Track Genres) in settings.</div>`;
+          }
+          return '<div style="color:#888; text-align:center; padding-top:20px;">No genre data</div>';
+        }
+
+        const trackRatio = Math.max(1, tracksWithGenres);
+        return skipBannerHtml + `<div class="sp-genre-list">` +
           sortedGenres.map(([name, count]) => {
-            const trackRatio = Math.max(1, tracksWithGenres);
             const pct = Math.round((count / trackRatio) * 100);
-            
             let displayString = `${pct}%`;
             let barWidth = pct;
             let textColor = '#fff';
 
             if (pct === 0 && count > 0) {
                 displayString = '<1%';
-                barWidth = 1; 
+                barWidth = 1;
                 textColor = 'rgba(255,255,255,0.5)';
             } else if (pct > 100) {
                 displayString = '100%';
                 barWidth = 100;
             }
 
+            const safeName = escapeHtml(name, "");
             return `
-              <div style="display:flex; align-items:center; gap:12px;">
-                <div style="width: 120px; font-size: 13px; color: #e0e0e0; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${name}">${name}</div>
-                <div style="flex: 1; height: 6px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden;">
+              <div class="sp-genre-row">
+                <div class="sp-genre-name-slot">
+                  <span class="sp-genre-name-base">${safeName}</span>
+                  <span class="sp-genre-name-full" aria-hidden="true">${safeName}</span>
+                </div>
+                <div class="sp-genre-bar-track">
                   <div class="sp-bar-fill" style="width: ${barWidth}%; height: 100%; background: ${dominantColorHex}; border-radius: 3px;"></div>
                 </div>
-                <div style="width: 40px; font-size: 14px; color: ${textColor}; font-weight: 700; text-align: right;">${displayString}</div>
+                <div class="sp-genre-pct" style="color: ${textColor};">${displayString}</div>
               </div>
             `;
           }).join('') + `</div>`;
-      }
+      };
+      const genresHtml = buildGenresContentHtml();
 
       const CAMELOT_TO_KEY = {
           "1B": "B", "2B": "F♯/G♭", "3B": "C♯/D♭", "4B": "G♯/A♭",
@@ -51141,8 +53148,13 @@ shadowRoot.innerHTML = `
 
       const boxGenres = `
         <div class="sp-bento-box">
-          <div class="sp-bento-box-title"><span>Top Genres</span></div>
-          <div class="scrollable-content">
+          <div class="sp-bento-box-title">
+            <span>Top Genres</span>
+            <div class="sp-chart-toggle">
+              <button id="sp-analysis-genre-settings-btn" title="Genre Sources">${settingsSvg.replace('<svg', '<svg fill="currentColor"')}</button>
+            </div>
+          </div>
+          <div id="sp-analysis-genres-content" class="scrollable-content">
             ${genresHtml}
           </div>
         </div>
@@ -51380,6 +53392,21 @@ shadowRoot.innerHTML = `
           .sp-chart-toggle button.active { background: rgba(${cR}, ${cG}, ${cB}, 0.75); color: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.4); border-color: rgba(255,255,255,0.1); }
           .sp-chart-toggle button:hover:not(.active) { color: rgba(255,255,255,0.8); background: rgba(${cR}, ${cG}, ${cB}, 0.2); }
           .sp-chart-toggle svg { width: 14px; height: 14px; }
+          @keyframes spGenreSpin { to { transform: rotate(360deg); } }
+          .sp-genre-loading { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; height: 100%; min-height: 160px; color: rgba(255,255,255,0.65); font-size: 13px; font-weight: 600; }
+          .sp-genre-spinner { width: 24px; height: 24px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.12); border-top-color: ${dominantColorHex}; animation: spGenreSpin 0.8s linear infinite; }
+          .sp-genre-skip-banner { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 12px; margin-bottom: 12px; border-radius: 10px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); font-size: 11px; color: rgba(255,255,255,0.65); line-height: 1.3; }
+          .sp-genre-skip-banner button { flex-shrink: 0; background: rgba(${cR}, ${cG}, ${cB}, 0.25); border: 1px solid rgba(${cR}, ${cG}, ${cB}, 0.45); color: #fff; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 8px; cursor: pointer; transition: background 0.2s, border-color 0.2s; }
+          .sp-genre-skip-banner button:hover { background: rgba(${cR}, ${cG}, ${cB}, 0.5); border-color: rgba(255,255,255,0.35); }
+          #sp-analysis-genres-content { overflow-x: hidden; }
+          .sp-genre-list { display: flex; flex-direction: column; gap: 16px; padding: 10px 4px 10px 8px; }
+          .sp-genre-row { position: relative; display: flex; align-items: center; gap: 12px; }
+          .sp-genre-name-slot { width: 120px; flex-shrink: 0; min-width: 0; cursor: default; }
+          .sp-genre-name-base { display: block; width: 100%; font-size: 13px; line-height: 18px; color: #e0e0e0; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+          .sp-genre-name-full { position: absolute; left: -6px; top: 50%; transform: translateY(-50%); width: max-content; max-width: calc(100% - 44px); padding: 3px 10px 3px 5px; font-size: 13px; line-height: 18px; color: #fff; text-align: left; white-space: normal; overflow-wrap: break-word; background: rgba(${bgR}, ${bgG}, ${bgB}, 0.96); border: 1px solid rgba(${cR}, ${cG}, ${cB}, 0.4); border-radius: 6px; box-shadow: 0 4px 14px rgba(0,0,0,0.45); opacity: 0; visibility: hidden; pointer-events: none; clip-path: inset(-12px max(0px, calc(100% - 126px)) -12px -12px); transition: opacity 0.14s ease, clip-path 0.18s cubic-bezier(0.22, 1, 0.36, 1), visibility 0s linear 0.18s; }
+          .sp-genre-row.sp-genre-expanded .sp-genre-name-full { opacity: 1; visibility: visible; pointer-events: auto; z-index: 20; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); clip-path: inset(-12px -16px -16px -12px); transition: opacity 0.14s ease, clip-path 0.2s cubic-bezier(0.22, 1, 0.36, 1), visibility 0s linear 0s; }
+          .sp-genre-bar-track { flex: 1; height: 6px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden; }
+          .sp-genre-pct { width: 40px; flex-shrink: 0; font-size: 14px; font-weight: 700; text-align: right; }
           .scrollable-content { flex: 1; min-height: 0; overflow-y: auto; padding-right: 8px; scrollbar-width: thin; scrollbar-color: rgba(${cR}, ${cG}, ${cB}, 0.4) transparent; }
           .scrollable-content::-webkit-scrollbar { width: 6px; }
           .scrollable-content::-webkit-scrollbar-thumb { background-color: rgba(${cR}, ${cG}, ${cB}, 0.4); border-radius: 3px; transition: background-color 0.2s ease; }
@@ -51704,7 +53731,7 @@ shadowRoot.innerHTML = `
 
       const onKeyDown = (e) => {
         if (e.key === 'Escape') {
-          if (document.querySelector('#sort-play-confirmation-overlay, [id*="vibe-filter"]')) return;
+          if (document.querySelector('#sort-play-confirmation-overlay, #sort-play-simple-input-overlay, [id*="vibe-filter"]')) return;
           e.preventDefault();
           e.stopPropagation();
           closeModal();
@@ -51735,7 +53762,7 @@ shadowRoot.innerHTML = `
       window.addEventListener('resize', updatePosition);
       document.addEventListener('keydown', onKeyDown);
 
-      const extraCleanups = [];
+      const extraCleanups = [() => { isAnalysisModalClosed = true; }];
       removeListeners = () => {
         window.removeEventListener('resize', updatePosition);
         document.removeEventListener('keydown', onKeyDown);
@@ -51744,6 +53771,117 @@ shadowRoot.innerHTML = `
       };
 
       requestAnimationFrame(updatePosition);
+
+      const genresContentEl = modalContainer.querySelector('#sp-analysis-genres-content');
+      const genreSettingsBtn = modalContainer.querySelector('#sp-analysis-genre-settings-btn');
+      let activeExpandedGenreRow = null;
+      const clearExpandedGenreRow = () => {
+          if (activeExpandedGenreRow) {
+              activeExpandedGenreRow.classList.remove('sp-genre-expanded');
+              activeExpandedGenreRow = null;
+          }
+      };
+      if (genresContentEl) {
+          genresContentEl.addEventListener('pointerover', (e) => {
+              const slot = e.target?.closest?.('.sp-genre-name-slot');
+              const row = slot?.closest?.('.sp-genre-row') || null;
+              if (!row) {
+                  clearExpandedGenreRow();
+                  return;
+              }
+              if (row === activeExpandedGenreRow) return;
+              clearExpandedGenreRow();
+              const base = slot.querySelector('.sp-genre-name-base');
+              if (base && base.scrollWidth > base.clientWidth + 1) {
+                  row.classList.add('sp-genre-expanded');
+                  activeExpandedGenreRow = row;
+              }
+          });
+          genresContentEl.addEventListener('pointerleave', clearExpandedGenreRow);
+          genresContentEl.addEventListener('scroll', clearExpandedGenreRow, { passive: true });
+      }
+
+      const syncEraGenreAttributes = () => {
+          modalContainer.querySelectorAll('.sp-era-element').forEach(el => {
+              const stat = decadeStats[Number(el.getAttribute('data-era-decade'))];
+              if (!stat) return;
+              const topGenres = Object.entries(stat.genres).sort((a, b) => b[1] - a[1]).slice(0, 3).map(g => g[0]).join(', ') || 'Mixed';
+              el.setAttribute('data-era-genres', topGenres);
+          });
+      };
+
+      const bindLoadSkippedBtn = () => {
+          const loadSkippedBtn = modalContainer.querySelector('#sp-analysis-load-skipped-btn');
+          if (loadSkippedBtn) {
+              loadSkippedBtn.addEventListener('click', (e) => {
+                  e.stopPropagation();
+                  triggerAnalysisGenreRefresh(analysisGenreConfig, { forceIgnoreLimit: true });
+              });
+          }
+      };
+
+      const renderAnalysisGenresUI = () => {
+          if (isAnalysisModalClosed || !genresContentEl) return;
+          clearExpandedGenreRow();
+          genresContentEl.innerHTML = buildGenresContentHtml();
+          if (genreSettingsBtn) {
+              genreSettingsBtn.disabled = isFetchingAnalysisGenres;
+              genreSettingsBtn.style.opacity = isFetchingAnalysisGenres ? '0.35' : '';
+              genreSettingsBtn.style.pointerEvents = isFetchingAnalysisGenres ? 'none' : '';
+          }
+          if (!isFetchingAnalysisGenres) {
+              syncEraGenreAttributes();
+              bindLoadSkippedBtn();
+          }
+      };
+
+      const triggerAnalysisGenreRefresh = async (nextConfig, { forceIgnoreLimit = false } = {}) => {
+          if (isFetchingAnalysisGenres || isAnalysisModalClosed) return;
+          analysisGenreConfig = nextConfig;
+          const needsSpotify = !!analysisGenreConfig.spotify_track && !spotifyTrackFetched && spotifyTrackUris.length > 0;
+          const needsEn = !!analysisGenreConfig.everynoise_artist && !everyNoiseFetched && allPlaylistArtistIds.length > 0;
+          const needsLfm = !!analysisGenreConfig.lastfm_artist && !lastfmArtistFetched && primaryArtistEntries.length > 0;
+          const needsFetch = needsSpotify || needsEn || needsLfm;
+
+          if (!needsFetch) {
+              skippedByLimit = { everynoise_artist: false, lastfm_artist: false };
+              computeAnalysisGenreData();
+              renderAnalysisGenresUI();
+              return;
+          }
+
+          isFetchingAnalysisGenres = true;
+          genreLoadingText = "Loading genre sources...";
+          renderAnalysisGenresUI();
+          try {
+              await ensureAnalysisGenresFetched(analysisGenreConfig, {
+                  forceIgnoreLimit,
+                  onProgress: (p) => {
+                      if (isAnalysisModalClosed) return;
+                      const lbl = modalContainer.querySelector('#sp-analysis-genre-loading-text');
+                      if (lbl) lbl.textContent = `Loading genre sources... ${p}%`;
+                  }
+              });
+          } finally {
+              isFetchingAnalysisGenres = false;
+              if (!isAnalysisModalClosed) {
+                  computeAnalysisGenreData();
+                  renderAnalysisGenresUI();
+              }
+          }
+      };
+
+      bindLoadSkippedBtn();
+      if (genreSettingsBtn) {
+          genreSettingsBtn.addEventListener('click', (e) => {
+              e.stopPropagation();
+              if (isFetchingAnalysisGenres) return;
+              showAnalysisGenreSettingsModal(analysisGenreConfig, (newConfig) => {
+                  saveAnalysisGenreConfig(newConfig);
+                  triggerAnalysisGenreRefresh(newConfig);
+              });
+          });
+      }
 
       const openVibeFilterBtn = modalContainer.querySelector('#sp-analysis-open-vibe-filter');
       if (openVibeFilterBtn) {
@@ -56863,6 +59001,10 @@ shadowRoot.innerHTML = `
              daysDesc = `the last ${days} days`;
         }
     
+        const releaseDateMode = followedReleasesConfig.releaseDateMode || 'standard';
+        const useTrueReleaseDate = releaseDateMode === 'trueFilterSort' || releaseDateMode === 'trueSortOnly';
+        const filterByTrueDate = releaseDateMode === 'trueFilterSort';
+
         const getAlbumReleaseDate = (dateObj) => {
             if (!dateObj) return null;
             if (typeof dateObj === 'string') return dateObj;
@@ -56871,6 +59013,15 @@ shadowRoot.innerHTML = `
                 return `${dateObj.year}-${String(dateObj.month || 1).padStart(2, '0')}-${String(dateObj.day || 1).padStart(2, '0')}`;
             }
             return null;
+        };
+
+        const getAlbumDatePrecision = (dateObj, formattedDate) => {
+            if (dateObj && typeof dateObj === 'object') {
+                if (dateObj.precision) return String(dateObj.precision).toLowerCase();
+                if (dateObj.isoString) return inferDatePrecision(dateObj.isoString);
+                if (dateObj.year) return dateObj.day ? 'day' : (dateObj.month ? 'month' : 'year');
+            }
+            return inferDatePrecision(formattedDate);
         };
 
         const newReleasesMap = new Map();
@@ -56936,7 +59087,6 @@ shadowRoot.innerHTML = `
         }
 
         updateProgress(`Get tracks...`);
-        let initialTrackPool = [];
         const verifiedNewTracks = [];
 
         const CONCURRENCY = 5;
@@ -56950,6 +59100,7 @@ shadowRoot.innerHTML = `
                     let tracks = await getAlbumTracks(albumId, getAlbumReleaseDate(albumMeta.date), false, albumMeta.name);
                     
                     if (!tracks || !Array.isArray(tracks)) tracks = [];
+                    const albumTotalTracks = tracks.length;
 
                     tracks = tracks.filter(t => {
                         const trackArtistIds = (t.artistUris || []).map(uri => uri.split(':')[2]).filter(Boolean);
@@ -56994,14 +59145,15 @@ shadowRoot.innerHTML = `
                         return true;
                     });
 
-                    if (followedReleasesAlbumLimit !== 'all') {
+                    if (!useTrueReleaseDate && followedReleasesAlbumLimit !== 'all') {
                         const limit = parseInt(followedReleasesAlbumLimit, 10);
                         if (!isNaN(limit)) tracks = tracks.slice(0, limit);
                     }
                     
                     return tracks.map(t => ({
                         track: t,
-                        albumMeta: albumMeta 
+                        albumMeta: albumMeta,
+                        albumTotalTracks
                     }));
                 } catch (e) { return []; }
             }));
@@ -57009,20 +59161,45 @@ shadowRoot.innerHTML = `
             results.flat().forEach(item => {
                 const t = item.track;
                 const meta = item.albumMeta;
+                const albumId = meta.uri.split(':')[2];
+                const trackId = t.uri.split(':')[2];
+                const albumReleaseDate = getAlbumReleaseDate(meta.date) || t.releaseDate;
+                const albumReleasePrecision = getAlbumDatePrecision(meta.date, albumReleaseDate);
+                const artists = t.track?.artists || (t.artistUris || []).map((u, idx) => ({ id: u.split(':')[2], name: (t.allArtists || "").split(', ')[idx] || 'Unknown' }));
+                const albumName = t.albumName || meta.name || '';
+                const albumType = meta.type || 'album';
+                const trackNumber = t.trackNumber || (t.track?.track_number) || 0;
+                const discNumber = t.discNumber || (t.track?.disc_number) || 1;
                 
                 const adapted = {
                     uri: t.uri,
-                    id: t.uri.split(':')[2],
+                    id: trackId,
+                    trackId,
                     name: t.name,
+                    songTitle: t.name,
                     duration_ms: t.durationMilis,
-                    track_number: t.trackNumber || (t.track?.track_number) || 0,
-                    disc_number: t.discNumber || (t.track?.disc_number) || 1,
-                    artists: t.track?.artists || (t.artistUris || []).map((u, idx) => ({ id: u.split(':')[2], name: (t.allArtists || "").split(', ')[idx] || 'Unknown' })),
+                    durationMs: t.durationMilis,
+                    durationMilis: t.durationMilis,
+                    track_number: trackNumber,
+                    trackNumber,
+                    disc_number: discNumber,
+                    discNumber,
+                    artists,
+                    allArtists: t.allArtists || artists.map(a => a.name).join(', '),
+                    playCount: t.playCount,
+                    _playCountChecked: !!t._playCountFromGql,
+                    albumId,
+                    albumName,
+                    albumType,
+                    releaseDate: albumReleaseDate,
+                    releaseDatePrecision: albumReleasePrecision,
                     album: {
-                        name: t.albumName,
-                        release_date: getAlbumReleaseDate(meta.date) || t.releaseDate,
-                        album_type: meta.type || 'album',
-                        total_tracks: 0 
+                        id: albumId,
+                        name: albumName,
+                        release_date: albumReleaseDate,
+                        release_date_precision: albumReleasePrecision,
+                        album_type: albumType,
+                        total_tracks: item.albumTotalTracks || 0
                     }
                 };
                 verifiedNewTracks.push(adapted);
@@ -57070,6 +59247,17 @@ shadowRoot.innerHTML = `
                 continue;
             }
 
+            let earliestDate = null;
+            let earliestPrec = null;
+            for (const gTrack of group) {
+                const gDate = gTrack.album?.release_date || gTrack.releaseDate;
+                const gPrec = gTrack.album?.release_date_precision || gTrack.releaseDatePrecision || inferDatePrecision(gDate);
+                if (gDate && isStrictlyEarlierDate(gDate, gPrec, earliestDate, earliestPrec)) {
+                    earliestDate = gDate;
+                    earliestPrec = gPrec;
+                }
+            }
+
             group.sort((a, b) => {
                 const scoreA = getTypeScore(a.album.album_type);
                 const scoreB = getTypeScore(b.album.album_type);
@@ -57088,24 +59276,95 @@ shadowRoot.innerHTML = `
                 return tracksB - tracksA;
             });
 
+            if (earliestDate) {
+                group[0]._earliestGroupDate = earliestDate;
+                group[0]._earliestGroupPrecision = earliestPrec;
+            }
             finalDeduplicatedTracks.push(group[0]);
         }
 
         let genuinelyNewTracks = finalDeduplicatedTracks;
         console.log(`Followed Releases: Verified ${verifiedNewTracks.length} tracks, deduplicated to ${genuinelyNewTracks.length} tracks.`);
 
+        if (useTrueReleaseDate && genuinelyNewTracks.length > 0) {
+            updateProgress("True Date 0%");
+            genuinelyNewTracks = await processTrueReleaseDatesConcurrently(genuinelyNewTracks, (progress) => {
+                updateProgress(`True Date ${progress}%`);
+            });
+
+            genuinelyNewTracks = genuinelyNewTracks.map(track => {
+                let effDate = track.trueReleaseDate || track.album?.release_date || track.releaseDate || null;
+                let effPrec = track.trueReleaseDatePrecision || track.releaseDatePrecision || inferDatePrecision(effDate);
+                if (track._earliestGroupDate && isStrictlyEarlierDate(track._earliestGroupDate, track._earliestGroupPrecision, effDate, effPrec)) {
+                    effDate = track._earliestGroupDate;
+                    effPrec = track._earliestGroupPrecision;
+                }
+                return { ...track, _effectiveReleaseDate: effDate, _effectiveReleasePrecision: effPrec };
+            });
+
+            if (filterByTrueDate) {
+                const dateLimitMs = dateLimit.getTime();
+                genuinelyNewTracks = genuinelyNewTracks.filter(track => {
+                    const dTime = track._effectiveReleaseDate ? new Date(track._effectiveReleaseDate).getTime() : NaN;
+                    if (isNaN(dTime)) return true;
+                    return dTime >= dateLimitMs;
+                });
+            }
+
+            if (followedReleasesAlbumLimit !== 'all') {
+                const limit = parseInt(followedReleasesAlbumLimit, 10);
+                if (!isNaN(limit) && limit > 0) {
+                    const byAlbum = new Map();
+                    for (const track of genuinelyNewTracks) {
+                        const albumKey = track.albumId || track.album?.id || `${track.artists?.[0]?.id || ''}|${track.album?.name || ''}`;
+                        if (!byAlbum.has(albumKey)) byAlbum.set(albumKey, []);
+                        byAlbum.get(albumKey).push(track);
+                    }
+                    const capped = [];
+                    for (const albumTracks of byAlbum.values()) {
+                        albumTracks.sort((a, b) => {
+                            const rawA = a._effectiveReleaseDate ? new Date(a._effectiveReleaseDate).getTime() : NaN;
+                            const rawB = b._effectiveReleaseDate ? new Date(b._effectiveReleaseDate).getTime() : NaN;
+                            const timeA = isNaN(rawA) ? -Infinity : rawA;
+                            const timeB = isNaN(rawB) ? -Infinity : rawB;
+                            if (timeB !== timeA) return timeB - timeA;
+                            const discA = a.disc_number || 1;
+                            const discB = b.disc_number || 1;
+                            if (discA !== discB) return discA - discB;
+                            return (a.track_number || 0) - (b.track_number || 0);
+                        });
+                        capped.push(...albumTracks.slice(0, limit));
+                    }
+                    genuinelyNewTracks = capped;
+                }
+            }
+        } else {
+            genuinelyNewTracks.forEach(track => {
+                track._effectiveReleaseDate = track.album?.release_date || track.releaseDate || null;
+            });
+        }
+
         if (genuinelyNewTracks.length === 0) {
             let errorMsg = "No genuinely new tracks found after verification and deduplication.";
             const hasVersionFilters = Object.values(followedReleasesConfig.versions).some(val => val !== 'all');
-            if (hasFrKeywords || hasVersionFilters) errorMsg += " (Your keyword/version filters might have excluded them).";
+            const filterReasons = [];
+            if (hasFrKeywords || hasVersionFilters) filterReasons.push("keyword/version filters");
+            if (filterByTrueDate) filterReasons.push("True Release Date filter");
+            if (filterReasons.length > 0) errorMsg += ` (Your ${filterReasons.join(' and ')} might have excluded them).`;
             throw new Error(errorMsg);
         }
         
         updateProgress("Sorting...");
         genuinelyNewTracks.sort((a, b) => {
-            const dateA = new Date(a.album.release_date).getTime();
-            const dateB = new Date(b.album.release_date).getTime();
-            if (dateB !== dateA) {
+            const rawA = a._effectiveReleaseDate || a.album.release_date;
+            const rawB = b._effectiveReleaseDate || b.album.release_date;
+            const dateA = rawA ? new Date(rawA).getTime() : NaN;
+            const dateB = rawB ? new Date(rawB).getTime() : NaN;
+            const validA = !isNaN(dateA);
+            const validB = !isNaN(dateB);
+            if (!validA && validB) return 1;
+            if (validA && !validB) return -1;
+            if (validA && validB && dateB !== dateA) {
                 return dateB - dateA;
             }
 
@@ -57134,7 +59393,10 @@ shadowRoot.innerHTML = `
 
         const trackUris = genuinelyNewTracks.map(track => track.uri);
         const playlistName = "New Releases: Followed";
-        let playlistDescription = `All new releases from artists you follow from ${daysDesc} (since ${dateLimit.toLocaleDateString(undefined, { timeZone: 'UTC' })}), sorted by release date.`;
+        const dateModeDesc = releaseDateMode === 'trueFilterSort'
+            ? 'filtered & sorted by true release date'
+            : (releaseDateMode === 'trueSortOnly' ? 'sorted by true release date' : 'sorted by release date');
+        let playlistDescription = `All new releases from artists you follow from ${daysDesc} (since ${dateLimit.toLocaleDateString(undefined, { timeZone: 'UTC' })}), ${dateModeDesc}.`;
         const hasVersionFilters = Object.values(followedReleasesConfig.versions).some(val => val !== 'all');
         if (hasFrKeywords && hasVersionFilters) {
             playlistDescription += ` (Filtered by keywords & versions).`;
@@ -57161,7 +59423,7 @@ shadowRoot.innerHTML = `
 
     } catch (error) {
         console.error("Error generating Chronological Followed Releases:", error);
-        const isNotFound = error.message.includes("No new releases found") || error.message.includes("not following any artists");
+        const isNotFound = error.message.includes("No new releases found") || error.message.includes("No genuinely new tracks found") || error.message.includes("not following any artists");
         showNotification(error.message, isNotFound ? 'warning' : true);
     } finally {
         if (!isHeadless) {
@@ -59790,15 +62052,12 @@ shadowRoot.innerHTML = `
             uniqueTracks = deduplicationResult.unique;
             removedTracks = deduplicationResult.removed;
     
-            const tracksWithData = uniqueTracks.filter(track => track[sortType] !== null && track[sortType] !== undefined);
-            const tracksWithoutData = uniqueTracks.filter(track => track[sortType] === null || track[sortType] === undefined);
+            const isValidFeat = (track) => typeof track[sortType] === 'number' && Number.isFinite(track[sortType]) && (sortType !== 'tempo' || track[sortType] > 0);
+            const tracksWithData = uniqueTracks.filter(isValidFeat);
+            const tracksWithoutData = uniqueTracks.filter(t => !isValidFeat(t));
             missingDataCount = tracksWithoutData.length;
 
-            const sortedTracksWithData = tracksWithData.sort((a, b) => {
-                const valA = a[sortType] || 0;
-                const valB = b[sortType] || 0;
-                return isAscending ? valA - valB : valB - valA;
-            });
+            const sortedTracksWithData = tracksWithData.sort((a, b) => isAscending ? a[sortType] - b[sortType] : b[sortType] - a[sortType]);
 
             sortedTracks = [...sortedTracksWithData, ...tracksWithoutData];
 
@@ -59870,36 +62129,22 @@ shadowRoot.innerHTML = `
 
                     let tracksToSort = uniqueTracks.map((track, index) => ({ ...track, originalIndex: track._origIndex ?? index }));
 
+                    const validNonNeg = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0) ? v : null;
                     sortedTracks = tracksToSort.sort((a, b) => {
-                        const getVal = (t) => (typeof t.personalScrobbles === 'number') ? t.personalScrobbles : -1;
-                        const valA = getVal(a);
-                        const valB = getVal(b);
-
-                        if (valA !== valB) {
-                            return isAscending ? valA - valB : valB - valA;
-                        }
-
-                        const globA = (typeof a.scrobbles === 'number') ? a.scrobbles : -1;
-                        const globB = (typeof b.scrobbles === 'number') ? b.scrobbles : -1;
-                        if (globA !== globB) {
-                            return isAscending ? globA - globB : globB - globA;
-                        }
-
+                        const cmp = compareNullableNumeric(validNonNeg(a.personalScrobbles), validNonNeg(b.personalScrobbles), isAscending);
+                        if (cmp !== 0) return cmp;
+                        const globCmp = compareNullableNumeric(validNonNeg(a.scrobbles), validNonNeg(b.scrobbles), isAscending);
+                        if (globCmp !== 0) return globCmp;
                         return a.originalIndex - b.originalIndex;
                     });
                 } else { 
                     const tracksToSort = uniqueTracks.map((track, index) => ({ ...track, originalIndex: track._origIndex ?? index }));
+                    const validNonNeg = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0) ? v : null;
 
                     sortedTracks = tracksToSort.sort((a, b) => {
-                        const getVal = (t) => (typeof t.scrobbles === 'number') ? t.scrobbles : -1;
-                        const valA = getVal(a);
-                        const valB = getVal(b);
-
-                        if (valA === valB) {
-                             return a.originalIndex - b.originalIndex;
-                        }
-
-                        return isAscending ? valA - valB : valB - valA;
+                        const cmp = compareNullableNumeric(validNonNeg(a.scrobbles), validNonNeg(b.scrobbles), isAscending);
+                        if (cmp !== 0) return cmp;
+                        return a.originalIndex - b.originalIndex;
                     });
                 }
                 updateProgressText("100%");
@@ -60105,6 +62350,8 @@ shadowRoot.innerHTML = `
                             .map(t => ({ uri: t.uri, uid: t.uid }));
                         
                         const playlistUri = `spotify:playlist:${playlistIdToModify}`;
+                        clearPlaylistViewSort(playlistUri, false);
+                        playlistRawItemsCache.delete(playlistUri);
                         if (toRemove.length > 0) {
                             updateProgressText(`Removing...`);
                             await removeTracksFromPlaylist(playlistUri, toRemove);
@@ -60250,6 +62497,7 @@ shadowRoot.innerHTML = `
                         }
                         
                         updateProgressText(`Syncing...`);
+                        playlistRawItemsCache.delete(playlistUri);
                         try {
                             if (typeof Spicetify.Platform.PlaylistAPI.resync === 'function') {
                                 await Spicetify.Platform.PlaylistAPI.resync(playlistUri);
@@ -61386,11 +63634,10 @@ shadowRoot.innerHTML = `
   function applyStandardSort(uniqueTracks, sortType, isAscending) {
     const isAsc = isAscending !== undefined ? isAscending : !!sortOrderState[sortType];
     if (sortType === "playCount") {
-        const getVal = (t) => (t.playCount === "N/A" || t.playCount == null) ? -1 : Number(t.playCount);
-        return [...uniqueTracks].sort((a, b) => isAsc ? getVal(a) - getVal(b) : getVal(b) - getVal(a));
+        return [...uniqueTracks].sort((a, b) => compareNullableNumeric(getPlayCountSortValue(a), getPlayCountSortValue(b), isAsc));
     } else if (sortType === "popularity") {
-        const getVal = (t) => (t.popularity == null) ? -1 : Number(t.popularity);
-        return [...uniqueTracks].sort((a, b) => isAsc ? getVal(a) - getVal(b) : getVal(b) - getVal(a));
+        const getPop = (t) => (typeof t.popularity === 'number' && Number.isFinite(t.popularity)) ? t.popularity : null;
+        return [...uniqueTracks].sort((a, b) => compareNullableNumeric(getPop(a), getPop(b), isAsc));
     } else if (sortType === "artistMonthlyListeners") {
         return sortTracksByArtistMonthlyListeners(uniqueTracks, isAsc);
     } else if (sortType === "releaseDate" || sortType === "trueReleaseDate") {
@@ -62852,7 +65099,7 @@ shadowRoot.innerHTML = `
     return { unique: cleanedUniqueTracks, removed: finalRemovedTracks };
   }
 
-  async function handleScrobblesSorting(tracks, sortType, updateProgress) {
+  async function handleScrobblesSorting(tracks, sortType, updateProgress, isCancelled = () => false) {
     if (!tracks || tracks.length === 0) return [];
     if (sortType !== 'scrobbles' && sortType !== 'personalScrobbles') {
       throw new Error('Invalid sort type for scrobbles sorting');
@@ -62877,10 +65124,18 @@ shadowRoot.innerHTML = `
     const storeName = isPersonal ? 'personalScrobbles' : 'scrobbles';
     const expiryTime = isPersonal ? CACHE_EXPIRE_PERSONAL_SCROBBLES : CACHE_EXPIRE_GLOBAL_SCROBBLES;
     
-    const [cachedMap, highWaterGlobalMap] = await Promise.all([
-        idb.getMany(storeName, allLfmKeys, expiryTime),
-        idb.getMany('scrobbles', allLfmKeys)
-    ]);
+    let cachedMap;
+    let highWaterGlobalMap;
+    if (isPersonal) {
+        [cachedMap, highWaterGlobalMap] = await Promise.all([
+            idb.getMany(storeName, allLfmKeys, expiryTime),
+            idb.getMany('scrobbles', allLfmKeys)
+        ]);
+    } else {
+        cachedMap = await idb.getMany(storeName, allLfmKeys, expiryTime);
+        highWaterGlobalMap = new Map();
+    }
+    if (isCancelled()) return [];
 
     const results = [];
     const missingTracks = [];
@@ -62921,9 +65176,17 @@ shadowRoot.innerHTML = `
     });
 
     if (missingTracks.length > 0) {
+        if (!isPersonal) {
+            const missingLfmKeys = [...new Set(missingTracks.map(t => t._lfmKey).filter(Boolean))];
+            if (missingLfmKeys.length > 0) {
+                highWaterGlobalMap = await idb.getMany('scrobbles', missingLfmKeys);
+                if (isCancelled()) return results;
+            }
+        }
         const fetchFunction = isPersonal ? getTrackDetailsWithPersonalScrobbles : getTrackDetailsWithScrobbles;
         
         if (L_F_M_Key_Pool.length === 0) await fetchLastFmKeys();
+        if (isCancelled()) return results;
         const safeConcurrencyPerKey = 3;
         const validKeys = Math.max(1, L_F_M_Key_Pool.length - revokedLfmKeys.size);
         const totalConcurrency = Math.min(100, Math.max(5, validKeys * safeConcurrencyPerKey));
@@ -62934,7 +65197,7 @@ shadowRoot.innerHTML = `
         const batchKeyPromises = new Map();
 
         const worker = async () => {
-            while (currentIndex < missingTracks.length) {
+            while (currentIndex < missingTracks.length && !isCancelled()) {
                 const track = missingTracks[currentIndex++];
                 if (!track) continue;
 
@@ -63085,7 +65348,7 @@ shadowRoot.innerHTML = `
     return { sortedTracks, removedTracks };
   }
 
-  async function fetchRecentScrobblesMap(updateProgress) {
+  async function fetchRecentScrobblesMap(updateProgress, isCancelled = () => false) {
     const username = loadLastFmUsername();
     if (!username) {
       throw new Error('Last.fm username is not set.');
@@ -63140,8 +65403,10 @@ shadowRoot.innerHTML = `
       }
     };
 
+    if (isCancelled()) return scrobblesMap;
     const firstPageData = await fetchPage(1);
     extractPageTracks(firstPageData);
+    if (isCancelled()) return scrobblesMap;
 
     const rawTotalPages = parseInt(firstPageData?.recenttracks?.['@attr']?.totalPages, 10) || 1;
     const totalPages = Math.min(maxPages, rawTotalPages);
@@ -63161,7 +65426,7 @@ shadowRoot.innerHTML = `
     let pageIdx = 0;
 
     const workers = Array.from({ length: concurrency }, async () => {
-      while (pageIdx < remainingPageNumbers.length) {
+      while (pageIdx < remainingPageNumbers.length && !isCancelled()) {
         const pageNum = remainingPageNumbers[pageIdx++];
         try {
           const data = await fetchPage(pageNum);
@@ -63656,11 +65921,12 @@ shadowRoot.innerHTML = `
     }
   }
 
-  async function getBatchTrackStats(trackIds, updateProgress = () => {}) {
+  async function getBatchTrackStats(trackIds, updateProgress = () => {}, isCancelled = () => false) {
     if (trackIds.length === 0) return {};
 
     const cacheKeys = trackIds.map(id => getCacheKey(id, true, false, "stats-column"));
     const cachedDataMap = await idb.getMany('aiData', cacheKeys);
+    if (isCancelled()) return {};
 
     const results = {};
     const missingIds = [];
@@ -63687,11 +65953,13 @@ shadowRoot.innerHTML = `
     let tracksProcessed = 0;
 
     for (let i = 0; i < missingIds.length; i += BATCH_SIZE) {
+        if (isCancelled()) break;
         const batchIds = missingIds.slice(i, i + BATCH_SIZE);
         
         const batchPromises = batchIds.map(async (id) => {
             let attempt = 0;
             while (attempt < 3) {
+                if (isCancelled()) return { id, features: null, success: false };
                 try {
                     if (internalTokenRefreshPromise) {
                         await internalTokenRefreshPromise;
@@ -63779,6 +66047,7 @@ shadowRoot.innerHTML = `
         }
         
         if (idb.setMany && entriesToSave.length > 0) await idb.setMany('aiData', entriesToSave);
+        if (isCancelled()) break;
 
         if (idsNeedingInternal.length > 0) {
             try {
@@ -63809,7 +66078,7 @@ shadowRoot.innerHTML = `
         tracksProcessed += batchIds.length;
         if (updateProgress) updateProgress(Math.min(100, Math.floor((tracksProcessed / missingIds.length) * 100)));
         
-        if (i + BATCH_SIZE < missingIds.length) {
+        if (i + BATCH_SIZE < missingIds.length && !isCancelled()) {
             await new Promise(r => setTimeout(r, 50)); 
         }
     }
@@ -63834,6 +66103,7 @@ shadowRoot.innerHTML = `
             const prevLfmInfo = getLfmInfo(previousTrackForScrobbleCache);
             if (prevLfmInfo) {
                 flagCachedPersonalScrobbleForUpdate(prevLfmInfo.key);
+                extraColMemCache.lastScrobbled.delete(prevLfmInfo.key);
                 idb.del('lastScrobbledDates', prevLfmInfo.key);
             }
         }
@@ -63843,6 +66113,8 @@ shadowRoot.innerHTML = `
         
         const lfmInfo = getLfmInfo(item);
         if (lfmInfo) {
+            extraColMemCache.personalScrobbles.delete(lfmInfo.key);
+            extraColMemCache.lastScrobbled.delete(lfmInfo.key);
             idb.del('personalScrobbles', lfmInfo.key);
             idb.del('lastScrobbledDates', lfmInfo.key);
         }
@@ -63976,12 +66248,47 @@ shadowRoot.innerHTML = `
         uri,
         name,
         artists,
+        isPlayable: getTrackRowPlayable(trackElement),
         album: {
             name: albumName || "Unknown Album",
             uri: albumUri,
             id: albumUri ? albumUri.split(':')[2] : null
         }
     };
+  }
+
+  function getTrackRowPlayable(trackElement, props = null) {
+    if (props && typeof props === 'object') {
+        if (props.isPlayable === false || props.is_playable === false || props.playable === false || props.playability?.playable === false) return false;
+        if (props.isPlayable === true || props.is_playable === true || props.playable === true || props.playability?.playable === true) return true;
+    }
+    if (!trackElement) return true;
+    try {
+        const fiberKey = Object.keys(trackElement).find(k => k.startsWith('__reactFiber$'));
+        if (fiberKey) {
+            let curr = trackElement[fiberKey];
+            for (let d = 0; curr && d < 12; d++, curr = curr.return) {
+                for (const p of [curr.memoizedProps, curr.pendingProps]) {
+                    if (!p || typeof p !== 'object') continue;
+                    if (typeof p.isPlayable === 'boolean') return p.isPlayable;
+                    if (typeof p.playable === 'boolean') return p.playable;
+                    if (typeof p.playability?.playable === 'boolean') return p.playability.playable;
+                    const sub = p.item || p.track;
+                    if (sub && typeof sub === 'object') {
+                        if (typeof sub.isPlayable === 'boolean') return sub.isPlayable;
+                        if (typeof sub.playable === 'boolean') return sub.playable;
+                        if (typeof sub.playability?.playable === 'boolean') return sub.playability.playable;
+                    }
+                }
+            }
+        }
+    } catch (_) {}
+    if (
+        trackElement.classList?.contains('main-trackList-disabled') ||
+        trackElement.getAttribute?.('aria-disabled') === 'true' ||
+        trackElement.querySelector?.('.main-trackList-disabled')
+    ) return false;
+    return true;
   }
 
   let lfmOverridesCache = null;
@@ -64023,7 +66330,19 @@ shadowRoot.innerHTML = `
       return rawMatch ? rawMatch[0] : null;
   }
   
-    function parseLastFmUrl(url) {
+  function encodeLfmWebSegment(str) {
+      return encodeURIComponent(str || '').replace(/%2B/gi, '%252B').replace(/%20/g, '+');
+  }
+
+  function buildLastFmWebUrl(artist, track = null, noRedirect = false) {
+      const prefix = noRedirect ? '+noredirect/' : '';
+      const artistSeg = encodeLfmWebSegment(artist);
+      return track
+          ? `https://www.last.fm/music/${prefix}${artistSeg}/_/${encodeLfmWebSegment(track)}`
+          : `https://www.last.fm/music/${prefix}${artistSeg}`;
+  }
+
+  function parseLastFmUrl(url) {
       try {
           let raw = (url || '').trim();
           if (!raw) return null;
@@ -64040,15 +66359,22 @@ shadowRoot.innerHTML = `
               subParts = subParts.slice(1);
           }
           if (subParts.length < 2) return null;
-          const artist = decodeURIComponent(subParts[0].replace(/\+/g, ' ')).trim();
-          let track = null;
-          if (subParts[1] === '_' && subParts.length >= 3) {
-              track = decodeURIComponent(subParts[2].replace(/\+/g, ' ')).trim();
-          } else if (subParts[1] !== '_') {
-              track = decodeURIComponent(subParts[1].replace(/\+/g, ' ')).trim();
+          const LFM_SYSTEM_SLUGS = new Set(['+shoutbox', '+wiki', '+images', '+tags', '+albums', '+tracks', '+listeners', '+similar', '+noredirect', '+charts', '+partial']);
+          const isSystemSlug = (part) => LFM_SYSTEM_SLUGS.has(decodeURIComponent(part).trim().toLowerCase());
+          const decodePart = (part) => decodeURIComponent(part.replace(/\+/g, ' ').replace(/%252B/gi, '%2B')).trim();
+          if (isSystemSlug(subParts[0])) return null;
+          const artist = decodePart(subParts[0]);
+          let trackRaw = null;
+          if (subParts[1] === '_') {
+              if (subParts.length >= 3) trackRaw = subParts[2];
+          } else if (subParts.length >= 3 && !isSystemSlug(subParts[2])) {
+              trackRaw = subParts[2];
+          } else if (subParts.length === 2 && !isSystemSlug(subParts[1])) {
+              trackRaw = subParts[1];
           }
-          const LFM_SYSTEM_SLUGS = new Set(['+shoutbox', '+wiki', '+images', '+tags', '+albums', '+tracks', '+listeners', '+similar', '+noredirect', '+charts']);
-          if (artist && track && !LFM_SYSTEM_SLUGS.has(artist.toLowerCase()) && !LFM_SYSTEM_SLUGS.has(track.toLowerCase())) {
+          if (!trackRaw || isSystemSlug(trackRaw)) return null;
+          const track = decodePart(trackRaw);
+          if (artist && track) {
               return { artist, track, noRedirect };
           }
       } catch(e) { return null; }
@@ -64058,22 +66384,12 @@ shadowRoot.innerHTML = `
   function refreshLfmDisplay(targetTrackId = null) {
       lfmDetailsCache.clear();
       shoutboxCache.clear();
+      clearExtraColMem(['scrobbles', 'personalScrobbles', 'lastScrobbled']);
 
       cleanupNowPlayingData();
       if (typeof displayNowPlayingData === 'function') {
           displayNowPlayingData(true);
       }
-
-      const resetCell = (cell) => {
-          cell.textContent = "";
-          delete cell.dataset.spProcessed;
-          cell.onclick = null;
-          cell.onmouseover = null;
-          cell.onmouseout = null;
-          cell.style.cursor = "default";
-          cell.style.textDecoration = "none";
-          cell.removeAttribute('title');
-      };
 
       if (targetTrackId) {
           document.querySelectorAll('.main-trackList-trackListRow, [role="row"]').forEach(row => {
@@ -64081,11 +66397,11 @@ shadowRoot.innerHTML = `
               if (uri && (uri === targetTrackId || uri.includes(targetTrackId))) {
                   row.classList.remove('sort-play-processing');
                   row.removeAttribute('data-sp-fetch-failed');
-                  row.querySelectorAll('.sort-play-data, .sort-play-second-data').forEach(resetCell);
+                  row.querySelectorAll('.sp-extra-col-val, .sort-play-data, .sort-play-second-data').forEach(resetExtraColumnCell);
               }
           });
       } else {
-          document.querySelectorAll('.sort-play-data, .sort-play-second-data').forEach(resetCell);
+          document.querySelectorAll('.sp-extra-col-val, .sort-play-data, .sort-play-second-data').forEach(resetExtraColumnCell);
           document.querySelectorAll('.main-trackList-trackListRow, [role="row"]').forEach(row => {
               row.classList.remove('sort-play-processing');
               row.removeAttribute('data-sp-fetch-failed');
@@ -64103,7 +66419,7 @@ shadowRoot.innerHTML = `
 
   function showLastFmOverrideModal(trackId, originalTitle, refreshModalCallback) {
       const existing = getLfmOverrides()[trackId];
-      const defaultVal = existing ? `https://www.last.fm/music/${existing.noRedirect ? '+noredirect/' : ''}${encodeURIComponent(existing.artist).replace(/%20/g, '+')}/_/${encodeURIComponent(existing.track).replace(/%20/g, '+')}` : "";
+      const defaultVal = existing ? buildLastFmWebUrl(existing.artist, existing.track, existing.noRedirect) : "";
 
       showSimpleInputModal({
           title: "Fix Last.fm Match",
@@ -64683,11 +66999,29 @@ shadowRoot.innerHTML = `
       }));
 
       await Promise.all(promises);
+
+      const fallbackPromises = [];
+      if (lfmTrack && !results.track && (lfmArtist?.includes('\\') || lfmTrack?.includes('\\'))) {
+          fallbackPromises.push((async () => {
+              let fb = await _fetchLastFmBackslashTrackInfo(lfmArtist, lfmTrack, username, isNoRedirect);
+              if (fb?.error === 17 && username) {
+                  fb = await _fetchLastFmBackslashTrackInfo(lfmArtist, lfmTrack, null, isNoRedirect);
+              }
+              if (fb?.track) results.track = fb.track;
+          })().catch(() => {}));
+      }
+      if (!results.artist && lfmArtist?.includes('\\')) {
+          fallbackPromises.push(_fetchLastFmBackslashArtistInfo(lfmArtist, isNoRedirect).then(fbArtist => {
+              if (fbArtist) results.artist = fbArtist;
+          }).catch(() => {}));
+      }
+      if (fallbackPromises.length > 0) await Promise.all(fallbackPromises);
+
       lfmDetailsCache.set(cacheKey, { ts: Date.now(), data: results });
       return results;
   }
 
-  async function fetchLastFmTrend(artist, track, noRedirect = false) {
+  async function fetchLastFmTrend(artist, track, noRedirect = false, throwOnNetworkError = false) {
       const isTrack = Boolean(track);
       const cacheKey = `${artist}|${track}|${noRedirect ? '1' : '0'}`;
       const ttl = isTrack ? 5 * 60 * 1000 : 12 * 60 * 60 * 1000;
@@ -64697,55 +67031,60 @@ shadowRoot.innerHTML = `
               return cached;
           }
       }
-      
-      const params = new URLSearchParams({
-          artist: artist,
-          track: track,
-          type: 'trend'
-      });
-      if (noRedirect) params.set('noredirect', '1');
 
-      try {
-          const queryString = params.toString().replace(/\+/g, '%20').replace(/%2B/ig, '%252B');
-          const response = await fetch(`${LFM_SHOUTBOX_GATEWAY_URL}?${queryString}`);
-          if (!response.ok) return null;
-          const data = await response.json();
-          if (Array.isArray(data)) {
-              if (data.length > 0) {
-                  await idb.set('lfmTrends', cacheKey, data);
-                  return data;
+      let reqPromise = inFlightLfmTrends.get(cacheKey);
+      if (!reqPromise) {
+          reqPromise = (async () => {
+              const params = new URLSearchParams({
+                  artist: artist,
+                  track: track,
+                  type: 'trend'
+              });
+              if (noRedirect) params.set('noredirect', '1');
+
+              try {
+                  const queryString = params.toString().replace(/\+/g, '%20').replace(/%2B/ig, '%252B');
+                  const response = await fetch(`${LFM_SHOUTBOX_GATEWAY_URL}?${queryString}`);
+                  if (!response.ok) return { ok: false, error: new Error(`Last.fm trend request failed with status ${response.status}`), data: null };
+                  const data = await response.json();
+                  if (Array.isArray(data)) {
+                      if (data.length > 0) {
+                          await idb.set('lfmTrends', cacheKey, data);
+                          return { ok: true, data };
+                      }
+                  } else if (data && typeof data === 'object') {
+                      const hasTrend = Array.isArray(data.trend) && data.trend.length > 0;
+                      const hasStats = typeof data.listeners === 'number' || typeof data.playcount === 'number';
+                      if (hasTrend || hasStats) {
+                          await idb.set('lfmTrends', cacheKey, data);
+                          return { ok: true, data };
+                      }
+                  }
+                  return { ok: true, data: null };
+              } catch (e) {
+                  return { ok: false, error: e, data: null };
               }
-          } else if (data && typeof data === 'object') {
-              const hasTrend = Array.isArray(data.trend) && data.trend.length > 0;
-              const hasStats = typeof data.listeners === 'number' || typeof data.playcount === 'number';
-              if (hasTrend || hasStats) {
-                  await idb.set('lfmTrends', cacheKey, data);
-                  return data;
-              }
-          }
-      } catch(e) {
-          console.warn("Failed to fetch Last.fm trend:", e);
+          })();
+          inFlightLfmTrends.set(cacheKey, reqPromise);
+          reqPromise.finally(() => inFlightLfmTrends.delete(cacheKey));
       }
-      return null;
+
+      const outcome = await reqPromise;
+      if (!outcome.ok) {
+          if (throwOnNetworkError) throw outcome.error;
+          console.warn("Failed to fetch Last.fm trend:", outcome.error);
+          return null;
+      }
+      return outcome.data;
   }
 
   function syncTrackScrobblesToUi(lfmKey, trackUri, scrobbleCount) {
       if (scrobbleCount === null || scrobbleCount === undefined || scrobbleCount < 0) return;
-      const currentUri = getCurrentUri();
-      const isSearch = Spicetify.Platform.History.location?.pathname?.startsWith('/search');
-      const isValidPlaylistPage = currentUri && (URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri) || isLocalFilesPage(currentUri));
+      if (lfmKey) setExtraColMem('scrobbles', lfmKey, scrobbleCount);
+      const ctx = getExtraColumnContextForPage();
+      const targetCols = ctx ? getActiveExtraColumns(ctx).filter(c => c.type === 'scrobbles') : [];
 
-      const targetSelectors = [];
-      if (isValidPlaylistPage || isSearch) {
-          if (showAdditionalColumn && selectedColumnType === 'scrobbles') targetSelectors.push('.sort-play-data');
-          if (showSecondAdditionalColumn && selectedSecondColumnType === 'scrobbles') targetSelectors.push('.sort-play-second-data');
-      } else if (URI.isAlbum(currentUri)) {
-          if (showAlbumColumn && selectedAlbumColumnType === 'scrobbles') targetSelectors.push('.sort-play-data');
-      } else if (URI.isArtist(currentUri)) {
-          if (showArtistColumn && selectedArtistColumnType === 'scrobbles') targetSelectors.push('.sort-play-data');
-      }
-
-      if (targetSelectors.length > 0) {
+      if (targetCols.length > 0) {
           document.querySelectorAll('.main-trackList-trackListRow, [role="row"]').forEach(row => {
               const rowUri = row.dataset.spTrackUri || getTracklistTrackUri(row);
               let isMatch = Boolean(trackUri && rowUri === trackUri);
@@ -64754,9 +67093,9 @@ shadowRoot.innerHTML = `
                   if (props && getLfmInfo(props)?.key === lfmKey) isMatch = true;
               }
               if (isMatch) {
-                  targetSelectors.forEach(sel => {
-                      const cell = row.querySelector(sel);
-                      if (cell) updateDisplay(cell, scrobbleCount, 'scrobbles');
+                  targetCols.forEach(col => {
+                      const cell = row.querySelector(`[data-sp-col-val="${col.id}"]`);
+                      if (cell) updateDisplay(cell, scrobbleCount, 'scrobbles', col.format);
                   });
               }
           });
@@ -64774,8 +67113,16 @@ shadowRoot.innerHTML = `
   }
 
   function renderTrendChart(container, data, dominantColor = '#1ed760') {
-      const width = container.clientWidth || 592; 
-      const height = 100;
+      container.innerHTML = `
+          <div style="display: flex; flex-direction: column; position: relative;">
+              <div class="tag-section-header" style="margin-bottom: clamp(2px, 0.6cqh, 5px);">Listening Trend</div>
+              <div class="lfm-trend-box" style="width: 100%; height: var(--lfm-trend-h, 100px); position: relative; border-radius: 4px; overflow: visible;"></div>
+          </div>
+      `;
+
+      const chartBox = container.querySelector('.lfm-trend-box');
+      const width = chartBox?.clientWidth || container.clientWidth || 592;
+      const height = chartBox?.clientHeight || 100;
       const padding = { top: 5, right: 0, bottom: 15, left: 0 };
       
       let fillPath = '';
@@ -64806,7 +67153,6 @@ shadowRoot.innerHTML = `
           }
       }
       
-      const minVal = 0; 
       const maxVal = Math.max(...renderData.map(d => d.listeners));
       
       const getX = (i) => padding.left + (i / (renderData.length - 1)) * (width - padding.left - padding.right);
@@ -64886,7 +67232,7 @@ shadowRoot.innerHTML = `
               }
               ` : ''}
           </style>
-          <svg id="trend-svg" viewBox="0 0 ${width} ${height}" width="100%" height="${height}" style="overflow: visible; display: block; position: relative; z-index: 1;">
+          <svg id="trend-svg" viewBox="0 0 ${width} ${height}" width="100%" height="100%" style="overflow: visible; display: block; position: relative; z-index: 1;">
               <defs>
                   <linearGradient id="trendGradient" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stop-color="${dominantColor}" stop-opacity="0.4" />
@@ -64903,22 +67249,16 @@ shadowRoot.innerHTML = `
               <rect id="trend-interactive-area" x="0" y="0" width="${width}" height="${height}" fill="transparent" style="${hasData ? 'cursor: crosshair;' : ''}" />
           </svg>
       `;
-      
-      container.innerHTML = `
-          <div style="display: flex; flex-direction: column; position: relative;">
-              <div class="tag-section-header" style="margin-bottom: 5px;">Listening Trend</div>
-              <div style="width: 100%; height: ${height}px; position: relative; border-radius: 4px; overflow: visible;">
-                  ${svgHtml}
-                  <div id="trend-tooltip" style="display: none; position: absolute; background: white; color: #121212; padding: 6px 10px; border-radius: 4px; font-size: 11px; font-weight: 500; box-shadow: 0 4px 12px rgba(0,0,0,0.3); pointer-events: none; z-index: 10; white-space: nowrap; transform: translate(-50%, 10px); transition: left 0.05s, top 0.05s;">
-                  </div>
-              </div>
-          </div>
+
+      chartBox.innerHTML = `
+          ${svgHtml}
+          <div id="trend-tooltip" style="display: none; position: absolute; left: 0; top: 0; background: white; color: #121212; padding: 5px 10px; border-radius: 4px; font-size: 11px; font-weight: 500; box-shadow: 0 4px 12px rgba(0,0,0,0.3); pointer-events: none; z-index: 10; white-space: nowrap;"></div>
       `;
 
       if (hasData) {
-          const interactiveArea = container.querySelector('#trend-interactive-area');
-          const hoverPoint = container.querySelector('#trend-hover-point');
-          const tooltip = container.querySelector('#trend-tooltip');
+          const interactiveArea = chartBox.querySelector('#trend-interactive-area');
+          const hoverPoint = chartBox.querySelector('#trend-hover-point');
+          const tooltip = chartBox.querySelector('#trend-tooltip');
 
           const dateFormatter = new Intl.DateTimeFormat('en-GB', {
               weekday: 'long', day: 'numeric', month: 'short', year: 'numeric'
@@ -64926,12 +67266,13 @@ shadowRoot.innerHTML = `
 
           interactiveArea.addEventListener('mousemove', (e) => {
               const rect = interactiveArea.getBoundingClientRect();
-              const mouseX = e.clientX - rect.left;
+              const boxRect = chartBox.getBoundingClientRect();
+              const svgMouseX = (e.clientX - rect.left) * (width / (rect.width || 1));
 
               let closest = points[0];
               let minDiff = Infinity;
               for (let i = 0; i < points.length; i++) {
-                  const diff = Math.abs(points[i].x - mouseX);
+                  const diff = Math.abs(points[i].x - svgMouseX);
                   if (diff < minDiff) {
                       minDiff = diff;
                       closest = points[i];
@@ -64948,30 +67289,34 @@ shadowRoot.innerHTML = `
                   formattedDate = dateFormatter.format(dateObj).replace(',', '');
               } catch(err) {}
 
+              const wasHidden = tooltip.style.display === 'none';
               tooltip.innerHTML = `<span style="color: #777;">${formattedDate}:</span> <span style="font-weight: 700; color: #121212; margin-left: 2px;">${Number(closest.listeners).toLocaleString()}</span>`;
-              
-              let tooltipX = closest.x;
-              let tooltipY = closest.y + 12; 
-              
-              tooltip.style.left = `${tooltipX}px`;
-              tooltip.style.top = `${tooltipY}px`;
+              tooltip.style.transition = wasHidden ? 'none' : 'left 0.05s, top 0.05s';
               tooltip.style.display = 'block';
-              
-              const tooltipRect = tooltip.getBoundingClientRect();
-              
-              if (tooltipX + (tooltipRect.width / 2) > width) {
-                  tooltip.style.transform = `translate(-100%, 10px)`;
-                  tooltip.style.left = `${closest.x + 8}px`;
-              } else if (tooltipX - (tooltipRect.width / 2) < 0) {
-                  tooltip.style.transform = `translate(0%, 10px)`;
-                  tooltip.style.left = `${closest.x - 8}px`;
+
+              const px = (rect.left - boxRect.left) + (closest.x / (width || 1)) * rect.width;
+              const py = (rect.top - boxRect.top) + (closest.y / (height || 1)) * rect.height;
+              const ttW = tooltip.offsetWidth;
+              const ttH = tooltip.offsetHeight;
+              const gap = 10;
+              const labelReserve = 16;
+
+              const left = Math.max(0, Math.min(Math.max(0, boxRect.width - ttW), px - ttW / 2));
+              const aboveY = py - ttH - gap;
+              const belowY = py + gap;
+              let top;
+              if (aboveY >= 0) {
+                  top = aboveY;
+              } else if (belowY + ttH <= boxRect.height - labelReserve) {
+                  top = belowY;
+              } else if (belowY + ttH <= boxRect.height) {
+                  top = belowY;
               } else {
-                  tooltip.style.transform = `translate(-50%, 10px)`;
+                  top = Math.max(-18, aboveY);
               }
-              
-              if (tooltipY + tooltipRect.height > height + 20) {
-                  tooltip.style.top = `${closest.y - tooltipRect.height - 12}px`;
-              }
+
+              tooltip.style.left = `${Math.round(left)}px`;
+              tooltip.style.top = `${Math.round(top)}px`;
           });
 
           interactiveArea.addEventListener('mouseleave', () => {
@@ -65214,14 +67559,19 @@ shadowRoot.innerHTML = `
           modalContainer.style.setProperty('border-color', 'rgba(255,255,255,0.1)', 'important');
           modalContainer.style.setProperty('box-shadow', '0 10px 60px rgba(0,0,0,0.8)', 'important');
 
-          const trackUrl = isArtistContext ? aData.url : (isNoRedirect ? `https://www.last.fm/music/+noredirect/${encodeURIComponent(lfmArtist).replace(/%20/g, '+')}/_/${encodeURIComponent(lfmTrack).replace(/%20/g, '+')}` : tData.url);
+          const trackUrl = isArtistContext
+              ? (aData.url || buildLastFmWebUrl(lfmArtist, null, isNoRedirect))
+              : (isNoRedirect ? buildLastFmWebUrl(lfmArtist, lfmTrack, true) : (tData.url || buildLastFmWebUrl(lfmArtist, lfmTrack, false)));
           
+          const naStatHtml = `<span style="color:rgba(255,255,255,0.5) !important; font-size: 18px;">N/A</span>`;
           let statsHtml = '';
           let fastTrendResolved = false;
           if (isArtistContext) {
               const totalListeners = aData?.stats?.listeners || 0;
-              const artistTotal = aData?.stats?.playcount || 0;
+              const artistTotal = aData?.stats?.playcount;
+              const hasArtistTotal = artistTotal !== null && artistTotal !== undefined && artistTotal !== '';
               const userArtistCount = aData?.stats?.userplaycount;
+              const showUserArtistNa = !username || (aData?._fromBackslashFallback && (userArtistCount === undefined || userArtistCount === null || userArtistCount === ''));
               statsHtml = `
                   <div class="lfm-stat-box">
                       <div class="lfm-stat-header">${listenersIcon} <span class="lfm-stat-label">Total Listeners</span></div>
@@ -65229,12 +67579,12 @@ shadowRoot.innerHTML = `
                   </div>
                   <div class="lfm-stat-box">
                       <div class="lfm-stat-header">${barsIcon} <span class="lfm-stat-label">Total Artist Scrobbles</span></div>
-                      <div class="lfm-stat-value">${Number(artistTotal).toLocaleString()}</div>
+                      <div class="lfm-stat-value">${hasArtistTotal ? Number(artistTotal).toLocaleString() : naStatHtml}</div>
                   </div>
                   <div class="lfm-stat-box" style="grid-column: 1 / -1;">
                       <div class="lfm-stat-header">${myPlaysIcon} <span class="lfm-stat-label">Your Artist Scrobbles</span></div>
                       <div class="lfm-stat-value">
-                          ${username ? Number(userArtistCount || 0).toLocaleString() : `<span style="color:rgba(255,255,255,0.5) !important; font-size: 18px;">N/A</span>`}
+                          ${!showUserArtistNa ? Number(userArtistCount || 0).toLocaleString() : naStatHtml}
                       </div>
                       ${!username ? `<div style="font-size: 12px; color: #fff !important; cursor: pointer !important; text-decoration: underline !important; opacity: 0.8;" id="set-user-btn">Set Last.fm Username</div>` : ''}
                   </div>
@@ -65243,7 +67593,8 @@ shadowRoot.innerHTML = `
               const fastTrendResult = await Promise.race([trendPromise, new Promise(r => setTimeout(() => r(null), 600))]);
               fastTrendResolved = Boolean(fastTrendResult);
               const cachedHighScrobbles = lfmTrackKey ? await idb.get('scrobbles', lfmTrackKey) : null;
-              const userPlaycount = tData.userplaycount || 0;
+              const userPlaycount = tData.userplaycount;
+              const showUserTrackNa = !username || (tData._fromBackslashFallback && (userPlaycount === undefined || userPlaycount === null || userPlaycount === ''));
               const totalListeners = Math.max(Number(tData.listeners || 0), Number(fastTrendResult?.listeners || 0));
               let totalScrobbles = Math.max(Number(tData.playcount || 0), Number(fastTrendResult?.playcount || 0), typeof cachedHighScrobbles === 'number' ? cachedHighScrobbles : 0);
               if (lfmTrackKey && totalScrobbles >= 0) {
@@ -65252,7 +67603,8 @@ shadowRoot.innerHTML = `
               }
               tData.listeners = totalListeners;
               tData.playcount = totalScrobbles;
-              const artistTotal = aData?.stats?.playcount || 0;
+              const artistTotal = aData?.stats?.playcount;
+              const hasArtistTotal = artistTotal !== null && artistTotal !== undefined && artistTotal !== '';
               const userArtistCount = aData?.stats?.userplaycount;
               statsHtml = `
                   <div class="lfm-stat-box">
@@ -65266,14 +67618,14 @@ shadowRoot.innerHTML = `
                   <div class="lfm-stat-box">
                       <div class="lfm-stat-header">${myPlaysIcon} <span class="lfm-stat-label">Your Track Scrobbles</span></div>
                       <div class="lfm-stat-value">
-                          ${username ? Number(userPlaycount).toLocaleString() : `<span style="color:rgba(255,255,255,0.5) !important; font-size: 18px;">N/A</span>`}
+                          ${!showUserTrackNa ? Number(userPlaycount || 0).toLocaleString() : naStatHtml}
                       </div>
                       ${!username ? `<div style="font-size: 12px; color: #fff !important; cursor: pointer !important; text-decoration: underline !important; opacity: 0.8;" id="set-user-btn">Set Last.fm Username</div>` : ''}
                   </div>
                   <div class="lfm-stat-box">
                       <div class="lfm-stat-header">${barsIcon} <span class="lfm-stat-label">Total Artist Scrobbles</span></div>
                       <div class="lfm-stat-value">
-                          ${Number(artistTotal).toLocaleString()}
+                          ${hasArtistTotal ? Number(artistTotal).toLocaleString() : naStatHtml}
                           ${(username && userArtistCount !== undefined) ? `<span style="font-size: 12px; color: rgba(255,255,255,0.5); font-weight: 500; margin-left: 6px; vertical-align: middle;">(You: ${Number(userArtistCount).toLocaleString()})</span>` : ''}
                       </div>
                   </div>
@@ -65288,18 +67640,21 @@ shadowRoot.innerHTML = `
           const trackTags = isArtistContext ? [] : filterTags(tData.toptags?.tag).slice(0, 5);
           const artistTags = filterTags(aData?.tags?.tag).slice(0, 5);
 
-          let targetHeight = '760px';
+          const estTagLines = (tags) => tags.length ? Math.max(1, Math.ceil(tags.reduce((s, t) => s + t.name.length * 7.5 + 28, 0) / 592)) : 0;
+          const extraTagLines = Math.max(0, estTagLines(trackTags) - 1) + Math.max(0, estTagLines(artistTags) - 1);
+          let targetHeightNum = 760;
           if (isArtistContext) {
-              targetHeight = artistTags.length > 0 ? '700px' : '680px';
+              targetHeightNum = artistTags.length > 0 ? 700 : 680;
+          } else if (trackTags.length > 0 && artistTags.length > 0) {
+              targetHeightNum = 760;
+          } else if (trackTags.length > 0 || artistTags.length > 0) {
+              targetHeightNum = 700;
           } else {
-              if (trackTags.length > 0 && artistTags.length > 0) {
-                  targetHeight = '760px';
-              } else if (trackTags.length > 0 || artistTags.length > 0) {
-                  targetHeight = '700px';
-              } else {
-                  targetHeight = '680px';
-              }
+              targetHeightNum = 680;
           }
+          targetHeightNum += extraTagLines * 34;
+          const targetHeight = `${targetHeightNum}px`;
+          const cq = (minPx, maxPx) => `clamp(${minPx}px, ${((maxPx / targetHeightNum) * 100).toFixed(2)}cqh, ${maxPx}px)`;
 
           if (isClosed || !overlay.isConnected) return;
           loadingState.remove();
@@ -65375,34 +67730,35 @@ shadowRoot.innerHTML = `
               @keyframes fadeInLfmModal { 0% { opacity: 0; } 100% { opacity: 1; } }
               .lfm-fade-in-wrapper { animation: fadeInLfmModal 0.2s ease forwards; height: 100%; width: 100%; display: flex; flex-direction: row; position: relative; }
               .lfm-modal-layout { display: flex; flex-direction: row; width: 1040px; height: 100%; flex: 1; min-height: 0; }
-              .lfm-main-panel { width: 640px; flex-shrink: 0; display: flex; flex-direction: column; height: 100%; background-color: rgb(${bgR}, ${bgG}, ${bgB}); position: relative;z-index: 1;overflow: hidden;}
-              .lfm-main-panel::before, .lfm-main-panel::after { content: ''; position: absolute; top: -24px; left: -24px; right: -24px; bottom: -24px; background-image: linear-gradient(to bottom, rgba(${cR}, ${cG}, ${cB}, 0.65) -35%, rgba(${bgR}, ${bgG}, ${bgB}, 0.9) 45%, rgb(${bgR}, ${bgG}, ${bgB}) 100%), url('${albumImage}'); background-size: cover;background-position: top center; background-repeat: no-repeat; }
+              .lfm-main-panel { width: 640px; flex-shrink: 0; display: flex; flex-direction: column; height: 100%; background-color: rgb(${bgR}, ${bgG}, ${bgB}); position: relative; z-index: 1; overflow: hidden; container-type: size; }
+              .lfm-main-panel::before, .lfm-main-panel::after { content: ''; position: absolute; top: -24px; left: -24px; right: -24px; bottom: -24px; background-image: linear-gradient(to bottom, rgba(${cR}, ${cG}, ${cB}, 0.65) -35%, rgba(${bgR}, ${bgG}, ${bgB}, 0.9) 45%, rgb(${bgR}, ${bgG}, ${bgB}) 100%), url('${albumImage}'); background-size: cover; background-position: top center; background-repeat: no-repeat; }
               .lfm-main-panel::before { z-index: -2; }
-              .lfm-main-panel::after { filter: blur(12px); z-index: -1;transform: scale(1.01); }
-              .lfm-header { display: flex; padding: 30px 24px 24px; background: transparent !important; gap: 24px; align-items: flex-start; flex-shrink: 0; border: none !important; }
-              .lfm-cover { width: 140px; height: 140px; box-shadow: 0 8px 24px rgba(0,0,0,0.1); border-radius: 15px; object-fit: cover; flex-shrink: 0; }
-              .lfm-info { display: flex; flex-direction: column; justify-content: center; gap: 4px; overflow: hidden; height: 140px; padding-right: 10px; }
-              .lfm-title { display: flex; align-items: center; font-size: 26px; font-weight: 800; color: white !important; line-height: 1.2; margin-bottom: 2px; }
+              .lfm-main-panel::after { filter: blur(12px); z-index: -1; transform: scale(1.01); }
+              .lfm-header { display: flex; padding: ${cq(14, 30)} 24px ${cq(10, 24)}; background: transparent !important; gap: ${cq(14, 24)}; align-items: flex-start; flex-shrink: 0; border: none !important; }
+              .lfm-cover { width: ${cq(72, 140)}; height: ${cq(72, 140)}; box-shadow: 0 8px 24px rgba(0,0,0,0.1); border-radius: ${cq(10, 15)}; object-fit: cover; flex-shrink: 0; }
+              .lfm-info { display: flex; flex-direction: column; justify-content: center; gap: ${cq(2, 4)}; overflow: hidden; height: ${cq(72, 140)}; padding-right: 10px; }
+              .lfm-title { display: flex; align-items: center; font-size: ${cq(18, 26)}; font-weight: 800; color: white !important; line-height: 1.2; margin-bottom: 2px; }
               .lfm-title-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 2px 10px rgba(0,0,0,0.2); padding-bottom: 6px; margin-bottom: -6px; padding-right: 8px; }
-              .lfm-artist { font-size: 18px; font-weight: 500; color: rgba(255,255,255,0.85) !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 5px rgba(0,0,0,0.2); padding-bottom: 6px; margin-bottom: -6px; padding-right: 8px; }
-              .lfm-body { padding: 0 24px 24px; display: flex; flex-direction: column; gap: 20px; background-color: transparent !important; flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.15) transparent; }
+              .lfm-artist { font-size: ${cq(13, 18)}; font-weight: 500; color: rgba(255,255,255,0.85) !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 5px rgba(0,0,0,0.2); padding-bottom: 6px; margin-bottom: -6px; padding-right: 8px; }
+              .lfm-body { padding: 0 24px ${cq(10, 24)}; display: flex; flex-direction: column; gap: ${cq(8, 20)}; background-color: transparent !important; flex: 1; min-height: 0; overflow: hidden; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.15) transparent; --lfm-trend-h: ${cq(62, 100)}; }
               .lfm-body::-webkit-scrollbar { width: 8px; }
               .lfm-body::-webkit-scrollbar-track { background: transparent; }
               .lfm-body::-webkit-scrollbar-thumb { background-color: rgba(255,255,255,0.15); border-radius: 4px; }
-              .lfm-stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-              .lfm-stat-box { background: rgba(255, 255, 255, 0.05) !important; border-radius: 12px !important; padding: 12px 16px !important; display: flex; flex-direction: column; justify-content: center; gap: 4px; border: 1px solid rgba(255,255,255,0.08) !important; transition: all 0.2s; min-height: 72px; min-width: 0; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+              .lfm-stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: ${cq(6, 12)}; }
+              .lfm-stat-box { background: rgba(255, 255, 255, 0.05) !important; border-radius: 12px !important; padding: ${cq(6, 12)} ${cq(12, 16)} !important; display: flex; flex-direction: column; justify-content: center; gap: ${cq(2, 4)}; border: 1px solid rgba(255,255,255,0.08) !important; transition: all 0.2s; min-height: ${cq(46, 72)}; min-width: 0; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
               .lfm-stat-box:hover { background: rgba(255, 255, 255, 0.08) !important; border-color: rgba(255, 255, 255, 0.15) !important; }
-              .lfm-stat-header { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; color: #ccc; }
-              .lfm-stat-label { font-size: 10px; color: rgba(255,255,255,0.7) !important; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; }
-              .lfm-stat-value { font-size: 20px; font-weight: 700; color: white !important; letter-spacing: -0.5px; }
+              .lfm-stat-header { display: flex; align-items: center; gap: 8px; margin-bottom: ${cq(0, 2)}; color: #ccc; }
+              .lfm-stat-label { font-size: ${cq(9, 10)}; color: rgba(255,255,255,0.7) !important; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; }
+              .lfm-stat-value { font-size: ${cq(15, 20)}; font-weight: 700; color: white !important; letter-spacing: -0.5px; }
               .lfm-stat-sub { font-size: 11px; color: rgba(255,255,255,0.6) !important; margin-top: -2px; }
-              .lfm-tags-container { display: flex; flex-direction: column; gap: 14px; }
-              .tag-section-header { font-size: 11px; color: rgba(255,255,255,0.5) !important; text-transform: uppercase; font-weight: 700; margin-left: 4px; margin-bottom: 5px; }
-              .lfm-tags { display: flex; flex-wrap: wrap; gap: 6px; }
-              .lfm-tag { background: rgba(255,255,255,0.08) !important; color: #fff !important; padding: 4px 10px !important; border-radius: 16px !important; font-size: 13px !important; font-weight: 500 !important; border: 1px solid rgba(255,255,255,0.05) !important; transition: all 0.2s; }
+              .lfm-tags-container { display: flex; flex-direction: column; gap: ${cq(6, 14)}; margin-top: ${cq(0, 6)}; }
+              .tag-section-header { font-size: ${cq(9, 11)}; color: rgba(255,255,255,0.5) !important; text-transform: uppercase; font-weight: 700; margin-left: 4px; margin-bottom: ${cq(3, 5)}; }
+              .lfm-tags { display: flex; flex-wrap: wrap; gap: ${cq(4, 6)}; }
+              .lfm-tag { background: rgba(255,255,255,0.08) !important; color: #fff !important; padding: ${cq(2, 4)} ${cq(8, 10)} !important; border-radius: 16px !important; font-size: ${cq(11, 13)} !important; font-weight: 500 !important; border: 1px solid rgba(255,255,255,0.05) !important; transition: all 0.2s; }
               .lfm-tag:hover { background-color: rgba(255,255,255,0.15) !important; border-color: rgba(255,255,255,0.2) !important; }
-              .lfm-footer { padding: 20px 24px; border-top: 1px solid rgba(255,255,255,0.08) !important; display: flex; justify-content: space-between; align-items: center; background: transparent !important; flex-shrink: 0; }
-              .lfm-btn { background-color: rgb(${cR}, ${cG}, ${cB}) !important; color: ${fabTextColor} !important; border: 1px solid rgba(255,255,255,0.1) !important; padding: 10px 24px !important; border-radius: 24px !important; font-weight: 700 !important; font-size: 14px !important; cursor: pointer !important; text-decoration: none !important; display: flex; align-items: center; gap: 8px; transition: transform 0.2s, filter 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+              #lfm-trend-container { margin-top: auto; padding-top: ${cq(2, 10)}; width: 100%; flex-shrink: 0; }
+              .lfm-footer { padding: ${cq(10, 20)} 24px; border-top: 1px solid rgba(255,255,255,0.08) !important; display: flex; justify-content: space-between; align-items: center; background: transparent !important; flex-shrink: 0; }
+              .lfm-btn { background-color: rgb(${cR}, ${cG}, ${cB}) !important; color: ${fabTextColor} !important; border: 1px solid rgba(255,255,255,0.1) !important; padding: ${cq(7, 10)} ${cq(16, 24)} !important; border-radius: 24px !important; font-weight: 700 !important; font-size: ${cq(12, 14)} !important; cursor: pointer !important; text-decoration: none !important; display: flex; align-items: center; gap: 8px; transition: transform 0.2s, filter 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
               .lfm-btn:hover { filter: brightness(1.2); transform: scale(1.03); }
               .lfm-comments-panel { width: 400px; flex-shrink: 0; border-left: 1px solid rgba(255,255,255,0.08); display: flex; flex-direction: column; height: 100%; background-color: rgb(${bgR}, ${bgG}, ${bgB}); background-image: linear-gradient(180deg, rgba(${cR}, ${cG}, ${cB}, 0.22) 0%, rgba(${cR}, ${cG}, ${cB}, 0.09) 35%, rgba(${cR}, ${cG}, ${cB}, 0.02) 70%, rgb(${bgR}, ${bgG}, ${bgB}) 100%); transition: opacity 0.3s; opacity: 1; }
               .lfm-comments-panel.collapsed { opacity: 0; pointer-events: none; }
@@ -65433,6 +67789,7 @@ shadowRoot.innerHTML = `
               #lfm-comments-sort-select option { background: rgb(${bgR}, ${bgG}, ${bgB}); color: #fff; }
               @keyframes slideDownShout { 0% { opacity: 0; transform: translateY(-15px); } 100% { opacity: 1; transform: translateY(0); }}
               .comment-item.fresh, .reply-item.fresh { animation: slideDownShout 200ms cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;}
+              @container (max-height: 460px) { .lfm-body { overflow-y: auto; } }
               @media (max-width: 960px) {
                 .lfm-modal-layout { width: 100%; }
                 .lfm-main-panel { flex: 1 1 58%; width: auto; min-width: 0; }
@@ -65441,8 +67798,8 @@ shadowRoot.innerHTML = `
               }
               @media (max-width: 640px) {
                 .lfm-modal-layout { flex-direction: column; overflow-y: auto; overflow-x: hidden; }
-                .lfm-main-panel { flex: 0 0 auto; width: 100%; height: auto; overflow: visible; }
-                .lfm-body { overflow-y: visible; }
+                .lfm-main-panel { flex: 0 0 auto; width: 100%; height: auto; overflow: visible; container-type: normal; }
+                .lfm-body { overflow-y: visible; --lfm-trend-h: 96px; }
                 .lfm-comments-panel { flex: 0 0 auto; width: 100%; height: 340px; border-left: none; border-top: 1px solid rgba(255,255,255,0.08); }
                 .lfm-header { padding: 24px 18px 16px; gap: 16px; }
                 .lfm-cover { width: 96px; height: 96px; }
@@ -65477,13 +67834,13 @@ shadowRoot.innerHTML = `
                         <div class="lfm-stats-grid">
                             ${statsHtml}
                         </div>
-                        <div class="lfm-tags-container" style="margin-top: 6px;">
+                        <div class="lfm-tags-container">
                             ${tagsHtml}
                         </div>
-                        <div id="lfm-trend-container" style="margin-top: auto; padding-top: 10px; width: 100%;">
+                        <div id="lfm-trend-container">
                             <div style="display: flex; flex-direction: column; position: relative;">
-                                <div class="tag-section-header" style="margin-bottom: 5px;">Listening Trend</div>
-                                <div style="width: 100%; height: 90px; display: flex; align-items: center; justify-content: center;">
+                                <div class="tag-section-header">Listening Trend</div>
+                                <div style="width: 100%; height: var(--lfm-trend-h, 100px); display: flex; align-items: center; justify-content: center;">
                                     <div class="loader" style="opacity: 0.3;"></div>
                                 </div>
                             </div>
@@ -65851,272 +68208,1759 @@ shadowRoot.innerHTML = `
       );
   }
 
-  function showColumnSelector(event, contextType) {
+  async function getRawPlaylistContents(uri, options) {
+      return options !== undefined
+          ? await spViewSortOriginals.getContents(uri, options)
+          : await spViewSortOriginals.getContents(uri);
+  }
+
+  async function getRawPlaylistContentsFast(uri, options, keepReleaseExt = false) {
+      const origDec = PlaylistAPI._getPlaylistDecorationPolicies;
+      if (typeof origDec !== 'function') {
+          return await getRawPlaylistContents(uri, options);
+      }
+      let promise;
+      PlaylistAPI._getPlaylistDecorationPolicies = function(...args) {
+          const pol = origDec.apply(this, args);
+          if (pol?.track?.track && Array.isArray(pol.track.track.extension)) {
+              const nextExt = keepReleaseExt ? pol.track.track.extension.filter(e => e === 183) : [];
+              return { ...pol, track: { ...pol.track, track: { ...pol.track.track, extension: nextExt } } };
+          }
+          return pol;
+      };
+      try {
+          promise = options !== undefined
+              ? spViewSortOriginals.getContents(uri, options)
+              : spViewSortOriginals.getContents(uri);
+      } finally {
+          PlaylistAPI._getPlaylistDecorationPolicies = origDec;
+      }
+      return await promise;
+  }
+
+  function getCachedRawPlaylistItems(uri, requireReleaseExt = false) {
+      const entry = playlistRawItemsCache.get(uri);
+      if (!entry) return null;
+      if ((Date.now() - entry.ts) >= 3 * 60 * 1000) {
+          playlistRawItemsCache.delete(uri);
+          return null;
+      }
+      if (requireReleaseExt && !entry.hasReleaseExt) return null;
+      playlistRawItemsCache.delete(uri);
+      playlistRawItemsCache.set(uri, entry);
+      return entry.items;
+  }
+
+  function setCachedRawPlaylistItems(uri, items, hasReleaseExt = false) {
+      if (!uri || !Array.isArray(items) || items.length === 0) return;
+      playlistRawItemsCache.delete(uri);
+      playlistRawItemsCache.set(uri, { items, hasReleaseExt: !!hasReleaseExt, ts: Date.now() });
+      while (playlistRawItemsCache.size > 4) {
+          const oldestKey = playlistRawItemsCache.keys().next().value;
+          if (!oldestKey) break;
+          playlistRawItemsCache.delete(oldestKey);
+      }
+  }
+
+  function setPlaylistViewSortState(uri, state) {
+      playlistViewSortState.delete(uri);
+      playlistViewSortState.set(uri, state);
+      if (playlistViewSortState.size > 6) {
+          const currentUri = getCurrentUri();
+          for (const key of playlistViewSortState.keys()) {
+              if (playlistViewSortState.size <= 6) break;
+              if (key !== uri && key !== currentUri) playlistViewSortState.delete(key);
+          }
+      }
+  }
+
+  function getViewSortFilterKey(options) {
+      if (!options) return '';
+      const f = options.filter ? String(options.filter).trim() : '';
+      const p = Array.isArray(options.filterPredicates) && options.filterPredicates.length > 0 ? options.filterPredicates : null;
+      const d = options.descriptorFilter ? String(options.descriptorFilter).trim() : '';
+      return (f || p || d) ? JSON.stringify({ f, p, d }) : '';
+  }
+
+  function getViewSortDefaultCycle(colType) {
+      return (colType === 'key' || colType === 'djInfo') ? ['ASC', 'DESC', null] : ['DESC', 'ASC', null];
+  }
+
+  function parseViewSortReleaseDateMs(dateVal) {
+      if (dateVal === null || dateVal === undefined || dateVal === 0 || dateVal === '' || dateVal === '_' || dateVal === '―') return NaN;
+      if (typeof dateVal === 'object' && !(dateVal instanceof Date) && dateVal.date !== undefined) dateVal = dateVal.date;
+      if (typeof dateVal === 'number') return (Number.isFinite(dateVal) && dateVal !== 0) ? dateVal : NaN;
+      if (dateVal instanceof Date) {
+          const ms = dateVal.getTime();
+          return Number.isFinite(ms) ? ms : NaN;
+      }
+      if (typeof dateVal !== 'string') return NaN;
+      const clean = dateVal.trim();
+      if (!clean || clean === '_' || clean === '―') return NaN;
+      const ms = new Date(clean).getTime();
+      return isNaN(ms) ? NaN : ms;
+  }
+
+  function normalizePlaylistItemReleaseDate(release) {
+      const iso = release?.isoString;
+      if (!iso || typeof iso !== 'string') return null;
+      const prec = String(release.precision || '').toUpperCase();
+      if (prec === 'YEAR') return iso.slice(0, 4);
+      if (prec === 'MONTH') return iso.slice(0, 7);
+      return iso.slice(0, 10);
+  }
+
+  function getViewSortKeyNumericValue(stats, keyMode = null) {
+      if (!stats || typeof stats !== 'object') return null;
+      const mode = keyMode || keyDisplayMode;
+      if (mode === 'openkey') {
+          const ok = formatKey(stats.key_raw, stats.mode, 'openkey', stats.camelot);
+          if (!ok || ok === '―') return null;
+          const num = parseInt(ok, 10);
+          return isNaN(num) ? null : num * 2 + (ok.endsWith('m') ? 1 : 0);
+      }
+      if (mode === 'standard' || mode === 'full_name') {
+          if (stats.key_raw == null || stats.key_raw === -1 || isNaN(stats.key_raw) || stats.mode == null || isNaN(stats.mode)) return null;
+          return stats.key_raw * 2 + (stats.mode === 0 ? 1 : 0);
+      }
+      return getCamelotSortValue(stats);
+  }
+
+  function buildViewSortTrackObj(item) {
+      const isLocal = URI.isLocal(item.uri);
+      const isTrack = typeof item.uri === 'string' && item.uri.startsWith('spotify:track:');
+      const isPlayable = isTrackItemPlayable(item);
+      const id = isLocal ? item.uri : (isTrack ? item.uri.split(':')[2] : null);
+      const albumId = (!isLocal && item.album?.uri?.startsWith('spotify:album:')) ? item.album.uri.split(':')[2] : null;
+      const rawArtist = item.artists?.[0]?.name || '';
+      const cleanedArtist = (isLocal && rawArtist.includes(';')) ? rawArtist.split(';')[0].trim() : rawArtist;
+      const artists = isLocal && cleanedArtist ? [{ name: cleanedArtist }] : (item.artists || []);
+      return {
+          uri: item.uri,
+          uid: item.uid,
+          id,
+          trackId: isTrack ? id : null,
+          name: item.name || '',
+          songTitle: item.name || '',
+          isPlayable,
+          is_playable: isPlayable,
+          albumId,
+          albumUri: item.album?.uri || null,
+          albumName: item.album?.name || '',
+          album: item.album ? { ...item.album, id: albumId } : null,
+          artists,
+          artistName: cleanedArtist,
+          allArtists: normalizeArtistNames(artists),
+          durationMs: item.duration?.milliseconds || 0,
+          durationMilis: item.duration?.milliseconds || 0,
+          discNumber: item.discNumber || item.album?.discNumber || 1,
+          trackNumber: item.trackNumber || item.album?.trackNumber || 0,
+          release: item.release || null,
+          track: {
+              id,
+              name: item.name || '',
+              isPlayable,
+              is_playable: isPlayable,
+              album: { id: albumId, name: item.album?.name || '' },
+              duration_ms: item.duration?.milliseconds || 0,
+              discNumber: item.discNumber || 1,
+              trackNumber: item.trackNumber || 0
+          }
+      };
+  }
+
+  async function fetchAllRawPlaylistItems(uri, options = null, isCancelled = () => false, fetchOpts = null) {
+      const keepReleaseExt = !!fetchOpts?.keepReleaseExt;
+      const forceRefresh = !!fetchOpts?.forceRefresh;
+      if (!options && !forceRefresh) {
+          const cached = getCachedRawPlaylistItems(uri, keepReleaseExt);
+          if (cached) return cached;
+      }
+      const baseOpts = options ? { ...options } : null;
+      if (baseOpts) {
+          delete baseOpts.sort;
+          baseOpts.offset = 0;
+          baseOpts.limit = 10000;
+      }
+      const firstRes = baseOpts
+          ? await getRawPlaylistContentsFast(uri, baseOpts, keepReleaseExt)
+          : await getRawPlaylistContentsFast(uri, undefined, keepReleaseExt);
+      if (isCancelled()) return null;
+      const items = Array.isArray(firstRes?.items) ? [...firstRes.items] : [];
+      const total = typeof firstRes?.totalLength === 'number' ? firstRes.totalLength : items.length;
+      if (items.length > 0 && items.length < total) {
+          const step = Math.max(items.length, 500);
+          let offset = items.length;
+          while (offset < total && !isCancelled()) {
+              const pageRes = await getRawPlaylistContentsFast(uri, { ...(baseOpts || {}), offset, limit: step }, keepReleaseExt);
+              if (isCancelled()) return null;
+              const pageItems = pageRes?.items || [];
+              if (pageItems.length === 0) break;
+              items.push(...pageItems);
+              offset += pageItems.length;
+          }
+      }
+      if (isCancelled()) return null;
+      if (!options && items.length > 0) setCachedRawPlaylistItems(uri, items, keepReleaseExt);
+      return items;
+  }
+
+  async function enrichItemsForColumnSort(rawItems, colType, isCancelled = () => false, seedMap = null) {
+      const valuesMap = seedMap ? new Map(seedMap) : new Map();
+      const seenUris = new Set();
+      const uniqueItems = [];
+      for (const item of rawItems) {
+          if (!item?.uri || seenUris.has(item.uri)) continue;
+          seenUris.add(item.uri);
+          if (valuesMap.has(item.uri)) continue;
+          uniqueItems.push(item);
+      }
+      if (uniqueItems.length === 0) return valuesMap;
+
+      const isLfmCol = colType === 'scrobbles' || colType === 'personalScrobbles' || colType === 'lastScrobbled';
+      const eligibleItems = uniqueItems.filter(item =>
+          item.uri.startsWith('spotify:track:') || (isLfmCol && URI.isLocal(item.uri))
+      );
+      if (eligibleItems.length === 0) return valuesMap;
+
+      if (colType === 'playCount') {
+          const now = Date.now();
+          const tracksToFetch = [];
+          for (const item of eligibleItems) {
+              const tid = item.uri.split(':')[2];
+              const unresolvedTs = tid ? viewSortUnresolvedPlayCounts.get(tid) : null;
+              if (unresolvedTs && (now - unresolvedTs) < 15 * 60 * 1000) continue;
+              if (unresolvedTs) viewSortUnresolvedPlayCounts.delete(tid);
+              tracksToFetch.push(buildViewSortTrackObj(item));
+          }
+          if (tracksToFetch.length > 0) {
+              const enriched = await enrichTracksWithPlayCounts(tracksToFetch, () => {}, isCancelled);
+              if (isCancelled()) return null;
+              let resolvedCount = 0;
+              const unresolvedIds = [];
+              for (const t of enriched) {
+                  const n = Number(t.playCount);
+                  if (t.playCount !== 'N/A' && t.playCount != null && Number.isFinite(n) && n >= 0) {
+                      valuesMap.set(t.uri, (n > 0 || isTrackItemPlayable(t)) ? n : null);
+                      resolvedCount++;
+                      if (t.trackId) viewSortUnresolvedPlayCounts.delete(t.trackId);
+                  } else if (t.trackId) {
+                      unresolvedIds.push(t.trackId);
+                  }
+              }
+              if (unresolvedIds.length > 0 && (resolvedCount > 0 || tracksToFetch.length <= 5)) {
+                  if (viewSortUnresolvedPlayCounts.size > 5000) viewSortUnresolvedPlayCounts.clear();
+                  for (const tid of unresolvedIds) viewSortUnresolvedPlayCounts.set(tid, now);
+              }
+          }
+      } else if (colType === 'popularity') {
+          const tracks = eligibleItems.map(buildViewSortTrackObj);
+          const enriched = await fetchPopularityForMultipleTracks(tracks, () => {}, 1, new Set(), isCancelled);
+          if (isCancelled()) return null;
+          for (const t of enriched) {
+              if (typeof t.popularity === 'number' && !isNaN(t.popularity)) valuesMap.set(t.uri, t.popularity);
+          }
+      } else if (colType === 'releaseDate') {
+          const ids = eligibleItems.map(i => i.uri.split(':')[2]).filter(Boolean);
+          const cachedMap = await idb.getMany('releaseDates', ids, CACHE_EXPIRE_RELEASE_DATE);
+          if (isCancelled()) return null;
+          const missing = [];
+          const toCache = [];
+          for (const item of eligibleItems) {
+              const tid = item.uri.split(':')[2];
+              const cached = tid ? cachedMap.get(tid) : null;
+              const rawCachedDate = (cached && typeof cached === 'object') ? cached.date : ((typeof cached === 'string' || (typeof cached === 'number' && cached !== 0)) ? cached : null);
+              let dateVal = (rawCachedDate != null && !isNaN(parseViewSortReleaseDateMs(rawCachedDate))) ? rawCachedDate : null;
+              let discNum = item.discNumber || item.album?.discNumber || cached?.discNumber || 1;
+              let trackNum = item.trackNumber || item.album?.trackNumber || cached?.trackNumber || 0;
+              if (dateVal == null && item.release?.isoString) {
+                  dateVal = normalizePlaylistItemReleaseDate(item.release);
+                  if (dateVal && tid) toCache.push({ key: tid, val: { date: dateVal, trackNumber: trackNum, discNumber: discNum } });
+              }
+              if (dateVal != null) {
+                  const ts = parseViewSortReleaseDateMs(dateVal);
+                  if (!isNaN(ts)) valuesMap.set(item.uri, { ts, albumName: item.album?.name || '', discNumber: discNum, trackNumber: trackNum });
+              } else {
+                  missing.push(buildViewSortTrackObj(item));
+              }
+          }
+          if (toCache.length > 0 && idb.setMany) idb.setMany('releaseDates', toCache).catch(() => {});
+          if (missing.length > 0 && !isCancelled()) {
+              const enriched = await processReleaseDatesConcurrently(missing, () => {}, getTrackDetailsWithReleaseDate, isCancelled);
+              if (isCancelled()) return null;
+              for (const t of enriched) {
+                  if (!t) continue;
+                  const ts = parseViewSortReleaseDateMs(t.releaseDate);
+                  if (!isNaN(ts)) valuesMap.set(t.uri, { ts, albumName: t.albumName || '', discNumber: t.discNumber || 1, trackNumber: t.trackNumber || 0 });
+              }
+          }
+      } else if (colType === 'trueReleaseDate') {
+          const tracks = eligibleItems.map(buildViewSortTrackObj);
+          const enriched = await processTrueReleaseDatesConcurrently(tracks, () => {}, isCancelled);
+          if (isCancelled()) return null;
+          for (const t of enriched) {
+              if (!t) continue;
+              const ts = parseViewSortReleaseDateMs(t.trueReleaseDate || t.releaseDate);
+              if (!isNaN(ts)) valuesMap.set(t.uri, { ts, albumName: t.trueAlbumName || t.albumName || '', discNumber: t.trueDiscNumber || t.discNumber || 1, trackNumber: t.trueTrackNumber || t.trackNumber || 0 });
+          }
+      } else if (colType === 'scrobbles' || colType === 'personalScrobbles') {
+          const tracks = eligibleItems.map(buildViewSortTrackObj);
+          const enriched = await handleScrobblesSorting(tracks, colType, () => {}, isCancelled);
+          if (isCancelled()) return null;
+          for (const t of enriched) {
+              const v = t?.[colType];
+              if (typeof v === 'number' && !isNaN(v) && v >= 0) valuesMap.set(t.uri, v);
+          }
+      } else if (colType === 'lastScrobbled') {
+          const tracks = eligibleItems.map(buildViewSortTrackObj);
+          const trackEntries = tracks.map(t => ({ track: t, lfmInfo: getLfmInfo(t), isLocal: URI.isLocal(t.uri) }));
+          const lfmKeys = [...new Set(trackEntries.map(e => e.lfmInfo?.key).filter(Boolean))];
+          const cachedMap = lfmKeys.length > 0
+              ? await idb.getMany('lastScrobbledDates', lfmKeys, CACHE_EXPIRE_PERSONAL_SCROBBLES)
+              : new Map();
+          if (isCancelled()) return null;
+          const needsRecent = trackEntries.some(e => e.lfmInfo?.key && (e.isLocal || !cachedMap.has(e.lfmInfo.key)));
+          let recentMap = new Map();
+          if (needsRecent) {
+              const username = loadLastFmUsername();
+              const now = Date.now();
+              if (
+                  viewSortRecentScrobblesCache.map &&
+                  viewSortRecentScrobblesCache.username === username &&
+                  (now - viewSortRecentScrobblesCache.ts) < 2 * 60 * 1000
+              ) {
+                  recentMap = viewSortRecentScrobblesCache.map;
+              } else {
+                  if (L_F_M_Key_Pool.length === 0) await fetchLastFmKeys();
+                  if (isCancelled()) return null;
+                  recentMap = await fetchRecentScrobblesMap(() => {}, isCancelled).catch(() => new Map());
+                  if (isCancelled()) return null;
+                  if (recentMap.size > 0) {
+                      viewSortRecentScrobblesCache = { username, map: recentMap, ts: Date.now() };
+                  }
+              }
+          }
+          const toCache = [];
+          const missingEntries = [];
+          const seenMissingKeys = new Set();
+          for (const entry of trackEntries) {
+              const key = entry.lfmInfo?.key;
+              if (!key) continue;
+              const recentTs = recentMap.get(key) || 0;
+              const cachedTs = (!entry.isLocal && cachedMap.has(key)) ? cachedMap.get(key) : null;
+              if (recentTs > 0 && (!cachedTs || recentTs > cachedTs)) {
+                  valuesMap.set(entry.track.uri, recentTs);
+                  if (!entry.isLocal) toCache.push({ key, val: recentTs });
+              } else if (typeof cachedTs === 'number' && cachedTs > 0) {
+                  valuesMap.set(entry.track.uri, cachedTs);
+              } else if (cachedTs === null || cachedTs === undefined) {
+                  if (!seenMissingKeys.has(key)) {
+                      seenMissingKeys.add(key);
+                      missingEntries.push(entry);
+                  }
+              }
+          }
+          if (toCache.length > 0 && idb.setMany) idb.setMany('lastScrobbledDates', toCache).catch(() => {});
+          if (missingEntries.length > 0 && missingEntries.length <= 60 && !isCancelled()) {
+              if (L_F_M_Key_Pool.length === 0) await fetchLastFmKeys();
+              if (isCancelled()) return null;
+              const keyResultMap = new Map();
+              const validKeys = Math.max(1, L_F_M_Key_Pool.length - revokedLfmKeys.size);
+              const conc = Math.min(missingEntries.length, Math.min(20, Math.max(5, validKeys * 2)));
+              let idx = 0;
+              await Promise.all(Array.from({ length: conc }, async () => {
+                  while (idx < missingEntries.length && !isCancelled()) {
+                      const entry = missingEntries[idx++];
+                      try {
+                          const r = await getTrackDetailsWithLastScrobbled(entry.track, true);
+                          if (typeof r?.lastScrobbled === 'number' && r.lastScrobbled > 0) {
+                              keyResultMap.set(entry.lfmInfo.key, r.lastScrobbled);
+                          }
+                      } catch (_) {}
+                  }
+              }));
+              if (isCancelled()) return null;
+              for (const entry of trackEntries) {
+                  const ts = entry.lfmInfo?.key ? keyResultMap.get(entry.lfmInfo.key) : null;
+                  if (ts > 0 && !valuesMap.has(entry.track.uri)) valuesMap.set(entry.track.uri, ts);
+              }
+          }
+      } else {
+          const ids = eligibleItems.map(i => i.uri.split(':')[2]).filter(Boolean);
+          const statsObj = await getBatchTrackStats(ids, () => {}, isCancelled);
+          if (isCancelled()) return null;
+          for (const item of eligibleItems) {
+              const st = statsObj[item.uri.split(':')[2]];
+              if (st) valuesMap.set(item.uri, st);
+          }
+      }
+
+      return isCancelled() ? null : valuesMap;
+  }
+
+  function sortPlaylistItemsByColumn(items, colType, valuesMap, dir, keyMode = null) {
+      const isAsc = dir === 'ASC';
+      const isDateCol = colType === 'releaseDate' || colType === 'trueReleaseDate';
+      const isAudioNumCol = colType === 'tempo' || colType === 'energy' || colType === 'danceability' || colType === 'valence';
+
+      return [...items].sort((a, b) => {
+          const valA = valuesMap.get(a?.uri);
+          const valB = valuesMap.get(b?.uri);
+
+          if (isDateCol) {
+              const hasA = valA && typeof valA.ts === 'number' && !isNaN(valA.ts);
+              const hasB = valB && typeof valB.ts === 'number' && !isNaN(valB.ts);
+              if (!hasA && !hasB) return 0;
+              if (!hasA) return 1;
+              if (!hasB) return -1;
+              if (valA.ts !== valB.ts) return isAsc ? valA.ts - valB.ts : valB.ts - valA.ts;
+              const albCmp = (valA.albumName || '').toLowerCase().localeCompare((valB.albumName || '').toLowerCase());
+              if (albCmp !== 0) return albCmp;
+              if ((valA.discNumber || 1) !== (valB.discNumber || 1)) return (valA.discNumber || 1) - (valB.discNumber || 1);
+              return (valA.trackNumber || 0) - (valB.trackNumber || 0);
+          }
+
+          if (colType === 'key') {
+              const kA = getViewSortKeyNumericValue(valA, keyMode);
+              const kB = getViewSortKeyNumericValue(valB, keyMode);
+              if (kA == null && kB == null) return 0;
+              if (kA == null) return 1;
+              if (kB == null) return -1;
+              return isAsc ? kA - kB : kB - kA;
+          }
+
+          if (colType === 'djInfo') {
+              const kA = getViewSortKeyNumericValue(valA, keyMode);
+              const kB = getViewSortKeyNumericValue(valB, keyMode);
+              const tA = (typeof valA?.tempo === 'number' && Number.isFinite(valA.tempo) && valA.tempo > 0) ? valA.tempo : null;
+              const tB = (typeof valB?.tempo === 'number' && Number.isFinite(valB.tempo) && valB.tempo > 0) ? valB.tempo : null;
+              const eA = (typeof valA?.energy === 'number' && Number.isFinite(valA.energy)) ? valA.energy : null;
+              const eB = (typeof valB?.energy === 'number' && Number.isFinite(valB.energy)) ? valB.energy : null;
+              const hasA = kA != null || tA != null || eA != null;
+              const hasB = kB != null || tB != null || eB != null;
+              if (!hasA && !hasB) return 0;
+              if (!hasA) return 1;
+              if (!hasB) return -1;
+              if (kA !== kB) {
+                  if (kA == null) return 1;
+                  if (kB == null) return -1;
+                  return isAsc ? kA - kB : kB - kA;
+              }
+              if (tA !== tB) {
+                  if (tA == null) return 1;
+                  if (tB == null) return -1;
+                  return isAsc ? tA - tB : tB - tA;
+              }
+              if (eA !== eB) {
+                  if (eA == null) return 1;
+                  if (eB == null) return -1;
+                  return isAsc ? eA - eB : eB - eA;
+              }
+              return 0;
+          }
+
+          const nA = isAudioNumCol ? valA?.[colType] : valA;
+          const nB = isAudioNumCol ? valB?.[colType] : valB;
+          const hasA = typeof nA === 'number' && Number.isFinite(nA) && (colType !== 'tempo' || nA > 0);
+          const hasB = typeof nB === 'number' && Number.isFinite(nB) && (colType !== 'tempo' || nB > 0);
+          if (!hasA && !hasB) return 0;
+          if (!hasA) return 1;
+          if (!hasB) return -1;
+          return isAsc ? nA - nB : nB - nA;
+      });
+  }
+
+  async function getViewSortedContents(uri, options) {
+      const state = playlistViewSortState.get(uri);
+      if (!state) return null;
+      const filterKey = getViewSortFilterKey(options);
+      state.lastFilterKey = filterKey;
+      let items = state.sortedItems;
+      if (filterKey) {
+          if (state.filteredCache.has(filterKey)) {
+              items = state.filteredCache.get(filterKey);
+          } else {
+              const filteredRaw = await fetchAllRawPlaylistItems(uri, options);
+              items = filteredRaw ? sortPlaylistItemsByColumn(filteredRaw, state.colType, state.valuesMap, state.dir, state.keyMode) : [];
+              if (playlistViewSortState.get(uri) === state) state.filteredCache.set(filterKey, items);
+          }
+      }
+      const offset = typeof options?.offset === 'number' ? options.offset : 0;
+      const limit = typeof options?.limit === 'number' ? options.limit : items.length;
+      return {
+          items: items.slice(offset, offset + limit),
+          totalLength: items.length,
+          unfilteredTotalLength: state.sortedItems.length,
+          offset,
+          limit
+      };
+  }
+
+  function clearNativePlaylistSort(uri) {
+      try {
+          const ls = Platform.LocalStorageAPI;
+          if (!ls?.getItem || !ls?.setItem) return;
+          const current = ls.getItem('sortedState');
+          if (current && typeof current === 'object' && Object.prototype.hasOwnProperty.call(current, uri)) {
+              const next = { ...current };
+              delete next[uri];
+              ls.setItem('sortedState', next);
+          }
+      } catch (_) {}
+  }
+
+  function refreshPlaylistViewSort(uri) {
+      if (getCurrentUri() !== uri) return;
+      let invalidated = false;
+      try {
+          const tracklistEl = Array.from(document.querySelectorAll('.main-trackList-indexable, main [role="grid"]:not([aria-colcount="1"])'))
+              .find(t => isTracklistGrid(t) && !t.closest('[data-testid="recommended-track"]'));
+          const probe = tracklistEl?.querySelector('.main-trackList-trackListRow, [role="row"]:not([aria-rowindex="1"])') || tracklistEl;
+          if (probe) {
+              const fk = Object.keys(probe).find(k => k.startsWith('__reactFiber$'));
+              let f = fk ? probe[fk] : null;
+              let depth = 0;
+              while (f && depth < 45) {
+                  if (typeof f.memoizedProps?.itemsCache?.invalidateCache === 'function') {
+                      f.memoizedProps.itemsCache.invalidateCache();
+                      invalidated = true;
+                      break;
+                  }
+                  f = f.return;
+                  depth++;
+              }
+          }
+      } catch (_) {}
+
+      if (!invalidated) {
+          isSyntheticViewSortUpdate = true;
+          try {
+              PlaylistAPI.getEvents?.()?.emit?.('update', { uri });
+          } catch (_) {
+          } finally {
+              isSyntheticViewSortUpdate = false;
+          }
+      }
+
+      setTimeout(() => { if (getCurrentUri() === uri) updateTracklist(); }, 16);
+      setTimeout(() => { if (getCurrentUri() === uri) updateTracklist(); }, 120);
+  }
+
+  function cancelPlaylistViewSort(uri) {
+      const job = playlistViewSortLoading.get(uri);
+      if (!job) return false;
+      job.cancelled = true;
+      if (job.spinnerTimer) {
+          clearTimeout(job.spinnerTimer);
+          job.spinnerTimer = null;
+      }
+      playlistViewSortLoading.delete(uri);
+      syncPlaylistViewSortHeaders();
+      return true;
+  }
+
+  function clearPlaylistViewSort(uri, shouldRefresh = true) {
+      cancelPlaylistViewSort(uri);
+      const hadSort = playlistViewSortState.delete(uri);
+      const t = playlistViewSortRefreshTimers.get(uri);
+      if (t) {
+          clearTimeout(t);
+          playlistViewSortRefreshTimers.delete(uri);
+      }
+      if (hadSort && shouldRefresh) refreshPlaylistViewSort(uri);
+      syncPlaylistViewSortHeaders();
+  }
+
+  function getExtraColMem(store, key, expiryMs = 0) {
+      const map = extraColMemCache[store];
+      if (!map || !key) return undefined;
+      const entry = map.get(key);
+      if (!entry) return undefined;
+      if (expiryMs && Date.now() - entry.ts >= expiryMs) {
+          map.delete(key);
+          return undefined;
+      }
+      return entry.val;
+  }
+
+  function setExtraColMem(store, key, val) {
+      const map = extraColMemCache[store];
+      if (!map || !key) return;
+      if (map.size >= 10000) {
+          let pruned = 0;
+          for (const k of map.keys()) {
+              map.delete(k);
+              if (++pruned >= 2000) break;
+          }
+      }
+      map.set(key, { val, ts: Date.now() });
+  }
+
+  function clearExtraColMem(stores = null) {
+      const targets = Array.isArray(stores) ? stores : Object.keys(extraColMemCache);
+      for (const s of targets) extraColMemCache[s]?.clear();
+  }
+
+  function createDefaultExtraColumnsConfig() {
+      return {
+          playlist: { enabled: true, columns: [{ id: 'playlist2', type: 'releaseDate', enabled: false }, { id: 'playlist1', type: 'playCount', enabled: false }] },
+          album: { enabled: true, columns: [{ id: 'album1', type: 'releaseDate', enabled: false }] },
+          artist: { enabled: true, columns: [{ id: 'artist1', type: 'releaseDate', enabled: false }] }
+      };
+  }
+
+  function syncLegacyFromExtraColumns() {
+      const pCtx = extraColumnsConfig?.playlist;
+      const pCols = Array.isArray(pCtx?.columns) ? pCtx.columns : [];
+      const pOn = pCtx?.enabled !== false;
+      const p1 = pCols.find(c => c.id === 'playlist1') || pCols[pCols.length - 1];
+      const p2 = pCols.find(c => c.id === 'playlist2') || (pCols.length > 1 ? pCols[0] : null);
+      showAdditionalColumn = !!(pOn && p1?.enabled);
+      if (p1?.type && EXTRA_COLUMN_TYPES[p1.type]) selectedColumnType = p1.type;
+      showSecondAdditionalColumn = !!(pOn && p2 && p2 !== p1 && p2.enabled);
+      if (p2 && p2 !== p1 && p2.type && EXTRA_COLUMN_TYPES[p2.type]) selectedSecondColumnType = p2.type;
+
+      const aCtx = extraColumnsConfig?.album;
+      const aCols = Array.isArray(aCtx?.columns) ? aCtx.columns : [];
+      const a1 = aCols.find(c => c.id === 'album1') || aCols[0];
+      showAlbumColumn = !!(aCtx?.enabled !== false && a1?.enabled);
+      if (a1?.type && EXTRA_COLUMN_TYPES[a1.type]) selectedAlbumColumnType = a1.type;
+
+      const rCtx = extraColumnsConfig?.artist;
+      const rCols = Array.isArray(rCtx?.columns) ? rCtx.columns : [];
+      const r1 = rCols.find(c => c.id === 'artist1') || rCols[0];
+      showArtistColumn = !!(rCtx?.enabled !== false && r1?.enabled);
+      if (r1?.type && EXTRA_COLUMN_TYPES[r1.type]) selectedArtistColumnType = r1.type;
+  }
+
+  function syncExtraColumnsFromLegacy(onlySlotId = null) {
+      const def = createDefaultExtraColumnsConfig();
+      if (!extraColumnsConfig || typeof extraColumnsConfig !== 'object') extraColumnsConfig = def;
+      const ensureSlot = (ctxName, id, type, enabled, insertFirst = false) => {
+          if (onlySlotId && onlySlotId !== id) return;
+          if (!extraColumnsConfig[ctxName] || !Array.isArray(extraColumnsConfig[ctxName].columns)) {
+              extraColumnsConfig[ctxName] = def[ctxName];
+          }
+          const cols = extraColumnsConfig[ctxName].columns;
+          const validType = (EXTRA_COLUMN_TYPES[type] && (ctxName === 'playlist' || type !== 'playCount')) ? type : (ctxName === 'playlist' ? 'playCount' : 'releaseDate');
+          const existing = cols.find(c => c.id === id);
+          if (existing) {
+              existing.type = validType;
+              existing.enabled = !!enabled;
+          } else {
+              const entry = { id, type: validType, enabled: !!enabled };
+              if (insertFirst) cols.unshift(entry);
+              else cols.push(entry);
+          }
+          if (enabled) extraColumnsConfig[ctxName].enabled = true;
+      };
+      ensureSlot('playlist', 'playlist2', selectedSecondColumnType, showSecondAdditionalColumn, true);
+      ensureSlot('playlist', 'playlist1', selectedColumnType, showAdditionalColumn, false);
+      ensureSlot('album', 'album1', selectedAlbumColumnType, showAlbumColumn, false);
+      ensureSlot('artist', 'artist1', selectedArtistColumnType, showArtistColumn, false);
+  }
+
+  function migrateAndLoadExtraColumnsConfig() {
+      const def = createDefaultExtraColumnsConfig();
+      const raw = localStorage.getItem(STORAGE_KEY_EXTRA_COLUMNS_CONFIG);
+      if (raw) {
+          try {
+              const parsed = JSON.parse(raw);
+              const normalizeCtx = (ctxName) => {
+                  const src = parsed?.[ctxName];
+                  const fallback = def[ctxName];
+                  if (!src || !Array.isArray(src.columns)) return fallback;
+                  const seen = new Set();
+                  const cols = [];
+                  for (const c of src.columns) {
+                      if (!c || typeof c !== 'object') continue;
+                      const id = typeof c.id === 'string' && c.id.trim() ? c.id.trim() : `${ctxName}_${cols.length + 1}`;
+                      if (seen.has(id)) continue;
+                      seen.add(id);
+                      const type = (EXTRA_COLUMN_TYPES[c.type] && (ctxName === 'playlist' || c.type !== 'playCount')) ? c.type : (ctxName === 'playlist' ? 'playCount' : 'releaseDate');
+                      const entry = { id, type, enabled: !!c.enabled };
+                      if (typeof c.format === 'string' && c.format.trim()) entry.format = c.format.trim();
+                      if (c.align === 'left' || c.align === 'right') entry.align = c.align;
+                      cols.push(entry);
+                  }
+                  return { enabled: src.enabled !== false && cols.some(c => c.enabled), columns: cols };
+              };
+              extraColumnsConfig = {
+                  playlist: normalizeCtx('playlist'),
+                  album: normalizeCtx('album'),
+                  artist: normalizeCtx('artist')
+              };
+              syncLegacyFromExtraColumns();
+          } catch (_) {
+              extraColumnsConfig = def;
+              syncExtraColumnsFromLegacy();
+          }
+      } else {
+          extraColumnsConfig = def;
+          syncExtraColumnsFromLegacy();
+          localStorage.setItem(STORAGE_KEY_EXTRA_COLUMNS_CONFIG, JSON.stringify(extraColumnsConfig));
+      }
+
+      const rawWidths = localStorage.getItem(STORAGE_KEY_EXTRA_COLUMN_WIDTHS);
+      extraColumnWidths = { layouts: {}, cols: {} };
+      if (rawWidths) {
+          try {
+              const pw = JSON.parse(rawWidths);
+              if (pw && typeof pw === 'object' && !Array.isArray(pw)) {
+                  if (pw.layouts && typeof pw.layouts === 'object' && !Array.isArray(pw.layouts)) {
+                      extraColumnWidths.layouts = { ...pw.layouts };
+                      extraColumnWidths.cols = (pw.cols && typeof pw.cols === 'object' && !Array.isArray(pw.cols)) ? { ...pw.cols } : {};
+                  } else {
+                      for (const [k, v] of Object.entries(pw)) {
+                          if (Array.isArray(v)) extraColumnWidths.layouts[k] = v;
+                      }
+                  }
+              }
+          } catch (_) {}
+      }
+  }
+
+  function getExtraColumnEffectiveFormat(type, formatOverride = null) {
+      if (typeof formatOverride === 'string' && formatOverride.trim()) return formatOverride.trim();
+      if (type === 'releaseDate' || type === 'trueReleaseDate') return releaseDateFormat || 'YYYY-MM-DD';
+      if (type === 'personalScrobbles') return myScrobblesDisplayMode || 'number';
+      if (type === 'lastScrobbled') return lastScrobbledFormat || 'relative';
+      if (type === 'key' || type === 'djInfo') return keyDisplayMode || 'standard';
+      if (type === 'playCount' || type === 'scrobbles') return 'raw';
+      return '';
+  }
+
+  function getExtraColumnSizing(type, formatOverride = null) {
+      const meta = EXTRA_COLUMN_TYPES[type];
+      const base = { minW: meta?.minW || 72, weight: meta?.weight || 1.3, fmtBucket: '' };
+      const fmt = getExtraColumnEffectiveFormat(type, formatOverride);
+      if (type === 'playCount' && (fmt === 'abbreviated' || fmt === 'rounded_abbreviated')) return { minW: 70, weight: 1.0, fmtBucket: 'short' };
+      if (type === 'scrobbles' && (fmt === 'abbreviated' || fmt === 'rounded_abbreviated')) return { minW: 76, weight: 1.0, fmtBucket: 'short' };
+      if (type === 'personalScrobbles') {
+          if (fmt === 'sign') return { minW: 66, weight: 0.9, fmtBucket: 'sign' };
+          if (fmt === 'abbreviated') return { minW: 94, weight: 1.2, fmtBucket: 'short' };
+      }
+      if (type === 'releaseDate' || type === 'trueReleaseDate') {
+          if (fmt === 'YYYY') return { minW: 72, weight: 0.95, fmtBucket: 'short' };
+          if (fmt === 'MMM D, YYYY' || fmt === 'D MMM, YYYY' || fmt === 'YYYY, MMM D') return { minW: 112, weight: 1.75, fmtBucket: 'long' };
+      }
+      if (type === 'lastScrobbled' && fmt === 'datetime') return { minW: 156, weight: 2.2, fmtBucket: 'long' };
+      if (type === 'djInfo') {
+          if (fmt === 'camelot' || fmt === 'openkey') return { minW: 114, weight: 1.85, fmtBucket: 'short' };
+          if (fmt === 'full_name' || fmt === 'standard_camelot') return { minW: 156, weight: 2.3, fmtBucket: 'long' };
+      }
+      if (type === 'key') {
+          if (fmt === 'camelot' || fmt === 'openkey') return { minW: 58, weight: 0.85, fmtBucket: 'short' };
+          if (fmt === 'full_name' || fmt === 'standard_camelot') return { minW: 108, weight: 1.6, fmtBucket: 'long' };
+      }
+      return base;
+  }
+
+  function formatExtraColumnNumber(value, format = 'raw', allowZero = false) {
+      const num = Number(value);
+      if (value === null || value === undefined || isNaN(num) || (allowZero ? num < 0 : num <= 0)) return "―";
+      if (format === 'abbreviated') {
+          if (num >= 1_000_000_000) return (num / 1_000_000_000).toFixed(1).replace(/\.0$/, '') + 'B';
+          if (num >= 1_000_000) return (num / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
+          if (num >= 1_000) return (num / 1_000).toFixed(1).replace(/\.0$/, '') + 'K';
+          return String(Math.round(num));
+      }
+      if (format === 'rounded_abbreviated') {
+          if (num >= 1_000_000_000) return Math.round(num / 1_000_000_000) + 'B';
+          if (num >= 1_000_000) return Math.round(num / 1_000_000) + 'M';
+          if (num >= 1_000) return Math.round(num / 1_000) + 'K';
+          return String(Math.round(num));
+      }
+      return spNumberFormatter.format(num);
+  }
+
+  function pickNextExtraColumnType(context) {
+      const order = context === 'playlist'
+          ? ['playCount', 'scrobbles', 'releaseDate', 'tempo', 'key', 'popularity', 'personalScrobbles', 'lastScrobbled', 'trueReleaseDate', 'djInfo', 'energy', 'danceability', 'valence']
+          : ['scrobbles', 'releaseDate', 'popularity', 'tempo', 'key', 'personalScrobbles', 'lastScrobbled', 'trueReleaseDate', 'djInfo', 'energy', 'danceability', 'valence'];
+      const used = new Set((extraColumnsConfig?.[context]?.columns || []).map(c => c.type));
+      return order.find(t => !used.has(t)) || order[0];
+  }
+
+  function syncOpenExtraColumnsUi() {
+      const settingsOverlay = document.getElementById('sort-play-settings-overlay');
+      if (typeof settingsOverlay?._syncExtraColumnsSummary === 'function') settingsOverlay._syncExtraColumnsSummary();
+      const ecHost = document.getElementById('sort-play-extra-cols-window') || document.getElementById('sort-play-extra-cols-overlay');
+      if (typeof ecHost?._syncFromExternal === 'function') ecHost._syncFromExternal();
+  }
+
+  function getExtraColumnLabel(type, formatOverride = null) {
+      if (type === 'personalScrobbles') return (formatOverride || myScrobblesDisplayMode) === 'sign' ? 'Listened' : 'My Scrobbles';
+      return EXTRA_COLUMN_TYPES[type]?.label || 'Plays';
+  }
+
+  function getExtraColumnContextForPage() {
+      const currentUri = getCurrentUri();
+      const isSearch = Spicetify.Platform.History.location?.pathname?.startsWith('/search');
+      if (isSearch || (currentUri && (URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri) || isLocalFilesPage(currentUri)))) return 'playlist';
+      if (currentUri && URI.isAlbum(currentUri)) return 'album';
+      if (currentUri && URI.isArtist(currentUri)) return 'artist';
+      return null;
+  }
+
+  function getActiveExtraColumns(context) {
+      const ctx = extraColumnsConfig?.[context];
+      if (!ctx || ctx.enabled === false || !Array.isArray(ctx.columns)) return [];
+      const active = [];
+      for (const col of ctx.columns) {
+          if (!col?.enabled) continue;
+          const meta = EXTRA_COLUMN_TYPES[col.type];
+          if (!meta || (context !== 'playlist' && col.type === 'playCount')) continue;
+          const sizing = getExtraColumnSizing(col.type, col.format || null);
+          active.push({
+              id: col.id,
+              type: col.type,
+              format: col.format || null,
+              align: (col.align === 'left' || col.align === 'right') ? col.align : 'center',
+              label: getExtraColumnLabel(col.type, col.format),
+              weight: sizing.weight,
+              minW: sizing.minW,
+              fmtBucket: sizing.fmtBucket
+          });
+      }
+      return active;
+  }
+
+  function getExtraColumnById(context, colId) {
+      return extraColumnsConfig?.[context]?.columns?.find(c => c.id === colId) || null;
+  }
+
+  function refreshExtraColumnsForContext(context) {
+      if (context === 'playlist') updateTracklist();
+      else if (context === 'album') updateAlbumTracklist();
+      else if (context === 'artist') updateArtistTracklist();
+  }
+
+  function setExtraColumnsContextEnabled(context, enabled, skipRefresh = false) {
+      const ctx = extraColumnsConfig?.[context];
+      if (!ctx) return false;
+      const nextEnabled = !!enabled;
+      if (nextEnabled) {
+          if (!Array.isArray(ctx.columns)) ctx.columns = [];
+          if (ctx.columns.length === 0) {
+              const defType = context === 'playlist' ? 'playCount' : 'scrobbles';
+              ctx.columns.push({ id: `col_${context[0]}_${Date.now().toString(36)}`, type: defType, enabled: true });
+          } else if (!ctx.columns.some(c => c.enabled)) {
+              ctx.columns[0].enabled = true;
+          }
+      }
+      ctx.enabled = nextEnabled;
+      syncLegacyFromExtraColumns();
+      saveSettings();
+      if (context === 'playlist' && !ctx.enabled) {
+          for (const col of ctx.columns) handleExtraColumnConfigChanged(col.id, false, col.type);
+      }
+      syncOpenExtraColumnsUi();
+      if (!skipRefresh) refreshExtraColumnsForContext(context);
+      return true;
+  }
+
+  function addExtraColumn(context, type = null, insertIndex = -1, format = null, align = null, skipRefresh = false) {
+      const ctx = extraColumnsConfig?.[context];
+      if (!ctx || !Array.isArray(ctx.columns)) return null;
+      const picked = type || pickNextExtraColumnType(context);
+      const safeType = (EXTRA_COLUMN_TYPES[picked] && !((context === 'album' || context === 'artist') && picked === 'playCount')) ? picked : (context === 'playlist' ? 'playCount' : 'scrobbles');
+      const col = { id: `col_${context[0]}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 5)}`, type: safeType, enabled: true };
+      if (typeof format === 'string' && format.trim()) col.format = format.trim();
+      if (align === 'left' || align === 'right') col.align = align;
+      if (insertIndex >= 0 && insertIndex <= ctx.columns.length) ctx.columns.splice(insertIndex, 0, col);
+      else ctx.columns.push(col);
+      ctx.enabled = true;
+      syncLegacyFromExtraColumns();
+      saveSettings();
+      syncOpenExtraColumnsUi();
+      if (!skipRefresh) refreshExtraColumnsForContext(context);
+      return col;
+  }
+
+  function removeExtraColumn(context, colId, skipRefresh = false) {
+      const ctx = extraColumnsConfig?.[context];
+      if (!ctx || !Array.isArray(ctx.columns)) return false;
+      const idx = ctx.columns.findIndex(c => c.id === colId);
+      if (idx === -1) return false;
+      const [removed] = ctx.columns.splice(idx, 1);
+      if (!ctx.columns.some(c => c.enabled)) ctx.enabled = false;
+      syncLegacyFromExtraColumns();
+      saveSettings();
+      if (context === 'playlist') handleExtraColumnConfigChanged(colId, false, removed.type);
+      syncOpenExtraColumnsUi();
+      if (!skipRefresh) refreshExtraColumnsForContext(context);
+      return true;
+  }
+
+  function setExtraColumnType(context, colId, newType, format = null, skipRefresh = false) {
+      const col = getExtraColumnById(context, colId);
+      if (!col || !EXTRA_COLUMN_TYPES[newType]) return false;
+      if ((context === 'album' || context === 'artist') && newType === 'playCount') return false;
+      col.type = newType;
+      if (typeof format === 'string' && format.trim()) col.format = format.trim();
+      else delete col.format;
+      syncLegacyFromExtraColumns();
+      saveSettings();
+      const isVisible = extraColumnsConfig[context].enabled !== false && !!col.enabled;
+      if (context === 'playlist') handleExtraColumnConfigChanged(colId, isVisible, newType);
+      syncOpenExtraColumnsUi();
+      if (!skipRefresh) refreshExtraColumnsForContext(context);
+      return true;
+  }
+
+  function setExtraColumnEnabled(context, colId, enabled, skipRefresh = false) {
+      const col = getExtraColumnById(context, colId);
+      if (!col) return false;
+      col.enabled = !!enabled;
+      if (enabled) extraColumnsConfig[context].enabled = true;
+      else if (!extraColumnsConfig[context].columns.some(c => c.enabled)) extraColumnsConfig[context].enabled = false;
+      syncLegacyFromExtraColumns();
+      saveSettings();
+      if (context === 'playlist') handleExtraColumnConfigChanged(colId, col.enabled, col.type);
+      syncOpenExtraColumnsUi();
+      if (!skipRefresh) refreshExtraColumnsForContext(context);
+      return true;
+  }
+
+  function setExtraColumnFormat(context, colId, format, skipRefresh = false) {
+      const col = getExtraColumnById(context, colId);
+      if (!col) return false;
+      if (typeof format === 'string' && format.trim()) col.format = format.trim();
+      else delete col.format;
+      saveSettings();
+      document.querySelectorAll(`[data-sp-col-val="${colId}"]`).forEach(resetExtraColumnCell);
+      if (context === 'playlist' && (col.type === 'key' || col.type === 'djInfo')) handleExtraColumnFormatChanged(col.type, colId);
+      syncOpenExtraColumnsUi();
+      if (!skipRefresh) refreshExtraColumnsForContext(context);
+      return true;
+  }
+
+  function setExtraColumnAlign(context, colId, align, skipRefresh = false) {
+      const col = getExtraColumnById(context, colId);
+      if (!col) return false;
+      if (align === 'left' || align === 'right') col.align = align;
+      else delete col.align;
+      saveSettings();
+      syncOpenExtraColumnsUi();
+      if (!skipRefresh) refreshExtraColumnsForContext(context);
+      return true;
+  }
+
+  function setContextExtraColumnsAlign(context, align, skipRefresh = false) {
+      const ctx = extraColumnsConfig?.[context];
+      if (!ctx || !Array.isArray(ctx.columns)) return false;
+      for (const col of ctx.columns) {
+          if (align === 'left' || align === 'right') col.align = align;
+          else delete col.align;
+      }
+      saveSettings();
+      syncOpenExtraColumnsUi();
+      if (!skipRefresh) refreshExtraColumnsForContext(context);
+      return true;
+  }
+
+  function reorderExtraColumns(context, orderedIds, skipRefresh = false) {
+      const ctx = extraColumnsConfig?.[context];
+      if (!ctx || !Array.isArray(ctx.columns) || !Array.isArray(orderedIds)) return false;
+      const byId = new Map(ctx.columns.map(c => [c.id, c]));
+      const next = [];
+      for (const id of orderedIds) {
+          const item = byId.get(id);
+          if (item) { next.push(item); byId.delete(id); }
+      }
+      for (const item of byId.values()) next.push(item);
+      ctx.columns = next;
+      syncLegacyFromExtraColumns();
+      saveSettings();
+      syncOpenExtraColumnsUi();
+      if (!skipRefresh) {
+          refreshExtraColumnsForContext(context);
+          if (context === 'playlist') syncPlaylistViewSortHeaders();
+      }
+      return true;
+  }
+
+  function resetExtraColumnWidths(context = null) {
+      if (!context) {
+          extraColumnWidths = { layouts: {}, cols: {} };
+      } else {
+          for (const k of Object.keys(extraColumnWidths.layouts || {})) {
+              if (k.startsWith(`${context}|`)) delete extraColumnWidths.layouts[k];
+          }
+          for (const k of Object.keys(extraColumnWidths.cols || {})) {
+              if (k.startsWith(`${context}:`)) delete extraColumnWidths.cols[k];
+          }
+      }
+      saveExtraColumnWidthsDebounced();
+      document.querySelectorAll('div[data-sp-grid]').forEach(g => {
+          delete g._spLayoutKey;
+          const hr = g.querySelector('.main-trackList-trackListHeaderRow, [role="row"]:has([role="columnheader"])');
+          const ctx = g.getAttribute('data-sp-grid');
+          if (hr && ctx && ctx !== 'rec' && (!context || ctx === context)) applyTracklistGridLayout(g, hr, ctx, true);
+      });
+  }
+
+  function hasCustomExtraColumnWidths(context) {
+      if (!context || !extraColumnWidths) return false;
+      const layoutPrefix = `${context}|`;
+      const colPrefix = `${context}:`;
+      return Object.keys(extraColumnWidths.layouts || {}).some(k => k.startsWith(layoutPrefix))
+          || Object.keys(extraColumnWidths.cols || {}).some(k => k.startsWith(colPrefix));
+  }
+  
+  function resetExtraColumnCell(cell) {
+      if (!cell) return;
+      cell.textContent = "";
+      delete cell.dataset.spProcessed;
+      cell.onclick = null;
+      cell.onmouseover = null;
+      cell.onmouseout = null;
+      cell.classList.remove('sp-col-clickable');
+      cell.style.cursor = "";
+      cell.style.textDecoration = "";
+      cell.style.color = "";
+      cell.removeAttribute('title');
+  }
+
+  function saveExtraColumnWidthsDebounced() {
+      clearTimeout(extraColumnWidthsSaveTimer);
+      extraColumnWidthsSaveTimer = setTimeout(() => {
+          localStorage.setItem(STORAGE_KEY_EXTRA_COLUMN_WIDTHS, JSON.stringify(extraColumnWidths));
+      }, 250);
+  }
+
+  function syncPlaylistViewSortHeaders(root = document) {
+      const currentUri = getCurrentUri();
+      const isSortable = !!(currentUri && URI.isPlaylistV1OrV2(currentUri));
+      const activeSort = isSortable ? playlistViewSortState.get(currentUri) : null;
+      const loadingJob = isSortable ? playlistViewSortLoading.get(currentUri) : null;
+      const headers = root.querySelectorAll('.sp-extra-col-header[data-sp-col-id], .sort-play-column[data-sp-slot], .sort-play-second-column[data-sp-slot]');
+      headers.forEach(col => {
+          const slot = col.dataset.spColId || col.dataset.spSlot;
+          const colType = col.dataset.spColType || getExtraColumnById('playlist', slot)?.type || (slot === 'playlist1' ? selectedColumnType : selectedSecondColumnType);
+          col.classList.toggle('sp-sortable-col', isSortable);
+          const isLoading = !!(loadingJob && loadingJob.slot === slot && loadingJob.spinnerVisible);
+          col.classList.toggle('sp-col-loading', isLoading);
+          const isActive = !!(activeSort && activeSort.slot === slot && activeSort.colType === colType && !isLoading);
+          const nextAriaSort = isActive ? (activeSort.dir === 'ASC' ? 'ascending' : 'descending') : 'none';
+          if (col.getAttribute('aria-sort') !== nextAriaSort) col.setAttribute('aria-sort', nextAriaSort);
+          const arrowEl = col.querySelector('.sort-play-sort-arrow');
+          let arrowChanged = false;
+          if (arrowEl) {
+              const expectedArrow = isActive ? (activeSort.dir === 'ASC' ? viewSortArrowAscSvg : viewSortArrowDescSvg) : '';
+              if (arrowEl.innerHTML !== expectedArrow) {
+                  arrowEl.innerHTML = expectedArrow;
+                  arrowChanged = true;
+              }
+          }
+          if (arrowChanged && (isLoading || col.classList.contains('sp-col-menu-open') || col.matches(':hover'))) {
+              syncExtraColHeaderHoverLock(col, false, true);
+              syncExtraColHeaderHoverLock(col, true);
+          } else {
+              syncExtraColHeaderHoverLock(col, isLoading);
+          }
+          const menuBtn = col.querySelector('.sort-play-col-menu-btn');
+          if (menuBtn) {
+              if (!isLoading && menuBtn.classList.contains('sp-col-aborting')) menuBtn.classList.remove('sp-col-aborting');
+              const nextLabel = isLoading ? 'Cancel sort' : 'Change column';
+              if (menuBtn.getAttribute('aria-label') !== nextLabel) menuBtn.setAttribute('aria-label', nextLabel);
+              const nextTitle = isLoading ? 'Cancel sort' : '';
+              if (menuBtn.title !== nextTitle) menuBtn.title = nextTitle;
+          }
+      });
+  }
+
+  async function handleExtraColumnHeaderSortClick(slot) {
+      const uri = getCurrentUri();
+      if (!uri || !URI.isPlaylistV1OrV2(uri)) return;
+      const colObj = getExtraColumnById('playlist', slot);
+      const colType = colObj?.type || (slot === 'playlist1' ? selectedColumnType : selectedSecondColumnType);
+      const keyMode = (colType === 'key' || colType === 'djInfo') ? (colObj?.format || keyDisplayMode) : null;
+      const existingJob = playlistViewSortLoading.get(uri);
+      if (existingJob) {
+          if (existingJob.slot === slot && existingJob.colType === colType) return;
+          cancelPlaylistViewSort(uri);
+      }
+
+      const cycle = getViewSortDefaultCycle(colType);
+      const currentSort = playlistViewSortState.get(uri);
+      if (currentSort && currentSort.slot === slot && currentSort.colType === colType) {
+          const nextDir = cycle[(cycle.indexOf(currentSort.dir) + 1) % cycle.length];
+          if (!nextDir) {
+              playlistViewSortState.delete(uri);
+              refreshPlaylistViewSort(uri);
+              syncPlaylistViewSortHeaders();
+              return;
+          }
+          currentSort.dir = nextDir;
+          currentSort.keyMode = keyMode;
+          currentSort.sortedItems = sortPlaylistItemsByColumn(currentSort.rawItems, colType, currentSort.valuesMap, nextDir, keyMode);
+          currentSort.filteredCache.clear();
+          refreshPlaylistViewSort(uri);
+          syncPlaylistViewSortHeaders();
+          return;
+      }
+
+      if ((colType === 'personalScrobbles' || colType === 'lastScrobbled') && !loadLastFmUsername()) {
+          showNotification("Last.fm username is not set.", true);
+          return;
+      }
+
+      const targetDir = cycle[0];
+      const token = ++playlistViewSortSeq;
+      const job = { token, slot, colType, targetDir, cancelled: false, spinnerVisible: false, spinnerTimer: null };
+      playlistViewSortLoading.set(uri, job);
+      job.spinnerTimer = setTimeout(() => {
+          job.spinnerTimer = null;
+          if (!job.cancelled && playlistViewSortLoading.get(uri)?.token === token) {
+              job.spinnerVisible = true;
+              syncPlaylistViewSortHeaders();
+          }
+      }, 280);
+
+      const isCancelled = () => job.cancelled || playlistViewSortLoading.get(uri)?.token !== token;
+      try {
+          const rawItems = await fetchAllRawPlaylistItems(uri, null, isCancelled, { keepReleaseExt: colType === 'releaseDate' });
+          if (!rawItems || isCancelled() || rawItems.length === 0) return;
+          const valuesMap = await enrichItemsForColumnSort(rawItems, colType, isCancelled);
+          if (!valuesMap || isCancelled()) return;
+          const sortedItems = sortPlaylistItemsByColumn(rawItems, colType, valuesMap, targetDir, keyMode);
+          if (job.spinnerTimer) {
+              clearTimeout(job.spinnerTimer);
+              job.spinnerTimer = null;
+          }
+          if (playlistViewSortLoading.get(uri)?.token === token) playlistViewSortLoading.delete(uri);
+          setPlaylistViewSortState(uri, {
+              slot,
+              colType,
+              keyMode,
+              dir: targetDir,
+              rawItems,
+              valuesMap,
+              sortedItems,
+              filteredCache: new Map(),
+              lastFilterKey: ''
+          });
+          clearNativePlaylistSort(uri);
+          refreshPlaylistViewSort(uri);
+      } catch (err) {
+          console.error("[Sort-Play] Extra column view sort failed:", err);
+      } finally {
+          if (job.spinnerTimer) {
+              clearTimeout(job.spinnerTimer);
+              job.spinnerTimer = null;
+          }
+          if (playlistViewSortLoading.get(uri)?.token === token) playlistViewSortLoading.delete(uri);
+          syncPlaylistViewSortHeaders();
+      }
+  }
+
+  function handleExtraColumnConfigChanged(slot, isVisible, colType) {
+      for (const [uri, job] of Array.from(playlistViewSortLoading.entries())) {
+          if (job.slot === slot && (!isVisible || job.colType !== colType)) {
+              cancelPlaylistViewSort(uri);
+          }
+      }
+      for (const [uri, state] of Array.from(playlistViewSortState.entries())) {
+          if (state.slot === slot && (!isVisible || state.colType !== colType)) {
+              playlistViewSortState.delete(uri);
+              if (getCurrentUri() === uri) refreshPlaylistViewSort(uri);
+          }
+      }
+      syncPlaylistViewSortHeaders();
+  }
+
+  function handleExtraColumnFormatChanged(colType, colId = null) {
+      for (const [uri, state] of playlistViewSortState.entries()) {
+          if (colId && state.slot !== colId) continue;
+          if (state.colType === colType || (colType === 'key' && state.colType === 'djInfo')) {
+              const colObj = getExtraColumnById('playlist', state.slot);
+              state.keyMode = colObj?.format || keyDisplayMode;
+              state.sortedItems = sortPlaylistItemsByColumn(state.rawItems, state.colType, state.valuesMap, state.dir, state.keyMode);
+              state.filteredCache.clear();
+              if (getCurrentUri() === uri) refreshPlaylistViewSort(uri);
+          }
+      }
+  }
+
+  function scheduleViewSortResync(uri) {
+      const existing = playlistViewSortRefreshTimers.get(uri);
+      if (existing) clearTimeout(existing);
+      playlistViewSortRefreshTimers.set(uri, setTimeout(async () => {
+          playlistViewSortRefreshTimers.delete(uri);
+          const state = playlistViewSortState.get(uri);
+          if (!state) return;
+          try {
+              const rawItems = await fetchAllRawPlaylistItems(uri, null, () => playlistViewSortState.get(uri) !== state, {
+                  keepReleaseExt: state.colType === 'releaseDate',
+                  forceRefresh: true
+              });
+              if (!rawItems || playlistViewSortState.get(uri) !== state) return;
+              const updatedMap = await enrichItemsForColumnSort(rawItems, state.colType, () => playlistViewSortState.get(uri) !== state, state.valuesMap);
+              if (!updatedMap || playlistViewSortState.get(uri) !== state) return;
+              state.rawItems = rawItems;
+              state.valuesMap = updatedMap;
+              state.sortedItems = sortPlaylistItemsByColumn(rawItems, state.colType, updatedMap, state.dir, state.keyMode);
+              state.filteredCache.clear();
+              refreshPlaylistViewSort(uri);
+          } catch (_) {}
+      }, 300));
+  }
+
+  function installPlaylistViewSortHooks() {
+      if (typeof window.__spViewSortCleanup === 'function') {
+          try { window.__spViewSortCleanup(); } catch (_) {}
+      }
+      if (!spViewSortOriginals.playerPlay && typeof Platform.PlayerAPI?.play === 'function') {
+          spViewSortOriginals.playerPlay = Platform.PlayerAPI.play.bind(Platform.PlayerAPI);
+      }
+
+      PlaylistAPI.getContents = async function(uri, options) {
+          if (typeof uri === 'string' && playlistViewSortState.has(uri)) {
+              if (options?.sort) {
+                  clearPlaylistViewSort(uri, false);
+              } else {
+                  const res = await getViewSortedContents(uri, options);
+                  if (res) return res;
+              }
+          }
+          return await getRawPlaylistContents(uri, options);
+      };
+
+      PlaylistAPI.getPlaylist = async function(uri, metadataOptions, contentsOptions) {
+          if (typeof uri === 'string' && playlistViewSortState.has(uri) && contentsOptions?.sort) {
+              clearPlaylistViewSort(uri, false);
+          }
+          const res = await spViewSortOriginals.getPlaylist(uri, metadataOptions, contentsOptions);
+          if (res?.contents && typeof uri === 'string') {
+              const unfilteredLen = res.contents.unfilteredTotalLength;
+              if (typeof unfilteredLen === 'number') {
+                  const cachedRaw = playlistRawItemsCache.get(uri);
+                  if (cachedRaw && cachedRaw.items.length !== unfilteredLen) {
+                      playlistRawItemsCache.delete(uri);
+                  }
+              }
+              if (playlistViewSortState.has(uri) && !contentsOptions?.sort) {
+                  const state = playlistViewSortState.get(uri);
+                  if (typeof unfilteredLen === 'number' && unfilteredLen !== state.rawItems.length) {
+                      scheduleViewSortResync(uri);
+                  }
+                  const sortedContents = await getViewSortedContents(uri, contentsOptions);
+                  if (sortedContents) return { ...res, contents: sortedContents };
+              }
+          }
+          return res;
+      };
+
+      if (spViewSortOriginals.move) {
+          PlaylistAPI.move = async function(uri) {
+              if (typeof uri === 'string' && playlistViewSortState.has(uri)) {
+                  return;
+              }
+              if (typeof uri === 'string') playlistRawItemsCache.delete(uri);
+              return await spViewSortOriginals.move.apply(this, arguments);
+          };
+      }
+
+      if (spViewSortOriginals.playerPlay && Platform.PlayerAPI) {
+          Platform.PlayerAPI.play = async function(context, origin, options) {
+              const ctxUri = typeof context === 'string' ? context : context?.uri;
+              if (
+                  typeof ctxUri === 'string' &&
+                  playlistViewSortState.has(ctxUri) &&
+                  !(typeof context === 'object' && context?.pages) &&
+                  !(typeof context === 'object' && context?.playlistQueryOptions?.sort)
+              ) {
+                  const state = playlistViewSortState.get(ctxUri);
+                  const filterKey = typeof context === 'object' ? getViewSortFilterKey(context.playlistQueryOptions) : '';
+                  const canUseLastFilter = !filterKey && getCurrentUri() === ctxUri && !(typeof context === 'object' && context?.playlistQueryOptions);
+                  const activeItems = (filterKey && state.filteredCache.get(filterKey))
+                      || (canUseLastFilter && state.lastFilterKey && state.filteredCache.get(state.lastFilterKey))
+                      || state.sortedItems;
+                  if (activeItems?.length > 0) {
+                      const modCtx = typeof context === 'string' ? { uri: ctxUri } : { ...context };
+                      delete modCtx.playlistQueryOptions;
+                      modCtx.url = `context://${ctxUri}`;
+                      modCtx.pages = [{ items: activeItems.map(t => ({ uri: t.uri, uid: t.uid ?? '' })) }];
+                      const modOpts = options ? { ...options } : {};
+                      if (modOpts.skipTo) {
+                          const { uid, uri: skipUri } = modOpts.skipTo;
+                          let matchedIdx = uid ? activeItems.findIndex(t => t.uid === uid) : -1;
+                          if (matchedIdx === -1 && skipUri) matchedIdx = activeItems.findIndex(t => t.uri === skipUri);
+                          modOpts.skipTo = matchedIdx !== -1 ? { ...modOpts.skipTo, index: matchedIdx } : { ...modOpts.skipTo };
+                      }
+                      return await spViewSortOriginals.playerPlay(modCtx, origin, modOpts);
+                  }
+              }
+              return await spViewSortOriginals.playerPlay.apply(this, arguments);
+          };
+      }
+
+      const lsEvents = Platform.LocalStorageAPI?.getEvents?.();
+      const onSortedStateUpdate = (evt) => {
+          const data = evt?.data || evt;
+          if (data?.key !== 'sortedState') return;
+          const val = data.value ?? Platform.LocalStorageAPI?.getItem?.('sortedState');
+          if (!val || typeof val !== 'object') return;
+          for (const uri of Array.from(playlistViewSortState.keys())) {
+              if (val[uri]) clearPlaylistViewSort(uri, false);
+          }
+          for (const uri of Array.from(playlistViewSortLoading.keys())) {
+              if (val[uri]) cancelPlaylistViewSort(uri);
+          }
+      };
+      if (lsEvents?.addListener) lsEvents.addListener('update', onSortedStateUpdate);
+
+      const plEvents = PlaylistAPI.getEvents?.();
+      const onPlaylistOp = (evt) => {
+          if (isSyntheticViewSortUpdate) return;
+          const data = evt?.data || evt;
+          const uri = data?.uri;
+          const op = data?.operation;
+          if (typeof uri === 'string') {
+              playlistRawItemsCache.delete(uri);
+              if (playlistViewSortState.has(uri) && (op === 'add' || op === 'remove')) {
+                  scheduleViewSortResync(uri);
+              }
+          }
+      };
+      if (plEvents?.addListener) plEvents.addListener('operation', onPlaylistOp);
+
+      window.__spViewSortCleanup = () => {
+          try { lsEvents?.removeListener?.('update', onSortedStateUpdate); } catch (_) {}
+          try { plEvents?.removeListener?.('operation', onPlaylistOp); } catch (_) {}
+      };
+  }
+
+  function showColumnSelector(event, contextType, colId = null) {
     event.stopPropagation();
     const anchorBtn = event.currentTarget;
+    const ownerHeaderCol = anchorBtn?.closest?.('.sp-extra-col-header, .sort-play-column, .sort-play-second-column');
 
     const existing = document.getElementById('sort-play-column-selector');
-    const isSameAnchor = existing && existing._anchor === anchorBtn;
+    const isSameAnchor = existing && existing._anchorCol === (ownerHeaderCol || anchorBtn) && event.type === 'click';
 
     closeAllMenus();
 
-    if (isSameAnchor) {
-        return;
+    if (isSameAnchor) return;
+
+    let ctx = contextType;
+    let targetColId = colId || ownerHeaderCol?.dataset?.spColId || null;
+    if (ctx === 'playlist1' || ctx === 'playlist2') {
+        targetColId = targetColId || ctx;
+        ctx = 'playlist';
+    } else if ((ctx === 'album' || ctx === 'artist') && !targetColId) {
+        targetColId = extraColumnsConfig?.[ctx]?.columns?.[0]?.id || `${ctx}1`;
     }
+    const targetCol = getExtraColumnById(ctx, targetColId);
+    if (!targetCol) return;
+
+    if (ownerHeaderCol) ownerHeaderCol.classList.add('sp-col-menu-open');
 
     window.columnSelectorAbortController = new AbortController();
     const signal = window.columnSelectorAbortController.signal;
 
-    const options = [
-        { value: 'off', label: 'Off (Hide Column)' },
-        { value: 'playCount', label: 'Play Count' },
-        { value: 'popularity', label: 'Popularity' },
-        { value: 'releaseDate', label: 'Release Date', hasSettings: true, getHtml: () => getDateFormatDropdownHtml(releaseDateFormat), datasetKey: 'format', updateVar: v => releaseDateFormat = v },
-        { value: 'trueReleaseDate', label: 'True Release Date', hasSettings: true, getHtml: () => getDateFormatDropdownHtml(releaseDateFormat), datasetKey: 'format', updateVar: v => releaseDateFormat = v },
-        { value: 'scrobbles', label: 'Scrobbles' },
-        { value: 'personalScrobbles', label: 'My Scrobbles', hasSettings: true, getHtml: () => getMyScrobblesDropdownHtml(myScrobblesDisplayMode), datasetKey: 'mode', updateVar: v => myScrobblesDisplayMode = v },
-        { value: 'lastScrobbled', label: 'Last Scrobbled', hasSettings: true, getHtml: () => getLastScrobbledDropdownHtml(lastScrobbledFormat), datasetKey: 'format', updateVar: v => lastScrobbledFormat = v },
-        { value: 'djInfo', label: 'DJ Info' },
-        { value: 'key', label: 'Key', hasSettings: true, getHtml: () => getKeyDropdownHtml(keyDisplayMode), datasetKey: 'mode', updateVar: v => keyDisplayMode = v },
-        { value: 'tempo', label: 'Tempo (BPM)' },
-        { value: 'energy', label: 'Energy' },
-        { value: 'danceability', label: 'Danceability' },
-        { value: 'valence', label: 'Valence' }
+    const TYPE_GROUPS = [
+        { label: 'Spotify Stats', types: ['playCount', 'popularity'] },
+        { label: 'Release Info', types: ['releaseDate', 'trueReleaseDate'] },
+        { label: 'Last.fm', types: ['scrobbles', 'personalScrobbles', 'lastScrobbled'] },
+        { label: 'Audio / DJ', types: ['djInfo', 'key', 'tempo', 'energy', 'danceability', 'valence'] }
     ];
-
-    let currentOptions = options;
-    if (contextType === 'album') {
-        currentOptions = options.filter(o => o.value !== 'playCount');
-    }
+    const allowPlayCount = ctx === 'playlist';
 
     const menu = document.createElement('div');
     menu.id = 'sort-play-column-selector';
     menu._anchor = anchorBtn;
+    menu._anchorCol = ownerHeaderCol || anchorBtn;
     menu.className = 'sort-play-font-scope';
-    menu.style.cssText = `
-        position: fixed; z-index: 9999; background-color: #282828; border-radius: 4px; padding: 4px;
-        box-shadow: 0 16px 24px rgba(0,0,0,.3), 0 6px 8px rgba(0,0,0,.2); max-height: 410px; overflow-y: auto;
-        min-width: 155px; display: flex; flex-direction: column; border: 1px solid #3e3e3e;
-        scrollbar-width: thin; scrollbar-color: #555 #282828;
-    `;
+    menu.style.cssText = 'position:fixed;z-index:9999;background-color:#282828;border-radius:6px;padding:4px;box-shadow:0 16px 28px rgba(0,0,0,.45),0 6px 10px rgba(0,0,0,.28);min-width:196px;max-width:224px;display:flex;flex-direction:column;border:1px solid #3e3e3e;';
 
     const shadowRoot = menu.attachShadow({ mode: 'open' });
     const menuStyle = document.createElement('style');
     menuStyle.innerHTML = `
-        :host { font-family: 'SpotifyMixUI', sans-serif !important; color: #fff; }
-        *, *::before, *::after { box-sizing: border-box; font-family: 'SpotifyMixUI', sans-serif !important; }
-        .sp-col-row { display: flex; align-items: center; position: relative; border-radius: 2px; }
-        .sp-col-row:hover, .sp-col-row.selected { background-color: rgba(255, 255, 255, 0.1); }
-        .sp-col-item-btn { color: #b3b3b3; padding: 4px 8px; width: 100%; text-align: left; background: transparent; border: none; cursor: pointer; display: flex; align-items: center; font-size: 13px; height: 28px !important; min-height: 28px !important; flex-grow: 1; border-radius: 2px; }
-        .sp-col-row:hover .sp-col-item-btn, .sp-col-row.selected .sp-col-item-btn { color: #ffffff; }
-        .sp-col-settings-btn { background: transparent; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; width: 27px; height: 27px; padding: 6px; flex-shrink: 0; opacity: 0.7; transition: opacity 0.2s; fill: #b3b3b3; }
-        .sp-col-settings-btn:hover { opacity: 1; }
-        .sp-col-row:hover .sp-col-settings-btn, .sp-col-row.selected .sp-col-settings-btn { fill: #ffffff; }
-        .sp-col-settings-btn svg { width: 15px; height: 15px; fill: inherit; }
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #282828; }
-        ::-webkit-scrollbar-thumb { background-color: #555; border-radius: 4px; border: 2px solid #282828; }
-        ::-webkit-scrollbar-thumb:hover { background-color: #777; }
+        :host{font-family:'SpotifyMixUI',sans-serif!important;color:#fff}
+        *,*::before,*::after{box-sizing:border-box;font-family:'SpotifyMixUI',sans-serif!important}
+        .sp-cs-top{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:2px 4px 5px;border-bottom:1px solid #383838;margin-bottom:3px}
+        .sp-cs-grp{display:inline-flex;align-items:center;gap:2px;background:#1e1e1e;border:1px solid #383838;border-radius:5px;padding:2px}
+        .sp-cs-icon-btn{background:transparent;border:none;color:#a0a0a0;width:23px;height:21px;border-radius:3px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;transition:all .12s}
+        .sp-cs-icon-btn:hover:not(:disabled){color:#fff;background:rgba(255,255,255,.1)}
+        .sp-cs-icon-btn.active{color:#1ed760;background:rgba(30,215,96,.2)}
+        .sp-cs-icon-btn:disabled{opacity:.28;cursor:default}
+        .sp-cs-list{position:relative;display:flex;flex-direction:column;max-height:300px;overflow-y:auto;padding-right:2px;scrollbar-gutter:stable;scrollbar-width:auto!important;scrollbar-color:auto!important}
+        .sp-cs-list::-webkit-scrollbar{width:3px!important;height:3px!important;background-color:transparent!important;display:block!important}
+        .sp-cs-list::-webkit-scrollbar-button{display:none!important;height:0!important;width:0!important;background-color:transparent!important}
+        .sp-cs-list::-webkit-scrollbar-thumb{background-color:#535353!important;border-radius:20px!important;border:none!important}
+        .sp-cs-list::-webkit-scrollbar-thumb:hover{background-color:#727272!important}
+        .sp-cs-list::-webkit-scrollbar-track{background:transparent!important;border:none!important;box-shadow:none!important;margin:4px 0!important}
+        .sp-cs-list::-webkit-scrollbar-corner{background:transparent!important}
+        .sp-cs-group-hdr{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#7a7a7a;padding:5px 8px 2px;user-select:none}
+        .sp-cs-group-hdr:not(:first-child){border-top:1px solid rgba(255,255,255,.06);margin-top:3px;padding-top:6px}
+        .sp-col-row{display:flex;align-items:center;position:relative;border-radius:3px}
+        .sp-col-row:hover,.sp-col-row.selected{background-color:rgba(255,255,255,.1)}
+        .sp-col-item-btn{color:#b3b3b3;padding:3px 8px;width:100%;text-align:left;background:transparent;border:none;cursor:pointer;display:flex;align-items:center;font-size:12.5px;height:26px!important;min-height:26px!important;flex-grow:1;border-radius:3px}
+        .sp-col-row:hover .sp-col-item-btn,.sp-col-row.selected .sp-col-item-btn{color:#fff}
+        .sp-col-row.selected .sp-col-item-btn{color:#1ed760}
+        .sp-col-settings-btn{background:transparent;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;width:25px;height:25px;padding:5px;flex-shrink:0;opacity:.7;border-radius:3px;transition:opacity .15s,background .15s,fill .15s;fill:#b3b3b3}
+        .sp-col-settings-btn:hover,.sp-col-settings-btn.open{opacity:1;background:rgba(255,255,255,.12);fill:#fff}
+        .sp-col-settings-btn.open{fill:#1ed760}
+        .sp-col-row:hover .sp-col-settings-btn,.sp-col-row.selected .sp-col-settings-btn{fill:#fff}
+        .sp-col-row.selected .sp-col-settings-btn.open{fill:#1ed760}
+        .sp-col-settings-btn svg{width:14px;height:14px;fill:inherit}
+        .sp-cs-footer{display:flex;flex-direction:column;gap:3px;padding-top:5px;margin-top:4px;border-top:1px solid #383838}
+        .sp-cs-actions{display:grid;grid-template-columns:1fr 1fr;gap:3px}
+        .sp-cs-act-btn{background:rgba(255,255,255,.05);border:none;border-radius:4px;color:#c8c8c8;font-size:11.5px;font-weight:600;height:26px;padding:0 7px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:5px;transition:all .12s;white-space:nowrap}
+        .sp-cs-act-btn:hover{background:rgba(255,255,255,.13);color:#fff}
+        .sp-cs-act-btn.danger:hover{background:rgba(235,77,75,.22);color:#ff7b7b}
+        .sp-cs-act-btn.accent{color:#1ed760}
+        .sp-cs-act-btn.accent:hover{background:rgba(30,215,96,.18);color:#fff}
+        .sp-cs-act-btn svg{width:13px;height:13px;flex-shrink:0}
+        .sp-cs-act-btn svg:not([fill="none"]){fill:currentColor}
+        .sp-cs-icon-btn,.sp-col-item-btn,.sp-col-settings-btn,.sp-cs-act-btn{outline:none}
+        .sp-cs-icon-btn:focus-visible,.sp-col-item-btn:focus-visible,.sp-col-settings-btn:focus-visible,.sp-cs-act-btn:focus-visible{box-shadow:inset 0 0 0 1.5px rgba(30,215,96,.7)}
     `;
     shadowRoot.appendChild(menuStyle);
 
     const allDropdowns = [];
+    const allSettingsBtns = [];
 
-    currentOptions.forEach(opt => {
-        const itemRow = document.createElement('div');
-        itemRow.className = 'sp-col-row';
+    const closeSubDropdowns = () => {
+        allDropdowns.forEach(d => {
+            d.style.display = 'none';
+            if (d.parentNode) d.parentNode.removeChild(d);
+        });
+        allSettingsBtns.forEach(b => b.classList.remove('open'));
+    };
 
-        const item = document.createElement('button');
-        item.className = 'sp-col-item-btn';
-        item.innerText = opt.label;
-        
-        let isSelected = false;
-        if (opt.value === 'off') {
-            if (contextType === 'playlist1' && !showAdditionalColumn) isSelected = true;
-            if (contextType === 'playlist2' && !showSecondAdditionalColumn) isSelected = true;
-            if (contextType === 'album' && !showAlbumColumn) isSelected = true;
-            if (contextType === 'artist' && !showArtistColumn) isSelected = true;
-        } else {
-            if (contextType === 'playlist1' && showAdditionalColumn && selectedColumnType === opt.value) isSelected = true;
-            if (contextType === 'playlist2' && showSecondAdditionalColumn && selectedSecondColumnType === opt.value) isSelected = true;
-            if (contextType === 'album' && showAlbumColumn && selectedAlbumColumnType === opt.value) isSelected = true;
-            if (contextType === 'artist' && showArtistColumn && selectedArtistColumnType === opt.value) isSelected = true;
+    const closeSelectorMenu = () => {
+        if (ownerHeaderCol) {
+            ownerHeaderCol.classList.remove('sp-col-menu-open');
+            syncExtraColHeaderHoverLock(ownerHeaderCol, false);
         }
-
-        if (isSelected) {
-            itemRow.classList.add('selected');
+        closeSubDropdowns();
+        if (menu.parentNode) menu.remove();
+        if (window.columnSelectorAbortController) {
+            window.columnSelectorAbortController.abort();
+            window.columnSelectorAbortController = null;
         }
+    };
 
-        item.onclick = (e) => {
-            e.stopPropagation();
-            if (opt.value === 'off') {
-                if (contextType === 'playlist1') showAdditionalColumn = false;
-                if (contextType === 'playlist2') showSecondAdditionalColumn = false;
-                if (contextType === 'album') showAlbumColumn = false;
-                if (contextType === 'artist') showArtistColumn = false;
-            } else {
-                if (contextType === 'playlist1') { showAdditionalColumn = true; selectedColumnType = opt.value; }
-                else if (contextType === 'playlist2') { showSecondAdditionalColumn = true; selectedSecondColumnType = opt.value; }
-                else if (contextType === 'album') { showAlbumColumn = true; selectedAlbumColumnType = opt.value; }
-                else if (contextType === 'artist') { showArtistColumn = true; selectedArtistColumnType = opt.value; }
-            }
-            
-            saveSettings();
+    signal.addEventListener('abort', () => {
+        if (ownerHeaderCol) {
+            ownerHeaderCol.classList.remove('sp-col-menu-open');
+            syncExtraColHeaderHoverLock(ownerHeaderCol, false);
+        }
+        closeSubDropdowns();
+    });
 
-            if (contextType === 'playlist1' || contextType === 'playlist2') updateTracklist();
-            else if (contextType === 'album') updateAlbumTracklist();
-            else if (contextType === 'artist') updateArtistTracklist();
-            
+    const positionMenu = () => {
+        const anchorEl = (ownerHeaderCol?.isConnected ? ownerHeaderCol : anchorBtn);
+        if (!anchorEl?.isConnected || anchorEl.getAttribute?.('data-sp-overflow-hidden') === 'true') {
             closeSelectorMenu();
+            return;
+        }
+        const rect = anchorEl.getBoundingClientRect();
+        if (rect.width === 0 && rect.height === 0) {
+            closeSelectorMenu();
+            return;
+        }
+        const menuWidth = menu.offsetWidth;
+        const menuHeight = menu.offsetHeight;
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        let top = rect.bottom + 7;
+        let left = rect.left + (rect.width / 2) - (menuWidth / 2);
+        if (left + menuWidth > viewportWidth - 10) left = viewportWidth - menuWidth - 10;
+        if (left < 10) left = 10;
+        if (top + menuHeight > viewportHeight - 10) top = Math.max(10, rect.top - menuHeight - 6);
+        menu.style.top = `${top}px`;
+        menu.style.left = `${left}px`;
+    };
+
+    const topBar = document.createElement('div');
+    topBar.className = 'sp-cs-top';
+
+    const moveGrp = document.createElement('div');
+    moveGrp.className = 'sp-cs-grp';
+    const moveLeftBtn = document.createElement('button');
+    moveLeftBtn.type = 'button';
+    moveLeftBtn.className = 'sp-cs-icon-btn';
+    moveLeftBtn.title = 'Move Column Left';
+    moveLeftBtn.innerHTML = moveLeftIconSvg;
+    const moveRightBtn = document.createElement('button');
+    moveRightBtn.type = 'button';
+    moveRightBtn.className = 'sp-cs-icon-btn';
+    moveRightBtn.title = 'Move Column Right';
+    moveRightBtn.innerHTML = moveRightIconSvg;
+    moveGrp.appendChild(moveLeftBtn);
+    moveGrp.appendChild(moveRightBtn);
+
+    const alignGrp = document.createElement('div');
+    alignGrp.className = 'sp-cs-grp';
+    const alignDefs = [
+        { val: 'left', title: 'Align Left', svg: alignLeftIconSvg },
+        { val: 'center', title: 'Align Center', svg: alignCenterIconSvg },
+        { val: 'right', title: 'Align Right', svg: alignRightIconSvg }
+    ];
+    const alignBtns = alignDefs.map(def => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'sp-cs-icon-btn';
+        b.title = def.title;
+        b.dataset.align = def.val;
+        b.innerHTML = def.svg;
+        b.onclick = (e) => {
+            e.stopPropagation();
+            setExtraColumnAlign(ctx, targetCol.id, def.val);
+            syncTopBarState();
         };
+        alignGrp.appendChild(b);
+        return b;
+    });
 
-        itemRow.appendChild(item);
+    const syncTopBarState = () => {
+        const enabledCols = (extraColumnsConfig?.[ctx]?.columns || []).filter(c => c.enabled);
+        const visIdx = enabledCols.findIndex(c => c.id === targetCol.id);
+        moveLeftBtn.disabled = visIdx <= 0;
+        moveRightBtn.disabled = visIdx === -1 || visIdx >= enabledCols.length - 1;
+        const curAlign = targetCol.align === 'left' || targetCol.align === 'right' ? targetCol.align : 'center';
+        alignBtns.forEach(b => b.classList.toggle('active', b.dataset.align === curAlign));
+    };
 
-        if (opt.hasSettings) {
-            const settingsBtn = document.createElement('button');
-            settingsBtn.className = 'sp-col-settings-btn';
-            settingsBtn.innerHTML = settingsSvg;
+    const moveColumnBy = (dir) => {
+        closeSubDropdowns();
+        const allCols = extraColumnsConfig?.[ctx]?.columns || [];
+        const enabledCols = allCols.filter(c => c.enabled);
+        const visIdx = enabledCols.findIndex(c => c.id === targetCol.id);
+        const swapCol = enabledCols[visIdx + dir];
+        if (!swapCol) return;
+        const ids = allCols.map(c => c.id);
+        const i1 = ids.indexOf(targetCol.id);
+        const i2 = ids.indexOf(swapCol.id);
+        if (i1 === -1 || i2 === -1) return;
+        [ids[i1], ids[i2]] = [ids[i2], ids[i1]];
+        reorderExtraColumns(ctx, ids);
+        syncTopBarState();
+        requestAnimationFrame(positionMenu);
+    };
 
-            const dropdown = document.createElement('div');
-            dropdown.className = 'sort-play-font-scope';
-            dropdown.style.cssText = `
-                display: none; position: fixed; background-color: #282828; min-width: 140px;
-                box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.4); z-index: 10001; border-radius: 4px;
-                padding: 4px 0; border: 1px solid #3e3e3e; overflow-y: auto;
-                scrollbar-width: thin; scrollbar-color: #555 #282828;
-            `;
-            
-            const dropShadow = dropdown.attachShadow({ mode: 'open' });
-            allDropdowns.push(dropdown);
+    moveLeftBtn.onclick = (e) => { e.stopPropagation(); moveColumnBy(-1); };
+    moveRightBtn.onclick = (e) => { e.stopPropagation(); moveColumnBy(1); };
 
-            const renderDropdownContent = () => {
-                dropShadow.innerHTML = `
-                    <style>
-                        :host { font-family: 'SpotifyMixUI', sans-serif !important; color: #fff; }
-                        *, *::before, *::after { box-sizing: border-box; font-family: 'SpotifyMixUI', sans-serif !important; }
-                        button { color: #b3b3b3; padding: 6px 12px; text-decoration: none; display: block; width: 100%; text-align: left; background: none; border: none; cursor: pointer; font-size: 13px; margin: 0; border-radius: 0; height: auto !important; min-height: unset !important; }
-                        button:hover { background-color: rgba(255, 255, 255, 0.1); color: #ffffff; }
-                        button.selected { color: #1ed760; background-color: rgba(30, 215, 96, 0.1); }
-                        ::-webkit-scrollbar { width: 8px; }
-                        ::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.1); border-radius: 4px; }
-                        ::-webkit-scrollbar-thumb { background-color: #555; border-radius: 4px; border: 2px solid #282828; }
-                        ::-webkit-scrollbar-thumb:hover { background-color: #777; }
-                    </style>
-                    ${opt.getHtml()}
-                `;
-                dropShadow.querySelectorAll('button').forEach(btn => {
-                    btn.onclick = (e) => {
-                        e.stopPropagation();
-                        opt.updateVar(btn.getAttribute(`data-${opt.datasetKey}`));
-                        renderDropdownContent();
-                        
-                        document.querySelectorAll('.sort-play-data, .sort-play-second-data').forEach(el => {
-                            el.textContent = "";
-                            delete el.dataset.spProcessed;
-                            el.onclick = null;
-                            el.onmouseover = null;
-                            el.onmouseout = null;
-                            el.style.cursor = "default";
-                            el.style.textDecoration = "none";
-                            el.removeAttribute('title');
-                        });
-                        saveSettings();
-                        onPageChange();
+    syncTopBarState();
+    topBar.appendChild(moveGrp);
+    topBar.appendChild(alignGrp);
+    shadowRoot.appendChild(topBar);
 
-                        dropdown.style.display = 'none';
-                        if (dropdown.parentNode) dropdown.parentNode.removeChild(dropdown);
-                    };
-                });
-            };
-            renderDropdownContent();
+    const listEl = document.createElement('div');
+    listEl.className = 'sp-cs-list';
+    listEl.addEventListener('scroll', closeSubDropdowns, { passive: true });
 
-            settingsBtn.onclick = (e) => {
+    TYPE_GROUPS.forEach(group => {
+        const types = group.types.filter(t => EXTRA_COLUMN_TYPES[t] && (allowPlayCount || t !== 'playCount'));
+        if (!types.length) return;
+
+        const hdr = document.createElement('div');
+        hdr.className = 'sp-cs-group-hdr';
+        hdr.textContent = group.label;
+        listEl.appendChild(hdr);
+
+        types.forEach(typeKey => {
+            const meta = EXTRA_COLUMN_TYPES[typeKey];
+            const fmtOpts = EXTRA_COLUMN_FORMAT_OPTIONS[typeKey];
+            const itemRow = document.createElement('div');
+            itemRow.className = 'sp-col-row';
+
+            const item = document.createElement('button');
+            item.type = 'button';
+            item.className = 'sp-col-item-btn';
+            item.textContent = meta.fullLabel;
+
+            if (targetCol.enabled && targetCol.type === typeKey) itemRow.classList.add('selected');
+
+            item.onclick = (e) => {
                 e.stopPropagation();
-                const isVisible = dropdown.style.display === 'block';
-                
-                allDropdowns.forEach(d => {
-                    d.style.display = 'none';
-                    if (d.parentNode) d.parentNode.removeChild(d);
-                });
+                if (targetCol.enabled && targetCol.type === typeKey) {
+                    closeSelectorMenu();
+                    return;
+                }
+                setExtraColumnType(ctx, targetCol.id, typeKey);
+                closeSelectorMenu();
+            };
 
-                if (!isVisible) {
-                    document.body.appendChild(dropdown);
-                    dropdown.style.maxHeight = ''; 
-                    dropdown.style.display = 'block';
-                    
-                    const btnRect = settingsBtn.getBoundingClientRect();
-                    const dRect = dropdown.getBoundingClientRect();
-                    const vW = window.innerWidth;
-                    const vH = window.innerHeight;
-                    
-                    let dLeft = btnRect.right + 5;
-                    if (dLeft + dRect.width > vW - 10) {
-                        dLeft = btnRect.left - dRect.width - 5;
-                    }
-                    
-                    const margin = 10;
-                    const spaceBelow = vH - btnRect.top - margin;
-                    const spaceAbove = btnRect.bottom - margin;
-                    
-                    let dTop;
-                    
-                    if (dRect.height <= spaceBelow) {
-                        dTop = btnRect.top;
-                    } else if (dRect.height <= spaceAbove) {
-                        dTop = btnRect.bottom - dRect.height;
-                    } else {
-                        if (spaceBelow > spaceAbove) {
+            itemRow.appendChild(item);
+
+            if (fmtOpts) {
+                const settingsBtn = document.createElement('button');
+                settingsBtn.type = 'button';
+                settingsBtn.className = 'sp-col-settings-btn';
+                settingsBtn.title = `${meta.fullLabel} Format`;
+                settingsBtn.innerHTML = settingsSvg;
+                allSettingsBtns.push(settingsBtn);
+
+                const dropdown = document.createElement('div');
+                dropdown.className = 'sort-play-font-scope';
+                dropdown.style.cssText = 'display:none;position:fixed;background-color:#282828;min-width:155px;box-shadow:0 10px 20px rgba(0,0,0,.45);z-index:10001;border-radius:6px;padding:4px;border:1px solid #3e3e3e;overflow:hidden;flex-direction:column;';
+
+                const dropShadow = dropdown.attachShadow({ mode: 'open' });
+                allDropdowns.push(dropdown);
+
+                const renderDropdownContent = () => {
+                    const effFmt = getExtraColumnEffectiveFormat(typeKey, targetCol.type === typeKey ? (targetCol.format || null) : null);
+                    dropShadow.innerHTML = `
+                        <style>
+                            :host{font-family:'SpotifyMixUI',sans-serif!important;color:#fff;display:flex;flex-direction:column;min-height:0;flex:1}
+                            *,*::before,*::after{box-sizing:border-box;font-family:'SpotifyMixUI',sans-serif!important}
+                            .sp-cs-sublist{display:flex;flex-direction:column;overflow-y:auto;min-height:0;max-height:100%;scrollbar-width:auto!important;scrollbar-color:auto!important}
+                            .sp-cs-sublist::-webkit-scrollbar{width:3px!important;height:3px!important;background-color:transparent!important;display:block!important}
+                            .sp-cs-sublist::-webkit-scrollbar-button{display:none!important;height:0!important;width:0!important;background-color:transparent!important}
+                            .sp-cs-sublist::-webkit-scrollbar-thumb{background-color:#535353!important;border-radius:20px!important;border:none!important}
+                            .sp-cs-sublist::-webkit-scrollbar-track{background:transparent!important;border:none!important;box-shadow:none!important;margin:4px 0!important}
+                            .sp-cs-sublist::-webkit-scrollbar-corner{background:transparent!important}
+                            button{color:#b3b3b3;padding:6px 10px;display:block;width:100%;text-align:left;background:none;border:none;cursor:pointer;font-size:12.5px;margin:0;border-radius:3px;height:auto!important;min-height:unset!important;outline:none}
+                            button:hover{background-color:rgba(255,255,255,.1);color:#fff}
+                            button:focus-visible{box-shadow:inset 0 0 0 1.5px rgba(30,215,96,.7)}
+                            button.selected{color:#1ed760;background-color:rgba(30,215,96,.12)}
+                        </style>
+                        <div class="sp-cs-sublist">${fmtOpts.map(o => `<button type="button" data-fmt="${escapeHtml(o.value)}" class="${effFmt === o.value ? 'selected' : ''}">${escapeHtml(o.label)}</button>`).join('')}</div>
+                    `;
+                    dropShadow.querySelectorAll('button').forEach(btn => {
+                        btn.onclick = (e) => {
+                            e.stopPropagation();
+                            const val = btn.dataset.fmt;
+                            if (targetCol.type === typeKey) {
+                                setExtraColumnFormat(ctx, targetCol.id, val);
+                                renderDropdownContent();
+                                closeSubDropdowns();
+                            } else {
+                                setExtraColumnType(ctx, targetCol.id, typeKey, val);
+                                closeSelectorMenu();
+                            }
+                        };
+                    });
+                };
+                renderDropdownContent();
+
+                settingsBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    const isVisible = dropdown.style.display === 'flex';
+                    closeSubDropdowns();
+
+                    if (!isVisible) {
+                        renderDropdownContent();
+                        settingsBtn.classList.add('open');
+                        document.body.appendChild(dropdown);
+                        dropdown.style.maxHeight = '';
+                        dropdown.style.display = 'flex';
+
+                        const btnRect = settingsBtn.getBoundingClientRect();
+                        const dRect = dropdown.getBoundingClientRect();
+                        const vW = window.innerWidth;
+                        const vH = window.innerHeight;
+
+                        let dLeft = btnRect.right + 6;
+                        if (dLeft + dRect.width > vW - 10) dLeft = btnRect.left - dRect.width - 6;
+
+                        const margin = 10;
+                        const spaceBelow = vH - btnRect.top - margin;
+                        const spaceAbove = btnRect.bottom - margin;
+
+                        let dTop;
+                        if (dRect.height <= spaceBelow) dTop = btnRect.top;
+                        else if (dRect.height <= spaceAbove) dTop = btnRect.bottom - dRect.height;
+                        else if (spaceBelow > spaceAbove) {
                             dropdown.style.maxHeight = `${spaceBelow}px`;
                             dTop = btnRect.top;
                         } else {
                             dropdown.style.maxHeight = `${spaceAbove}px`;
                             dTop = btnRect.bottom - dropdown.offsetHeight;
                         }
+
+                        dropdown.style.left = `${dLeft}px`;
+                        dropdown.style.top = `${dTop}px`;
                     }
-                    
-                    dropdown.style.left = `${dLeft}px`;
-                    dropdown.style.top = `${dTop}px`;
-                }
-            };
+                };
 
-            itemRow.appendChild(settingsBtn);
-        }
+                itemRow.appendChild(settingsBtn);
+            }
 
-        shadowRoot.appendChild(itemRow);
+            listEl.appendChild(itemRow);
+        });
     });
+    shadowRoot.appendChild(listEl);
+
+    const footer = document.createElement('div');
+    footer.className = 'sp-cs-footer';
+
+    const row1 = document.createElement('div');
+    row1.className = 'sp-cs-actions';
+
+    const hideBtn = document.createElement('button');
+    hideBtn.type = 'button';
+    hideBtn.className = 'sp-cs-act-btn';
+    hideBtn.title = 'Hide column (keeps it in Manager)';
+    hideBtn.innerHTML = `${eyeOffIconSvg}<span>Hide</span>`;
+    hideBtn.onclick = (e) => {
+        e.stopPropagation();
+        setExtraColumnEnabled(ctx, targetCol.id, false);
+        closeSelectorMenu();
+    };
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'sp-cs-act-btn danger';
+    removeBtn.title = 'Delete column';
+    removeBtn.innerHTML = `${closeIcon16Svg}<span>Remove</span>`;
+    removeBtn.onclick = (e) => {
+        e.stopPropagation();
+        removeExtraColumn(ctx, targetCol.id);
+        closeSelectorMenu();
+    };
+
+    row1.appendChild(hideBtn);
+    row1.appendChild(removeBtn);
+
+    const row2 = document.createElement('div');
+    row2.className = 'sp-cs-actions';
+
+    const addRightBtn = document.createElement('button');
+    addRightBtn.type = 'button';
+    addRightBtn.className = 'sp-cs-act-btn accent';
+    addRightBtn.title = 'Insert a new column to the right';
+    addRightBtn.innerHTML = `${tagAddIconSvg}<span>Add Right</span>`;
+    addRightBtn.onclick = (e) => {
+        e.stopPropagation();
+        const cols = extraColumnsConfig?.[ctx]?.columns || [];
+        const idx = cols.findIndex(c => c.id === targetCol.id);
+        addExtraColumn(ctx, null, idx !== -1 ? idx + 1 : -1);
+        closeSelectorMenu();
+    };
+
+    const manageBtn = document.createElement('button');
+    manageBtn.type = 'button';
+    manageBtn.className = 'sp-cs-act-btn';
+    manageBtn.title = 'Open Extra Columns Manager';
+    manageBtn.innerHTML = `${settingsSvg}<span>Manage</span>`;
+    manageBtn.onclick = (e) => {
+        e.stopPropagation();
+        closeSelectorMenu();
+        showExtraColumnsManagerModal(ctx, false);
+    };
+
+    row2.appendChild(addRightBtn);
+    row2.appendChild(manageBtn);
+
+    footer.appendChild(row1);
+    footer.appendChild(row2);
+    shadowRoot.appendChild(footer);
 
     document.body.appendChild(menu);
-    const rect = anchorBtn.getBoundingClientRect();
-    const menuWidth = menu.offsetWidth;
-    const menuHeight = menu.offsetHeight;
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
+    positionMenu();
 
-    let top = rect.bottom + 7;
-    let left = rect.left + (rect.width / 2) - (menuWidth / 2);
-
-    if (left + menuWidth > viewportWidth) {
-        left = viewportWidth - menuWidth - 10;
+    const selectedRow = listEl.querySelector('.sp-col-row.selected');
+    if (selectedRow && selectedRow.offsetTop + selectedRow.offsetHeight > listEl.clientHeight) {
+        listEl.scrollTop = Math.max(0, selectedRow.offsetTop - (listEl.clientHeight / 2) + (selectedRow.offsetHeight / 2));
     }
-    if (left < 10) left = 10;
-
-    if (top + menuHeight > viewportHeight) {
-        top = rect.top - menuHeight - 5;
-    }
-
-    menu.style.top = `${top}px`;
-    menu.style.left = `${left}px`;
-
-    const closeSelectorMenu = () => {
-        if (menu.parentNode) menu.remove();
-        allDropdowns.forEach(d => {
-            if (d.parentNode) d.parentNode.removeChild(d);
-        });
-        if (window.columnSelectorAbortController) {
-            window.columnSelectorAbortController.abort();
-            window.columnSelectorAbortController = null;
-        }
-    };
 
     const clickOutsideHandler = (e) => {
         if (e) {
@@ -66127,38 +69971,95 @@ shadowRoot.innerHTML = `
         }
         closeSelectorMenu();
     };
-    
+
     setTimeout(() => {
         document.addEventListener('click', clickOutsideHandler, { capture: true, signal });
         document.addEventListener('contextmenu', clickOutsideHandler, { capture: true, signal });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSelectorMenu(); }, { capture: true, signal });
         window.addEventListener('wheel', clickOutsideHandler, { capture: true, signal });
         window.addEventListener('resize', closeSelectorMenu, { signal });
     }, 0);
   }
-  
+
   async function loadAdditionalColumnData(tracklist_) {
+    const context = getExtraColumnContextForPage();
+    const activeCols = context ? getActiveExtraColumns(context) : [];
+    if (activeCols.length === 0) return;
+
     const currentUri = getCurrentUri();
-    const isSearch = Spicetify.Platform.History.location?.pathname?.startsWith('/search');
-    let columnConfigs = [];
-    const audioFeatureTypes = ['key', 'tempo', 'energy', 'danceability', 'valence', 'djInfo'];
-
-    const isValidPlaylistPage = currentUri && (URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri) || isLocalFilesPage(currentUri));
-
-    if (isValidPlaylistPage || isSearch) {
-        if (showSecondAdditionalColumn) columnConfigs.push({ type: selectedSecondColumnType, dataSelector: ".sort-play-second-data" });
-        if (showAdditionalColumn) columnConfigs.push({ type: selectedColumnType, dataSelector: ".sort-play-data" });
-    } else if (URI.isAlbum(currentUri)) {
-        if (showAlbumColumn) columnConfigs.push({ type: selectedAlbumColumnType, dataSelector: ".sort-play-data" });
-    } else if (URI.isArtist(currentUri)) {
-        if (showArtistColumn) columnConfigs.push({ type: selectedArtistColumnType, dataSelector: ".sort-play-data" });
-    }
-
-    if (columnConfigs.length === 0) return;
+    const audioFeatureTypes = new Set(['key', 'tempo', 'energy', 'danceability', 'valence', 'djInfo']);
+    const columnConfigs = activeCols.map(c => ({ id: c.id, type: c.type, format: c.format || null, dataSelector: `[data-sp-col-val="${c.id}"]` }));
 
     const isRecGrid = !!tracklist_.closest?.('[data-testid="recommended-track"]');
-    const allTrackRows = Array.from(tracklist_.querySelectorAll(isRecGrid ? '.main-trackList-trackListRow, [role="row"]' : '.main-trackList-trackListRow, [role="row"]:not([aria-rowindex="1"])')).filter(r => !r.querySelector('[role="columnheader"]'));
+    const rawRows = tracklist_.querySelectorAll('.main-trackList-trackListRow');
+    const allTrackRows = rawRows.length > 0
+        ? Array.from(rawRows)
+        : Array.from(tracklist_.querySelectorAll(isRecGrid ? '[role="row"]' : '[role="row"]:not([aria-rowindex="1"])')).filter(r => !r.querySelector('[role="columnheader"]'));
     const spotifyTracksToProcess = [];
-    const expectedCols = columnConfigs.map(c => c.type).join('|');
+    const lfmUser = loadLastFmUsername() || '';
+    const hasLfmUser = !!lfmUser;
+    const expectedCols = columnConfigs.map(c => `${c.id}:${c.type}:${c.format || ''}`).join('|')
+        + (columnConfigs.some(c => c.type === 'personalScrobbles' || c.type === 'lastScrobbled') ? `|u:${lfmUser}` : '');
+
+    const bindLfmClick = (el, info) => {
+        el.classList.add('sp-col-clickable');
+        el.title = "Click for Last.fm details";
+        el.onclick = (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            showLastFmDetailsModal({
+                name: info.name,
+                artistName: info.artistName ?? info.artists?.[0]?.name,
+                artists: info.artists,
+                albumName: info.albumName,
+                uri: info.uri
+            });
+        };
+    };
+
+    const bindReleaseDateClick = (el, id, props, trackInfo) => {
+        el.classList.add('sp-col-clickable');
+        el.title = "Click to view album";
+        el.onclick = async (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            let albId = props?.album?.id || props?.album?.uri?.split(':')[2] || trackInfo?.album?.id || trackInfo?.album?.uri?.split(':')[2];
+            if (!albId) {
+                const meta = await idb.get('trackMetadata', id);
+                albId = meta?.album?.id || meta?.album?.uri?.split(':')[2];
+            }
+            if (!albId) {
+                const meta = await fetchInternalTrackMetadata(id);
+                albId = meta?.album?.id || meta?.album?.uri?.split(':')[2];
+            }
+            const cleanAlbId = albId ? albId.split(':').pop() : null;
+            if (cleanAlbId) Spicetify.Platform.History.push(`/album/${cleanAlbId}`);
+            else showNotification("Album not found.", true);
+        };
+    };
+
+    const bindTrueReleaseDateClick = (el, id, trackInfo, cachedObj, getFallbackPlayCount) => {
+        el.classList.add('sp-col-clickable');
+        el.title = "Click to view album";
+        el.onclick = async (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            if (cachedObj?.albumId) {
+                Spicetify.Platform.History.push(`/album/${cachedObj.albumId.split(':').pop()}`);
+                return;
+            }
+            try {
+                const trackObjForFetch = { id, trackId: id, name: trackInfo.name, uri: trackInfo.uri, artists: trackInfo.artists, track: trackInfo, playCount: getFallbackPlayCount?.() || "N/A", album: trackInfo.album, albumId: trackInfo.album?.id || trackInfo.albumId };
+                const freshR = await getTrackDetailsWithTrueReleaseDate(trackObjForFetch, true);
+                const rawClickAlbId = freshR.trueAlbumId || trackObjForFetch.albumId;
+                const clickAlbId = rawClickAlbId ? rawClickAlbId.split(':').pop() : null;
+                if (clickAlbId) Spicetify.Platform.History.push(`/album/${clickAlbId}`);
+                else showNotification("Album not found.", true);
+            } catch (_) {
+                showNotification("Failed to find album.", true);
+            }
+        };
+    };
 
     for (const trackElement of allTrackRows) {
         const trackUri = getTracklistTrackUri(trackElement);
@@ -66168,16 +70069,7 @@ shadowRoot.innerHTML = `
         if (trackElement.dataset.spTrackUri !== trackUri || trackElement.dataset.spColTypes !== expectedCols) {
             trackElement.dataset.spTrackUri = trackUri;
             trackElement.dataset.spColTypes = expectedCols;
-            trackElement.querySelectorAll('.sort-play-data, .sort-play-second-data').forEach(cell => {
-                cell.textContent = "";
-                delete cell.dataset.spProcessed;
-                cell.onclick = null;
-                cell.onmouseover = null;
-                cell.onmouseout = null;
-                cell.style.cursor = "default";
-                cell.style.textDecoration = "none";
-                cell.removeAttribute('title');
-            });
+            trackElement.querySelectorAll('.sp-extra-col-val, .sort-play-data, .sort-play-second-data').forEach(resetExtraColumnCell);
             trackElement.classList.remove('sort-play-processing');
             trackElement.removeAttribute('data-sp-fetch-failed');
             needsRestart = true;
@@ -66188,13 +70080,20 @@ shadowRoot.innerHTML = `
         }
 
         if (Spicetify.URI.isLocal(trackUri)) {
+            const hasUnprocessed = columnConfigs.some(c => {
+                const dEl = trackElement.querySelector(c.dataSelector);
+                return dEl && !dEl.dataset.spProcessed;
+            });
+            if (!hasUnprocessed) continue;
+
             trackElement.classList.add('sort-play-processing');
             const trackData = getTrackDataObject(trackElement);
 
             if (trackData) {
-                const rawArtistName = trackData.artists[0]?.name || "";
+                const rawArtistName = trackData.artists?.[0]?.name || "";
                 const cleanedArtistName = rawArtistName.includes(';') ? rawArtistName.split(';')[0].trim() : rawArtistName;
                 const localTrackInfo = { name: trackData.name, artistName: cleanedArtistName, artists: [{ name: cleanedArtistName }], albumName: trackData.album?.name, uri: trackData.uri };
+                const localResolved = {};
 
                 const localPromises = columnConfigs.map(async (config) => {
                     const dataElement = trackElement.querySelector(config.dataSelector);
@@ -66202,783 +70101,740 @@ shadowRoot.innerHTML = `
 
                     try {
                         if (config.type === 'scrobbles' || config.type === 'personalScrobbles' || config.type === 'lastScrobbled') {
-                            dataElement.style.cursor = "pointer";
-                            dataElement.title = "Click for Last.fm details";
-                            dataElement.onclick = (e) => {
-                                e.stopPropagation();
-                                e.preventDefault();
-                                showLastFmDetailsModal({
-                                    name: localTrackInfo.name,
-                                    artistName: localTrackInfo.artistName,
-                                    artists: localTrackInfo.artists,
-                                    albumName: localTrackInfo.albumName,
-                                    uri: localTrackInfo.uri
-                                });
-                            };
-                            dataElement.onmouseover = () => { dataElement.style.textDecoration = "underline"; dataElement.style.color = "var(--spice-text)"; };
-                            dataElement.onmouseout = () => { dataElement.style.textDecoration = "none"; dataElement.style.color = "var(--spice-subtext)"; };
-                        
+                            bindLfmClick(dataElement, localTrackInfo);
                             if (config.type === 'scrobbles') {
-                                const result = await getTrackDetailsWithScrobbles(localTrackInfo, true);
+                                localResolved.scrobbles ??= getTrackDetailsWithScrobbles(localTrackInfo, true);
+                                const result = await localResolved.scrobbles;
                                 if (trackElement.dataset.spColTypes !== expectedCols) return;
-                                if (result.scrobbles === -1 || result.error) {
-                                    updateDisplay(dataElement, { error: result.error || "Track not found on Last.fm", errorLabel: result.errorLabel || "N/A" }, config.type);
-                                } else {
-                                    updateDisplay(dataElement, result.scrobbles, config.type);
-                                }
+                                updateDisplay(dataElement, (result.scrobbles === -1 || result.error) ? { error: result.error || "Track not found on Last.fm", errorLabel: result.errorLabel || "N/A" } : result.scrobbles, config.type, config.format);
                             } else if (config.type === 'personalScrobbles') {
-                                if (!loadLastFmUsername()) {
+                                if (!hasLfmUser) {
                                     if (trackElement.dataset.spColTypes !== expectedCols) return;
-                                    updateDisplay(dataElement, { error: "Set Last.fm username in setting", errorLabel: "No User" }, config.type);
+                                    updateDisplay(dataElement, { error: "Set Last.fm username in setting", errorLabel: "No User" }, config.type, config.format);
                                 } else {
-                                    const result = await getTrackDetailsWithPersonalScrobbles(localTrackInfo, true);
+                                    localResolved.personalScrobbles ??= getTrackDetailsWithPersonalScrobbles(localTrackInfo, true);
+                                    const result = await localResolved.personalScrobbles;
                                     if (trackElement.dataset.spColTypes !== expectedCols) return;
-                                    if (result.personalScrobbles === -1 || result.error) {
-                                        updateDisplay(dataElement, { error: result.error || "Track not found on Last.fm", errorLabel: result.errorLabel || "N/A" }, config.type);
-                                    } else {
-                                        updateDisplay(dataElement, result.personalScrobbles, config.type);
-                                    }
+                                    updateDisplay(dataElement, (result.personalScrobbles === -1 || result.error) ? { error: result.error || "Track not found on Last.fm", errorLabel: result.errorLabel || "N/A" } : result.personalScrobbles, config.type, config.format);
                                 }
-                            } else if (config.type === 'lastScrobbled') {
-                                if (!loadLastFmUsername()) {
+                            } else {
+                                if (!hasLfmUser) {
                                     if (trackElement.dataset.spColTypes !== expectedCols) return;
-                                    updateDisplay(dataElement, { error: "Set Last.fm username in setting", errorLabel: "No User" }, config.type);
+                                    updateDisplay(dataElement, { error: "Set Last.fm username in setting", errorLabel: "No User" }, config.type, config.format);
                                 } else {
-                                    const result = await getTrackDetailsWithLastScrobbled(localTrackInfo, true);
+                                    localResolved.lastScrobbled ??= getTrackDetailsWithLastScrobbled(localTrackInfo, true);
+                                    const result = await localResolved.lastScrobbled;
                                     if (trackElement.dataset.spColTypes !== expectedCols) return;
-                                    if (result.lastScrobbled === -1 || result.error) {
-                                        updateDisplay(dataElement, { error: result.error || "Track not found on Last.fm", errorLabel: result.errorLabel || "N/A" }, config.type);
-                                    } else {
-                                        updateDisplay(dataElement, result.lastScrobbled, config.type);
-                                    }
+                                    updateDisplay(dataElement, (result.lastScrobbled === -1 || result.error) ? { error: result.error || "Track not found on Last.fm", errorLabel: result.errorLabel || "N/A" } : result.lastScrobbled, config.type, config.format);
                                 }
                             }
                         } else {
                             if (trackElement.dataset.spColTypes !== expectedCols) return;
-                            updateDisplay(dataElement, "―", config.type);
+                            updateDisplay(dataElement, "―", config.type, config.format);
                         }
-                    } catch (e) {
+                    } catch (_) {
                         if (trackElement.dataset.spColTypes !== expectedCols) return;
-                        updateDisplay(dataElement, { error: "Local Load Failed", errorLabel: "Err" }, config.type);
+                        updateDisplay(dataElement, { error: "Local Load Failed", errorLabel: "Err" }, config.type, config.format);
                         trackElement.setAttribute('data-sp-fetch-failed', 'true');
                     }
                 });
-                
+
                 Promise.all(localPromises).finally(() => {
-                    if (trackElement.dataset.spColTypes === expectedCols) {
-                        trackElement.classList.remove('sort-play-processing');
-                    }
+                    if (trackElement.dataset.spColTypes === expectedCols) trackElement.classList.remove('sort-play-processing');
                 });
             } else {
                 columnConfigs.forEach(config => {
                     const dataElement = trackElement.querySelector(config.dataSelector);
-                    if (dataElement && !dataElement.dataset.spProcessed) {
-                        updateDisplay(dataElement, "―", config.type);
-                    }
+                    if (dataElement && !dataElement.dataset.spProcessed) updateDisplay(dataElement, "―", config.type, config.format);
                 });
                 trackElement.classList.remove('sort-play-processing');
             }
         } else if (trackUri.includes("track")) {
-            const needsProcessing = columnConfigs.some(config => {
+            const pendingCols = [];
+            for (const config of columnConfigs) {
                 const dataElement = trackElement.querySelector(config.dataSelector);
-                return dataElement && !dataElement.dataset.spProcessed;
-            });
-            if (needsProcessing) {
-                const props = getTrackDataObject(trackElement);
-                spotifyTracksToProcess.push({ element: trackElement, id: trackUri.split(":")[2], props });
+                if (dataElement && !dataElement.dataset.spProcessed) pendingCols.push({ config, dataElement });
+            }
+            if (pendingCols.length === 0) continue;
+
+            const id = trackUri.split(":")[2];
+            const props = getTrackDataObject(trackElement);
+            const isPlayable = getTrackRowPlayable(trackElement, props);
+            const trackInfo = props ? {
+                name: props.name,
+                artists: props.artists,
+                artistName: props.artists?.[0]?.name,
+                albumName: props.album?.name,
+                album: props.album,
+                uri: props.uri
+            } : null;
+            const lfmKey = trackInfo ? getLfmInfo({
+                name: trackInfo.name,
+                artists: trackInfo.artists,
+                artistName: trackInfo.artistName,
+                uri: trackInfo.uri,
+                allArtists: trackInfo.artists?.map(a => a.name).join(', ')
+            })?.key : null;
+
+            let stillNeedsAsync = false;
+            for (const { config, dataElement } of pendingCols) {
+                if ((config.type === 'personalScrobbles' || config.type === 'lastScrobbled') && !hasLfmUser) {
+                    if (trackInfo) bindLfmClick(dataElement, trackInfo);
+                    updateDisplay(dataElement, { error: "Set Last.fm username in setting", errorLabel: "No User" }, config.type, config.format);
+                    continue;
+                }
+                let memVal = undefined;
+                let trdObj = null;
+                if (config.type === 'playCount') {
+                    memVal = getExtraColMem('playCounts', id, CACHE_EXPIRE_PLAYCOUNTS);
+                    if (memVal === "N/A") memVal = getExtraColMem('playCounts', id, 5 * 60 * 1000);
+                } else if (config.type === 'releaseDate') {
+                    memVal = getExtraColMem('releaseDates', id, CACHE_EXPIRE_RELEASE_DATE);
+                } else if (config.type === 'trueReleaseDate') {
+                    const cached = getExtraColMem('trueReleaseDates', id, CACHE_EXPIRE_RELEASE_DATE);
+                    if (cached !== undefined) {
+                        trdObj = (cached && typeof cached === 'object') ? cached : { date: cached };
+                        memVal = trdObj.date;
+                    }
+                } else if (config.type === 'scrobbles' && lfmKey) {
+                    memVal = getExtraColMem('scrobbles', lfmKey, CACHE_EXPIRE_GLOBAL_SCROBBLES);
+                } else if (config.type === 'personalScrobbles' && lfmKey) {
+                    memVal = getExtraColMem('personalScrobbles', lfmKey, CACHE_EXPIRE_PERSONAL_SCROBBLES);
+                } else if (config.type === 'lastScrobbled' && lfmKey) {
+                    memVal = getExtraColMem('lastScrobbled', lfmKey, CACHE_EXPIRE_PERSONAL_SCROBBLES);
+                } else if (config.type === 'popularity') {
+                    memVal = getExtraColMem('popularity', id, CACHE_EXPIRE_METADATA);
+                } else if (audioFeatureTypes.has(config.type)) {
+                    const stats = getExtraColMem('aiStats', id, CACHE_EXPIRE_AI_DATA);
+                    if (stats) memVal = stats._missing ? "―" : ((config.type === 'djInfo' || config.type === 'key') ? stats : stats[config.type]);
+                }
+
+                if (memVal !== undefined && memVal !== null) {
+                    if ((config.type === 'scrobbles' || config.type === 'personalScrobbles' || config.type === 'lastScrobbled') && trackInfo) {
+                        bindLfmClick(dataElement, trackInfo);
+                    }
+                    if (config.type === 'releaseDate' && memVal && memVal !== '―' && !URI.isAlbum(currentUri)) {
+                        bindReleaseDateClick(dataElement, id, props, trackInfo);
+                    }
+                    if (config.type === 'trueReleaseDate' && memVal && memVal !== '―' && trackInfo) {
+                        bindTrueReleaseDateClick(dataElement, id, trackInfo, trdObj, () => getExtraColMem('playCounts', id, CACHE_EXPIRE_PLAYCOUNTS));
+                    }
+                    if ((config.type === 'scrobbles' || config.type === 'personalScrobbles' || config.type === 'lastScrobbled') && memVal === -1) {
+                        updateDisplay(dataElement, { error: "Track not found on Last.fm", errorLabel: "N/A" }, config.type, config.format);
+                    } else {
+                        updateDisplay(dataElement, memVal, config.type, config.format, { isPlayable });
+                    }
+                } else {
+                    stillNeedsAsync = true;
+                }
+            }
+
+            if (stillNeedsAsync) {
+                trackElement.classList.add('sort-play-processing');
+                spotifyTracksToProcess.push({ element: trackElement, id, props, isPlayable });
             }
         }
     }
 
     if (spotifyTracksToProcess.length === 0) return;
 
-    if (columnConfigs.some(c => c.type === 'playCount')) {
-        const allSpotifyIds = spotifyTracksToProcess.map(item => item.id);
-        const cachedGlobalPC = await idb.getMany('playCounts', allSpotifyIds, CACHE_EXPIRE_PLAYCOUNTS);
-        const missingPCIds = allSpotifyIds.filter(id => {
-            const pc = cachedGlobalPC.get(id);
-            return pc === undefined || pc === null || pc === "N/A";
-        });
+    const hasType = (t) => columnConfigs.some(c => c.type === t);
+    const hasAudioCol = columnConfigs.some(c => audioFeatureTypes.has(c.type));
+    const nonAudioConfigs = columnConfigs.filter(c => !audioFeatureTypes.has(c.type));
+    const uniqueSpotifyIds = [...new Set(spotifyTracksToProcess.map(item => item.id))];
+    const rowPlayableMap = new WeakMap();
+    for (const item of spotifyTracksToProcess) rowPlayableMap.set(item.element, item.isPlayable);
+    const playCountBatchAttempted = new Set();
+    let prefetchedPC = null;
+    let prefetchedRD = null;
 
-        if (missingPCIds.length > 0) {
-            try {
-                const PC_BATCH_SIZE = 500;
-                for (let i = 0; i < missingPCIds.length; i += PC_BATCH_SIZE) {
-                    const batch = missingPCIds.slice(i, i + PC_BATCH_SIZE);
-                    const uris = batch.map(id => `spotify:track:${id}`);
-                    const pcResults = await fetchPlayCountsBatchNew(uris);
-                    
-                    for (const [uri, count] of pcResults.entries()) {
-                        const tId = uri.split(":")[2];
-                        await idb.set('playCounts', tId, count);
-                    }
+    try {
+        const prefetchTasks = [];
+        if (hasType('playCount')) {
+            prefetchTasks.push((async () => {
+                prefetchedPC = await idb.getMany('playCounts', uniqueSpotifyIds, CACHE_EXPIRE_PLAYCOUNTS);
+                const missingPCIds = [];
+                for (const id of uniqueSpotifyIds) {
+                    const pc = prefetchedPC.get(id);
+                    if (pc === undefined || pc === null || pc === "N/A") missingPCIds.push(id);
+                    else setExtraColMem('playCounts', id, pc);
                 }
-            } catch(e) {
-                console.warn("[Sort-Play] Global playcount prefetch failed", e);
-            }
-        }
-    }
-
-    if (columnConfigs.some(c => c.type === 'releaseDate')) {
-        const allSpotifyIds = spotifyTracksToProcess.map(item => item.id);
-        const cachedGlobalRD = await idb.getMany('releaseDates', allSpotifyIds, CACHE_EXPIRE_RELEASE_DATE);
-        const missingRDIds = allSpotifyIds.filter(id => {
-            const rd = cachedGlobalRD.get(id);
-            return rd === undefined || rd === null;
-        });
-
-        if (missingRDIds.length > 0) {
-            try {
-                const RD_BATCH_SIZE = 500;
-                for (let i = 0; i < missingRDIds.length; i += RD_BATCH_SIZE) {
-                    const batch = missingRDIds.slice(i, i + RD_BATCH_SIZE);
-                    const uris = batch.map(id => `spotify:track:${id}`);
-                    const rdResults = await fetchReleaseDatesBatchNew(uris);
-                    
-                    for (const [uri, date] of rdResults.entries()) {
-                        const tId = uri.split(":")[2];
-                        await idb.set('releaseDates', tId, { date: date, trackNumber: 0 });
-                    }
-                }
-            } catch(e) {
-                console.warn("[Sort-Play] Global release date prefetch failed", e);
-            }
-        }
-    }
-
-    const BATCH_SIZE = 50; 
-    
-    for (let i = 0; i < spotifyTracksToProcess.length; i += BATCH_SIZE) {
-        const batch = spotifyTracksToProcess.slice(i, i + BATCH_SIZE);
-        const batchIds = batch.map(item => item.id);
-        
-        const dataMap = { playCounts: null, releaseDates: null, trueReleaseDates: null, scrobbles: null, personal: null, ai: null, metadata: null, lastScrobbled: null };
-        const fetchPromises1 = [];
-
-        if (columnConfigs.some(c => c.type === 'playCount')) {
-            fetchPromises1.push(idb.getMany('playCounts', batchIds, CACHE_EXPIRE_PLAYCOUNTS).then(res => dataMap.playCounts = res));
-        }
-        if (columnConfigs.some(c => c.type === 'releaseDate')) {
-            fetchPromises1.push(idb.getMany('releaseDates', batchIds, CACHE_EXPIRE_RELEASE_DATE).then(res => dataMap.releaseDates = res));
-        }
-        if (columnConfigs.some(c => c.type === 'trueReleaseDate')) {
-            fetchPromises1.push(idb.getMany('trueReleaseDates', batchIds, CACHE_EXPIRE_RELEASE_DATE).then(res => dataMap.trueReleaseDates = res));
-        }
-        if (columnConfigs.some(c => c.type === 'scrobbles' || c.type === 'personalScrobbles' || c.type === 'lastScrobbled' || c.type === 'popularity' || c.type === 'trueReleaseDate')) {
-            fetchPromises1.push(idb.getMany('trackMetadata', batchIds, CACHE_EXPIRE_METADATA).then(res => dataMap.metadata = res));
-        }
-
-        const audioFeatureConfig = columnConfigs.find(c => audioFeatureTypes.includes(c.type));
-        if (audioFeatureConfig) {
-            const aiKeys = batchIds.map(id => getCacheKey(id, true, false, "stats-column"));
-            fetchPromises1.push(idb.getMany('aiData', aiKeys, CACHE_EXPIRE_AI_DATA).then(res => dataMap.ai = res));
-        }
-
-        await Promise.all(fetchPromises1);
-
-        const lfmKeys = new Set();
-        const idToLfmKey = new Map();
-        
-        for (const { id, props } of batch) {
-            let trackInfo = null;
-            if (props) {
-                trackInfo = {
-                    name: props.name,
-                    artists: props.artists,
-                    artistName: props.artists?.[0]?.name,
-                    uri: props.uri,
-                    allArtists: props.artists?.map(a => a.name).join(', ')
-                };
-            } else if (dataMap.metadata && dataMap.metadata.has(id)) {
-                const meta = dataMap.metadata.get(id);
-                trackInfo = {
-                    name: meta.name,
-                    artists: meta.artists,
-                    artistName: meta.artists?.[0]?.name,
-                    uri: meta.uri,
-                    allArtists: meta.artists?.map(a => a.name).join(', ')
-                };
-            }
-            if (trackInfo) {
-                const lfmInfo = getLfmInfo(trackInfo);
-                if (lfmInfo) {
-                    lfmKeys.add(lfmInfo.key);
-                    idToLfmKey.set(id, lfmInfo.key);
-                }
-            }
-        }
-        
-        if (lfmKeys.size > 0) {
-            const lfmKeysArray = Array.from(lfmKeys);
-            const fetchPromises2 = [];
-            if (columnConfigs.some(c => c.type === 'scrobbles')) {
-                fetchPromises2.push(idb.getMany('scrobbles', lfmKeysArray, CACHE_EXPIRE_GLOBAL_SCROBBLES).then(res => dataMap.scrobbles = res));
-            }
-            if (columnConfigs.some(c => c.type === 'personalScrobbles')) {
-                fetchPromises2.push(idb.getMany('personalScrobbles', lfmKeysArray, CACHE_EXPIRE_PERSONAL_SCROBBLES).then(res => dataMap.personal = res));
-            }
-            if (columnConfigs.some(c => c.type === 'lastScrobbled')) {
-                fetchPromises2.push(idb.getMany('lastScrobbledDates', lfmKeysArray, CACHE_EXPIRE_PERSONAL_SCROBBLES).then(res => dataMap.lastScrobbled = res));
-            }
-            await Promise.all(fetchPromises2);
-        }
-
-        const idsToFetchFromApi = [];
-        const elementsToFetchFromApi = new Map();
-        const propsMap = new Map();
-
-        for (const { element, id, props } of batch) {
-            if (element.dataset.spColTypes !== expectedCols) continue;
-            
-            let isFullyCached = true;
-            
-            let trackInfo = null;
-            if (props) {
-                trackInfo = {
-                    name: props.name,
-                    artists: props.artists,
-                    artistName: props.artists?.[0]?.name,
-                    albumName: props.album?.name,
-                    album: props.album,
-                    uri: props.uri
-                };
-            } else if (dataMap.metadata) {
-                const meta = dataMap.metadata.get(id);
-                if (meta) {
-                    trackInfo = {
-                        name: meta.name,
-                        artists: meta.artists,
-                        artistName: meta.artists?.[0]?.name,
-                        albumName: meta.album?.name,
-                        album: meta.album,
-                        uri: meta.uri
-                    };
-                }
-            }
-
-            for (const config of columnConfigs) {
-                const dataElement = element.querySelector(config.dataSelector);
-                if (!dataElement || (dataElement.textContent !== "" && dataElement.textContent !== "_" && dataElement.textContent !== "―")) continue;
-
-                let val = undefined;
-                if (config.type === 'playCount' && dataMap.playCounts) val = dataMap.playCounts.get(id);
-                else if (config.type === 'releaseDate' && dataMap.releaseDates) {
-                    const cached = dataMap.releaseDates.get(id);
-                    val = (cached && typeof cached === 'object' && cached.date !== undefined) ? cached.date : cached;
-                }
-                else if (config.type === 'trueReleaseDate' && dataMap.trueReleaseDates) {
-                    const cached = dataMap.trueReleaseDates.get(id);
-                    val = (cached && typeof cached === 'object' && cached.date !== undefined) ? cached.date : cached;
-                }
-                else if (config.type === 'scrobbles' && dataMap.scrobbles) {
-                    const lfmKey = idToLfmKey.get(id);
-                    if (lfmKey) val = dataMap.scrobbles.get(lfmKey);
-                }
-                else if (config.type === 'personalScrobbles' && dataMap.personal) {
-                    const lfmKey = idToLfmKey.get(id);
-                    if (lfmKey) {
-                        const d = dataMap.personal.get(lfmKey);
-                        if (d && !d.pendingUpdate) val = d.count;
-                    }
-                } else if (config.type === 'lastScrobbled' && dataMap.lastScrobbled) {
-                    const lfmKey = idToLfmKey.get(id);
-                    if (lfmKey) val = dataMap.lastScrobbled.get(lfmKey);
-                } else if (audioFeatureTypes.includes(config.type) && dataMap.ai) {
-                    const aiKey = getCacheKey(id, true, false, "stats-column");
-                    const cached = dataMap.ai.get(aiKey);
-                    const stats = cached ? (cached.stats || cached) : null;
-                    if (stats) val = (config.type === 'djInfo' || config.type === 'key') ? stats : stats[config.type];
-                } else if (config.type === 'popularity' && dataMap.metadata) {
-                    const meta = dataMap.metadata.get(id);
-                    if (meta && meta.popularity !== undefined && meta.popularity !== null) {
-                        val = meta.popularity;
-                    }
-                }
-
-                if ((config.type === 'scrobbles' || config.type === 'personalScrobbles' || config.type === 'lastScrobbled') && !trackInfo) {
-                    val = undefined; 
-                }
-
-                if ((config.type === 'scrobbles' || config.type === 'personalScrobbles' || config.type === 'lastScrobbled') && trackInfo) {
-                    dataElement.style.cursor = "pointer";
-                    dataElement.title = "Click for Last.fm details";
-                    dataElement.onclick = (e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        showLastFmDetailsModal({
-                            name: trackInfo.name,
-                            artistName: trackInfo.artistName,
-                            artists: trackInfo.artists,
-                            albumName: trackInfo.albumName,
-                            uri: trackInfo.uri
-                        });
-                    };
-                    dataElement.onmouseover = () => { dataElement.style.textDecoration = "underline"; dataElement.style.color = "var(--spice-text)"; };
-                    dataElement.onmouseout = () => { dataElement.style.textDecoration = "none"; dataElement.style.color = "var(--spice-subtext)"; };
-                }
-
-                if (config.type === 'releaseDate' && val && val !== '―' && !URI.isAlbum(currentUri)) {
-                    dataElement.style.cursor = "pointer";
-                    dataElement.title = "Click to view album";
-                    dataElement.onclick = async (e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        let albId = props?.album?.id || props?.album?.uri?.split(':')[2] || trackInfo?.album?.id || trackInfo?.album?.uri?.split(':')[2];
-                        if (!albId) {
-                            const meta = await idb.get('trackMetadata', id);
-                            albId = meta?.album?.id || meta?.album?.uri?.split(':')[2];
-                        }
-                        if (!albId) {
-                            const meta = await fetchInternalTrackMetadata(id);
-                            albId = meta?.album?.id || meta?.album?.uri?.split(':')[2];
-                        }
-                        const cleanAlbId = albId ? albId.split(':').pop() : null;
-                        if (cleanAlbId) {
-                            Spicetify.Platform.History.push(`/album/${cleanAlbId}`);
-                        } else {
-                            showNotification("Album not found.", true);
-                        }
-                    };
-                    dataElement.onmouseover = () => { dataElement.style.textDecoration = "underline"; dataElement.style.color = "var(--spice-text)"; };
-                    dataElement.onmouseout = () => { dataElement.style.textDecoration = "none"; dataElement.style.color = "var(--spice-subtext)"; };
-                }
-
-                if (config.type === 'trueReleaseDate' && val && val !== '―' && trackInfo) {
-                    dataElement.style.cursor = "pointer";
-                    dataElement.title = "Click to view album";
-                    dataElement.onclick = async (e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        let albId = null;
-                        let exact = false;
-                        if (dataMap.trueReleaseDates) {
-                            const cached = dataMap.trueReleaseDates.get(id);
-                            if (cached && cached.albumId) {
-                                albId = cached.albumId;
-                                exact = true;
-                            }
-                        }
-                        if (exact && albId) {
-                            const cleanAlbId = albId.split(':').pop();
-                            Spicetify.Platform.History.push(`/album/${cleanAlbId}`);
-                        } else {
-                            try {
-                                const trackObjForFetch = {
-                                    id: id, trackId: id, name: trackInfo.name, uri: trackInfo.uri, artists: trackInfo.artists, track: trackInfo, playCount: dataMap.playCounts?.get(id) || "N/A", album: trackInfo.album, albumId: trackInfo.album?.id || trackInfo.albumId
-                                };
-                                const freshR = await getTrackDetailsWithTrueReleaseDate(trackObjForFetch, true);
-                                const rawClickAlbId = freshR.trueAlbumId || trackObjForFetch.albumId;
-                                const clickAlbId = rawClickAlbId ? rawClickAlbId.split(':').pop() : null;
-                                if (clickAlbId) Spicetify.Platform.History.push(`/album/${clickAlbId}`);
-                                else showNotification("Album not found.", true);
-                            } catch(err) {
-                                showNotification("Failed to find album.", true);
-                            }
-                        }
-                    };
-                    dataElement.onmouseover = () => { dataElement.style.textDecoration = "underline"; dataElement.style.color = "var(--spice-text)"; };
-                    dataElement.onmouseout = () => { dataElement.style.textDecoration = "none"; dataElement.style.color = "var(--spice-subtext)"; };
-                }
-
-                if (val !== undefined && val !== null) {
-                    if ((config.type === 'scrobbles' || config.type === 'personalScrobbles' || config.type === 'lastScrobbled') && val === -1) {
-                         updateDisplay(dataElement, { error: "Track not found on Last.fm", errorLabel: "N/A" }, config.type);
-                    } else {
-                         updateDisplay(dataElement, val, config.type);
-                    }
-                } else {
-                    element.classList.add('sort-play-processing');
-                    isFullyCached = false;
-                }
-            }
-
-            if (!isFullyCached) {
-                if (!elementsToFetchFromApi.has(id)) {
-                    idsToFetchFromApi.push(id);
-                    elementsToFetchFromApi.set(id, []);
-                }
-                elementsToFetchFromApi.get(id).push(element);
-                if (props && !propsMap.has(id)) propsMap.set(id, props);
-            }
-        }
-
-        if (idsToFetchFromApi.length > 0) {
-            if (audioFeatureConfig) {
+                if (missingPCIds.length === 0) return;
                 try {
-                    const stats = await getBatchTrackStats(idsToFetchFromApi);
-                    for (const id of idsToFetchFromApi) {
-                        const stat = stats[id];
-                        if (stat) {
-                            await setTrackCache(id, { stats: stat }, true, false, "stats-column");
-                            const els = elementsToFetchFromApi.get(id) || [];
-                            els.forEach(el => {
-                                if (el && el.dataset.spColTypes === expectedCols) {
-                                    columnConfigs.forEach(c => {
-                                        if (audioFeatureTypes.includes(c.type)) {
-                                            updateDisplay(el.querySelector(c.dataSelector), (c.type === 'djInfo' || c.type === 'key') ? stat : stat[c.type], c.type);
+                    const PC_BATCH_SIZE = 500;
+                    for (let i = 0; i < missingPCIds.length; i += PC_BATCH_SIZE) {
+                        const batch = missingPCIds.slice(i, i + PC_BATCH_SIZE);
+                        const pcResults = await fetchPlayCountsBatchNew(batch.map(id => `spotify:track:${id}`));
+                        for (const id of batch) playCountBatchAttempted.add(id);
+                        const pcEntries = [];
+                        for (const [uri, count] of pcResults.entries()) {
+                            const tid = uri.split(":")[2];
+                            prefetchedPC.set(tid, count);
+                            setExtraColMem('playCounts', tid, count);
+                            pcEntries.push({ key: tid, val: count });
+                        }
+                        if (pcEntries.length > 0) await idb.setMany('playCounts', pcEntries);
+                    }
+                } catch (e) {
+                    console.warn("[Sort-Play] Global playcount prefetch failed", e);
+                }
+            })());
+        }
+
+        if (hasType('releaseDate')) {
+            prefetchTasks.push((async () => {
+                prefetchedRD = await idb.getMany('releaseDates', uniqueSpotifyIds, CACHE_EXPIRE_RELEASE_DATE);
+                const missingRDIds = [];
+                for (const id of uniqueSpotifyIds) {
+                    const rd = prefetchedRD.get(id);
+                    if (rd === undefined || rd === null) missingRDIds.push(id);
+                    else setExtraColMem('releaseDates', id, (typeof rd === 'object' && rd.date !== undefined) ? rd.date : rd);
+                }
+                if (missingRDIds.length === 0) return;
+                try {
+                    const RD_BATCH_SIZE = 500;
+                    for (let i = 0; i < missingRDIds.length; i += RD_BATCH_SIZE) {
+                        const batch = missingRDIds.slice(i, i + RD_BATCH_SIZE);
+                        const rdResults = await fetchReleaseDatesBatchNew(batch.map(id => `spotify:track:${id}`));
+                        const rdEntries = [];
+                        for (const [uri, date] of rdResults.entries()) {
+                            const tid = uri.split(":")[2];
+                            prefetchedRD.set(tid, { date, trackNumber: 0 });
+                            setExtraColMem('releaseDates', tid, date);
+                            rdEntries.push({ key: tid, val: { date, trackNumber: 0 } });
+                        }
+                        if (rdEntries.length > 0) await idb.setMany('releaseDates', rdEntries);
+                    }
+                } catch (e) {
+                    console.warn("[Sort-Play] Global release date prefetch failed", e);
+                }
+            })());
+        }
+
+        if (prefetchTasks.length > 0) await Promise.all(prefetchTasks);
+
+        const BATCH_SIZE = 50;
+        for (let i = 0; i < spotifyTracksToProcess.length; i += BATCH_SIZE) {
+            const batch = spotifyTracksToProcess.slice(i, i + BATCH_SIZE);
+            const batchIds = [...new Set(batch.map(item => item.id))];
+
+            const dataMap = { playCounts: prefetchedPC, releaseDates: prefetchedRD, trueReleaseDates: null, scrobbles: null, personal: null, ai: null, metadata: null, lastScrobbled: null };
+            const fetchPromises1 = [];
+
+            const needsLfmPersonal = hasLfmUser && hasType('personalScrobbles');
+            const needsLfmLast = hasLfmUser && hasType('lastScrobbled');
+            const hasAnyLfm = hasType('scrobbles') || needsLfmPersonal || needsLfmLast;
+
+            if (hasType('trueReleaseDate')) fetchPromises1.push(idb.getMany('trueReleaseDates', batchIds, CACHE_EXPIRE_RELEASE_DATE).then(res => dataMap.trueReleaseDates = res));
+            if (hasAnyLfm || hasType('popularity') || hasType('trueReleaseDate')) {
+                fetchPromises1.push(idb.getMany('trackMetadata', batchIds, CACHE_EXPIRE_METADATA).then(res => dataMap.metadata = res));
+            }
+            if (hasAudioCol) {
+                fetchPromises1.push(idb.getMany('aiData', batchIds.map(id => getCacheKey(id, true, false, "stats-column")), CACHE_EXPIRE_AI_DATA).then(res => dataMap.ai = res));
+            }
+
+            if (fetchPromises1.length > 0) await Promise.all(fetchPromises1);
+
+            const lfmKeys = new Set();
+            const idToLfmKey = new Map();
+
+            if (hasAnyLfm) {
+                for (const { id, props } of batch) {
+                    if (idToLfmKey.has(id)) continue;
+                    const src = props || dataMap.metadata?.get(id);
+                    if (!src) continue;
+                    const lfmInfo = getLfmInfo({
+                        name: src.name,
+                        artists: src.artists,
+                        artistName: src.artists?.[0]?.name,
+                        uri: src.uri,
+                        allArtists: src.artists?.map(a => a.name).join(', ')
+                    });
+                    if (lfmInfo) {
+                        lfmKeys.add(lfmInfo.key);
+                        idToLfmKey.set(id, lfmInfo.key);
+                    }
+                }
+
+                if (lfmKeys.size > 0) {
+                    const lfmKeysArray = Array.from(lfmKeys);
+                    const fetchPromises2 = [];
+                    if (hasType('scrobbles')) fetchPromises2.push(idb.getMany('scrobbles', lfmKeysArray, CACHE_EXPIRE_GLOBAL_SCROBBLES).then(res => dataMap.scrobbles = res));
+                    if (needsLfmPersonal) fetchPromises2.push(idb.getMany('personalScrobbles', lfmKeysArray, CACHE_EXPIRE_PERSONAL_SCROBBLES).then(res => dataMap.personal = res));
+                    if (needsLfmLast) fetchPromises2.push(idb.getMany('lastScrobbledDates', lfmKeysArray, CACHE_EXPIRE_PERSONAL_SCROBBLES).then(res => dataMap.lastScrobbled = res));
+                    if (fetchPromises2.length > 0) await Promise.all(fetchPromises2);
+                }
+            }
+
+            const idsToFetchFromApi = [];
+            const elementsToFetchFromApi = new Map();
+            const propsMap = new Map();
+
+            for (const { element, id, props } of batch) {
+                if (element.dataset.spColTypes !== expectedCols) continue;
+
+                let isFullyCached = true;
+                const src = props || dataMap.metadata?.get(id);
+                const trackInfo = src ? {
+                    name: src.name,
+                    artists: src.artists,
+                    artistName: src.artists?.[0]?.name,
+                    albumName: src.album?.name,
+                    album: src.album,
+                    uri: src.uri
+                } : null;
+
+                for (const config of columnConfigs) {
+                    const dataElement = element.querySelector(config.dataSelector);
+                    if (!dataElement || dataElement.dataset.spProcessed) continue;
+
+                    let val = undefined;
+                    if (config.type === 'playCount' && dataMap.playCounts) {
+                        val = dataMap.playCounts.get(id);
+                    } else if (config.type === 'releaseDate' && dataMap.releaseDates) {
+                        const cached = dataMap.releaseDates.get(id);
+                        val = (cached && typeof cached === 'object' && cached.date !== undefined) ? cached.date : cached;
+                    } else if (config.type === 'trueReleaseDate' && dataMap.trueReleaseDates) {
+                        const cached = dataMap.trueReleaseDates.get(id);
+                        if (cached !== undefined && cached !== null) {
+                            setExtraColMem('trueReleaseDates', id, cached);
+                            val = (typeof cached === 'object' && cached.date !== undefined) ? cached.date : cached;
+                        }
+                    } else if (config.type === 'scrobbles' && dataMap.scrobbles) {
+                        const lfmKey = idToLfmKey.get(id);
+                        if (lfmKey) {
+                            val = dataMap.scrobbles.get(lfmKey);
+                            if (val !== undefined && val !== null) setExtraColMem('scrobbles', lfmKey, val);
+                        }
+                    } else if (config.type === 'personalScrobbles' && dataMap.personal) {
+                        const lfmKey = idToLfmKey.get(id);
+                        if (lfmKey) {
+                            const d = dataMap.personal.get(lfmKey);
+                            if (d && !d.pendingUpdate) {
+                                val = d.count;
+                                setExtraColMem('personalScrobbles', lfmKey, val);
+                            }
+                        }
+                    } else if (config.type === 'lastScrobbled' && dataMap.lastScrobbled) {
+                        const lfmKey = idToLfmKey.get(id);
+                        if (lfmKey) {
+                            val = dataMap.lastScrobbled.get(lfmKey);
+                            if (val !== undefined && val !== null) setExtraColMem('lastScrobbled', lfmKey, val);
+                        }
+                    } else if (audioFeatureTypes.has(config.type) && dataMap.ai) {
+                        const cached = dataMap.ai.get(getCacheKey(id, true, false, "stats-column"));
+                        const stats = cached ? (cached.stats || cached) : null;
+                        if (stats) {
+                            setExtraColMem('aiStats', id, stats);
+                            val = (config.type === 'djInfo' || config.type === 'key') ? stats : stats[config.type];
+                        }
+                    } else if (config.type === 'popularity' && dataMap.metadata) {
+                        const meta = dataMap.metadata.get(id);
+                        if (meta && meta.popularity !== undefined && meta.popularity !== null) {
+                            val = meta.popularity;
+                            setExtraColMem('popularity', id, val);
+                        }
+                    }
+
+                    if ((config.type === 'scrobbles' || config.type === 'personalScrobbles' || config.type === 'lastScrobbled') && !trackInfo) {
+                        val = undefined;
+                    }
+
+                    if ((config.type === 'scrobbles' || config.type === 'personalScrobbles' || config.type === 'lastScrobbled') && trackInfo) {
+                        bindLfmClick(dataElement, trackInfo);
+                    }
+
+                    if (config.type === 'releaseDate' && val && val !== '―' && !URI.isAlbum(currentUri)) {
+                        bindReleaseDateClick(dataElement, id, props, trackInfo);
+                    }
+
+                    if (config.type === 'trueReleaseDate' && val && val !== '―' && trackInfo) {
+                        const cachedObj = dataMap.trueReleaseDates?.get(id);
+                        bindTrueReleaseDateClick(dataElement, id, trackInfo, cachedObj, () => dataMap.playCounts?.get(id));
+                    }
+
+                    if (val !== undefined && val !== null) {
+                        if ((config.type === 'scrobbles' || config.type === 'personalScrobbles' || config.type === 'lastScrobbled') && val === -1) {
+                            updateDisplay(dataElement, { error: "Track not found on Last.fm", errorLabel: "N/A" }, config.type, config.format);
+                        } else {
+                            updateDisplay(dataElement, val, config.type, config.format, { isPlayable: rowPlayableMap.get(element) !== false });
+                        }
+                    } else {
+                        isFullyCached = false;
+                    }
+                }
+
+                if (isFullyCached) {
+                    if (element.dataset.spColTypes === expectedCols) element.classList.remove('sort-play-processing');
+                } else {
+                    if (!elementsToFetchFromApi.has(id)) {
+                        idsToFetchFromApi.push(id);
+                        elementsToFetchFromApi.set(id, []);
+                    }
+                    elementsToFetchFromApi.get(id).push(element);
+                    if (props && !propsMap.has(id)) propsMap.set(id, props);
+                }
+            }
+
+            if (idsToFetchFromApi.length > 0) {
+                const apiTasks = [];
+
+                if (hasAudioCol) {
+                    const audioCols = columnConfigs.filter(c => audioFeatureTypes.has(c.type));
+                    const audioFetchIds = idsToFetchFromApi.filter(id => (elementsToFetchFromApi.get(id) || []).some(el => audioCols.some(c => {
+                        const dEl = el.querySelector(c.dataSelector);
+                        return dEl && !dEl.dataset.spProcessed;
+                    })));
+                    if (audioFetchIds.length > 0) {
+                        apiTasks.push((async () => {
+                            try {
+                                const stats = await getBatchTrackStats(audioFetchIds);
+                                for (const id of audioFetchIds) {
+                                    const stat = stats?.[id];
+                                    const els = elementsToFetchFromApi.get(id) || [];
+                                    if (!stat) {
+                                        setExtraColMem('aiStats', id, { _missing: true });
+                                        els.forEach(el => {
+                                            if (el && el.dataset.spColTypes === expectedCols) {
+                                                audioCols.forEach(c => {
+                                                    const dEl = el.querySelector(c.dataSelector);
+                                                    if (dEl && !dEl.dataset.spProcessed) updateDisplay(dEl, "―", c.type, c.format);
+                                                });
+                                            }
+                                        });
+                                        continue;
+                                    }
+                                    setExtraColMem('aiStats', id, stat);
+                                    await setTrackCache(id, { stats: stat }, true, false, "stats-column");
+                                    els.forEach(el => {
+                                        if (el && el.dataset.spColTypes === expectedCols) {
+                                            audioCols.forEach(c => {
+                                                updateDisplay(el.querySelector(c.dataSelector), (c.type === 'djInfo' || c.type === 'key') ? stat : stat[c.type], c.type, c.format);
+                                            });
                                         }
                                     });
                                 }
-                            });
-                        }
+                            } catch (_) {}
+                        })());
                     }
-                } catch(e) {}
-            }
+                }
 
-            const nonAudioConfigs = columnConfigs.filter(c => !audioFeatureTypes.includes(c.type));
-            if (nonAudioConfigs.length > 0) {
-                const processTrackData = async (t) => {
-                    if (!t) return;
-                    const els = elementsToFetchFromApi.get(t.id) || [];
-                    const activeEls = els.filter(el => el.dataset.spColTypes === expectedCols);
-                    if (activeEls.length === 0) return;
+                if (nonAudioConfigs.length > 0) {
+                    const nonAudioFetchIds = idsToFetchFromApi.filter(id => (elementsToFetchFromApi.get(id) || []).some(el => nonAudioConfigs.some(c => {
+                        const dEl = el.querySelector(c.dataSelector);
+                        return dEl && !dEl.dataset.spProcessed;
+                    })));
+                    if (nonAudioFetchIds.length > 0) {
+                    const processTrackData = async (t) => {
+                        if (!t) return;
+                        const els = elementsToFetchFromApi.get(t.id) || [];
+                        const activeEls = els.filter(el => el.dataset.spColTypes === expectedCols);
+                        if (activeEls.length === 0) return;
 
-                    const resolvedVals = {};
-
-                    for (const c of nonAudioConfigs) {
-                        const needsCol = activeEls.some(el => {
-                            const dEl = el.querySelector(c.dataSelector);
-                            return dEl && !dEl.dataset.spProcessed;
-                        });
-                        if (!needsCol) continue;
-
-                        if (c.type === 'playCount') {
-                            let pc = dataMap.playCounts?.get(t.id);
-                            if (pc !== undefined && pc !== null) {
-                                resolvedVals.playCount = pc;
-                            } else {
-                                const r = await getTrackDetailsWithPlayCount({
-                                    id: t.id, trackId: t.id, albumId: t.album?.id, name: t.name, uri: t.uri, track: t
-                                });
-                                resolvedVals.playCount = r?.playCount;
-                                if (r?.playCount !== "N/A" && r?.playCount !== undefined) {
-                                    await setCachedPlayCount(t.id, r.playCount);
-                                }
-                            }
-                        } else if (c.type === 'releaseDate') {
-                            resolvedVals.releaseDate = t.album.release_date;
-                            if (t.album.release_date) await setCachedReleaseDate(t.id, t.album.release_date);
-                        } else if (c.type === 'trueReleaseDate') {
-                            const trackObjForFetch = {
-                                id: t.id, trackId: t.id, albumId: t.album?.id, name: t.name, uri: t.uri, artists: t.artists, track: t, playCount: dataMap.playCounts?.get(t.id) || "N/A"
-                            };
-                            const r = await getTrackDetailsWithTrueReleaseDate(trackObjForFetch);
-                            resolvedVals.trueReleaseDateObj = { val: r?.trueReleaseDate, obj: r, trackObjForFetch };
-                        } else if (c.type === 'popularity') {
-                            resolvedVals.popularity = t.popularity;
-                        } else if (c.type === 'scrobbles' || c.type === 'personalScrobbles' || c.type === 'lastScrobbled') {
-                            const info = { name: t.name, artists: t.artists, uri: t.uri, albumName: t.album?.name };
-                            resolvedVals.info = info;
-
-                            if (c.type === 'scrobbles') {
-                                if (resolvedVals.scrobbles === undefined) {
-                                    const r = await getTrackDetailsWithScrobbles(info, true);
-                                    resolvedVals.scrobbles = (r.scrobbles === -1 || r.error) ? { error: r.error || "Not found", errorLabel: r.errorLabel || "N/A" } : r.scrobbles;
-                                    if (r.personalScrobbles !== undefined && resolvedVals.personalScrobbles === undefined) {
-                                        resolvedVals.personalScrobbles = (r.personalScrobbles === -1 || r.error) ? { error: r.error || "Not found", errorLabel: r.errorLabel || "N/A" } : r.personalScrobbles;
-                                    }
-                                }
-                            } else if (c.type === 'personalScrobbles') {
-                                if (!loadLastFmUsername()) {
-                                    resolvedVals.personalScrobbles = { error: "Set last.fm username", errorLabel: "No User" };
-                                } else if (resolvedVals.personalScrobbles === undefined) {
-                                    const r = await getTrackDetailsWithPersonalScrobbles(info, true);
-                                    resolvedVals.personalScrobbles = (r.personalScrobbles === -1 || r.error) ? { error: r.error || "Not found", errorLabel: r.errorLabel || "N/A" } : r.personalScrobbles;
-                                    if (r.scrobbles !== undefined && resolvedVals.scrobbles === undefined) {
-                                        resolvedVals.scrobbles = (r.scrobbles === -1 || r.error) ? { error: r.error || "Not found", errorLabel: r.errorLabel || "N/A" } : r.scrobbles;
-                                    }
-                                }
-                            } else if (c.type === 'lastScrobbled') {
-                                if (loadLastFmUsername()) {
-                                    const r = await getTrackDetailsWithLastScrobbled(info, true);
-                                    resolvedVals.lastScrobbled = (r.lastScrobbled === -1 || r.error) ? { error: r.error || "Not found", errorLabel: "N/A" } : r.lastScrobbled;
-                                } else {
-                                    resolvedVals.lastScrobbled = { error: "Set last.fm username", errorLabel: "No User" };
-                                }
-                            }
-                        }
-                    }
-
-                    for (const el of activeEls) {
-                        if (el.dataset.spColTypes !== expectedCols) continue;
+                        const resolvedVals = {};
+                        const handledTypes = new Set();
 
                         for (const c of nonAudioConfigs) {
-                            const dEl = el.querySelector(c.dataSelector);
-                            if (!dEl || dEl.dataset.spProcessed) continue;
+                            if (handledTypes.has(c.type)) continue;
+                            const needsCol = activeEls.some(el => {
+                                const dEl = el.querySelector(c.dataSelector);
+                                return dEl && !dEl.dataset.spProcessed;
+                            });
+                            if (!needsCol) continue;
+                            handledTypes.add(c.type);
 
                             if (c.type === 'playCount') {
-                                updateDisplay(dEl, resolvedVals.playCount, c.type);
+                                const pc = dataMap.playCounts?.get(t.id);
+                                if (pc !== undefined && pc !== null && pc !== "N/A") {
+                                    resolvedVals.playCount = pc;
+                                } else {
+                                    const r = await getTrackDetailsWithPlayCount({ id: t.id, trackId: t.id, albumId: t.album?.id, name: t.name, uri: t.uri, track: t }, 3, 1000, playCountBatchAttempted.has(t.id));
+                                    resolvedVals.playCount = r?.playCount ?? "N/A";
+                                    if (r?.playCount !== "N/A" && r?.playCount !== undefined) await setCachedPlayCount(t.id, r.playCount);
+                                    else setExtraColMem('playCounts', t.id, "N/A");
+                                }
                             } else if (c.type === 'releaseDate') {
-                                updateDisplay(dEl, resolvedVals.releaseDate, c.type);
-                                if (resolvedVals.releaseDate && resolvedVals.releaseDate !== '―' && !URI.isAlbum(currentUri)) {
-                                    dEl.style.cursor = "pointer";
-                                    dEl.title = "Click to view album";
-                                    dEl.onclick = (e) => {
-                                        e.stopPropagation();
-                                        e.preventDefault();
-                                        const rawAlbId = t.album?.id || t.album?.uri?.split(':')[2];
-                                        const albId = rawAlbId ? rawAlbId.split(':').pop() : null;
-                                        if (albId) Spicetify.Platform.History.push(`/album/${albId}`);
-                                        else showNotification("Album not found.", true);
-                                    };
-                                    dEl.onmouseover = () => { dEl.style.textDecoration = "underline"; dEl.style.color = "var(--spice-text)"; };
-                                    dEl.onmouseout = () => { dEl.style.textDecoration = "none"; dEl.style.color = "var(--spice-subtext)"; };
-                                }
+                                const relDate = t.album?.release_date ?? null;
+                                resolvedVals.releaseDate = relDate;
+                                if (relDate) await setCachedReleaseDate(t.id, relDate);
                             } else if (c.type === 'trueReleaseDate') {
-                                const res = resolvedVals.trueReleaseDateObj;
-                                updateDisplay(dEl, res.val, c.type);
-                                if (res.val && res.val !== '―') {
-                                    dEl.style.cursor = "pointer";
-                                    dEl.title = "Click to view album";
-                                    dEl.onclick = async (e) => {
-                                        e.stopPropagation();
-                                        e.preventDefault();
-                                        if (res.obj._exactAlbumIdFound && res.obj.trueAlbumId) {
-                                            Spicetify.Platform.History.push(`/album/${res.obj.trueAlbumId}`);
-                                        } else {
-                                            try {
-                                                const freshR = await getTrackDetailsWithTrueReleaseDate(res.trackObjForFetch, true);
-                                                const clickAlbId = freshR.trueAlbumId || t.album?.id || res.trackObjForFetch.albumId;
-                                                if (clickAlbId) Spicetify.Platform.History.push(`/album/${clickAlbId}`);
-                                                else showNotification("Album not found.", true);
-                                            } catch(err) {
-                                                showNotification("Failed to find album.", true);
-                                            }
-                                        }
-                                    };
-                                    dEl.onmouseover = () => { dEl.style.textDecoration = "underline"; dEl.style.color = "var(--spice-text)"; };
-                                    dEl.onmouseout = () => { dEl.style.textDecoration = "none"; dEl.style.color = "var(--spice-subtext)"; };
-                                }
+                                const trackObjForFetch = { id: t.id, trackId: t.id, albumId: t.album?.id, name: t.name, uri: t.uri, artists: t.artists, track: t, playCount: dataMap.playCounts?.get(t.id) || "N/A" };
+                                const r = await getTrackDetailsWithTrueReleaseDate(trackObjForFetch);
+                                if (r?.trueReleaseDate) setExtraColMem('trueReleaseDates', t.id, { date: r.trueReleaseDate, albumId: r._exactAlbumIdFound ? r.trueAlbumId : null });
+                                resolvedVals.trueReleaseDateObj = { val: r?.trueReleaseDate, obj: r, trackObjForFetch };
                             } else if (c.type === 'popularity') {
-                                updateDisplay(dEl, resolvedVals.popularity, c.type);
+                                resolvedVals.popularity = t.popularity;
+                                if (t.popularity !== undefined && t.popularity !== null) setExtraColMem('popularity', t.id, t.popularity);
                             } else if (c.type === 'scrobbles' || c.type === 'personalScrobbles' || c.type === 'lastScrobbled') {
-                                dEl.style.cursor = "pointer";
-                                dEl.title = "Click for Last.fm details";
-                                dEl.onclick = (e) => {
-                                    e.stopPropagation();
-                                    e.preventDefault();
-                                    showLastFmDetailsModal({
-                                        name: resolvedVals.info.name,
-                                        artistName: resolvedVals.info.artists[0]?.name,
-                                        artists: resolvedVals.info.artists,
-                                        albumName: resolvedVals.info.albumName,
-                                        uri: resolvedVals.info.uri
-                                    });
-                                };
-                                dEl.onmouseover = () => { dEl.style.textDecoration = "underline"; dEl.style.color = "var(--spice-text)"; };
-                                dEl.onmouseout = () => { dEl.style.textDecoration = "none"; dEl.style.color = "var(--spice-subtext)"; };
+                                const info = { name: t.name, artists: t.artists, uri: t.uri, albumName: t.album?.name };
+                                resolvedVals.info = info;
+                                const lfmK = getLfmInfo(info)?.key;
 
-                                updateDisplay(dEl, resolvedVals[c.type], c.type);
+                                if (c.type === 'scrobbles') {
+                                    if (resolvedVals.scrobbles === undefined) {
+                                        const r = await getTrackDetailsWithScrobbles(info, true);
+                                        resolvedVals.scrobbles = (r.scrobbles === -1 || r.error) ? { error: r.error || "Not found", errorLabel: r.errorLabel || "N/A" } : r.scrobbles;
+                                        if (lfmK && typeof r.scrobbles === 'number') setExtraColMem('scrobbles', lfmK, r.scrobbles);
+                                        if (r.personalScrobbles !== undefined && resolvedVals.personalScrobbles === undefined) {
+                                            resolvedVals.personalScrobbles = (r.personalScrobbles === -1 || r.error) ? { error: r.error || "Not found", errorLabel: r.errorLabel || "N/A" } : r.personalScrobbles;
+                                            if (lfmK && typeof r.personalScrobbles === 'number') setExtraColMem('personalScrobbles', lfmK, r.personalScrobbles);
+                                        }
+                                    }
+                                } else if (c.type === 'personalScrobbles') {
+                                    if (!hasLfmUser) {
+                                        resolvedVals.personalScrobbles = { error: "Set last.fm username", errorLabel: "No User" };
+                                    } else if (resolvedVals.personalScrobbles === undefined) {
+                                        const r = await getTrackDetailsWithPersonalScrobbles(info, true);
+                                        resolvedVals.personalScrobbles = (r.personalScrobbles === -1 || r.error) ? { error: r.error || "Not found", errorLabel: r.errorLabel || "N/A" } : r.personalScrobbles;
+                                        if (lfmK && typeof r.personalScrobbles === 'number') setExtraColMem('personalScrobbles', lfmK, r.personalScrobbles);
+                                        if (r.scrobbles !== undefined && resolvedVals.scrobbles === undefined) {
+                                            resolvedVals.scrobbles = (r.scrobbles === -1 || r.error) ? { error: r.error || "Not found", errorLabel: r.errorLabel || "N/A" } : r.scrobbles;
+                                            if (lfmK && typeof r.scrobbles === 'number') setExtraColMem('scrobbles', lfmK, r.scrobbles);
+                                        }
+                                    }
+                                } else {
+                                    if (hasLfmUser) {
+                                        const r = await getTrackDetailsWithLastScrobbled(info, true);
+                                        resolvedVals.lastScrobbled = (r.lastScrobbled === -1 || r.error) ? { error: r.error || "Not found", errorLabel: "N/A" } : r.lastScrobbled;
+                                        if (lfmK && r.lastScrobbled !== undefined && !r.error) setExtraColMem('lastScrobbled', lfmK, r.lastScrobbled);
+                                    } else {
+                                        resolvedVals.lastScrobbled = { error: "Set last.fm username", errorLabel: "No User" };
+                                    }
+                                }
                             }
                         }
-                        
-                        if (el.dataset.spColTypes === expectedCols) {
-                            el.classList.remove('sort-play-processing');
+
+                        for (const el of activeEls) {
+                            if (el.dataset.spColTypes !== expectedCols) continue;
+                            for (const c of nonAudioConfigs) {
+                                const dEl = el.querySelector(c.dataSelector);
+                                if (!dEl || dEl.dataset.spProcessed) continue;
+
+                                if (c.type === 'playCount') {
+                                    updateDisplay(dEl, resolvedVals.playCount, c.type, c.format, { isPlayable: rowPlayableMap.get(el) !== false });
+                                } else if (c.type === 'releaseDate') {
+                                    updateDisplay(dEl, resolvedVals.releaseDate, c.type, c.format);
+                                    if (resolvedVals.releaseDate && resolvedVals.releaseDate !== '―' && !URI.isAlbum(currentUri)) {
+                                        dEl.classList.add('sp-col-clickable');
+                                        dEl.title = "Click to view album";
+                                        dEl.onclick = (e) => {
+                                            e.stopPropagation();
+                                            e.preventDefault();
+                                            const rawAlbId = t.album?.id || t.album?.uri?.split(':')[2];
+                                            const albId = rawAlbId ? rawAlbId.split(':').pop() : null;
+                                            if (albId) Spicetify.Platform.History.push(`/album/${albId}`);
+                                            else showNotification("Album not found.", true);
+                                        };
+                                    }
+                                } else if (c.type === 'trueReleaseDate') {
+                                    const res = resolvedVals.trueReleaseDateObj;
+                                    updateDisplay(dEl, res?.val, c.type, c.format);
+                                    if (res?.val && res.val !== '―') {
+                                        dEl.classList.add('sp-col-clickable');
+                                        dEl.title = "Click to view album";
+                                        dEl.onclick = async (e) => {
+                                            e.stopPropagation();
+                                            e.preventDefault();
+                                            if (res.obj?._exactAlbumIdFound && res.obj.trueAlbumId) {
+                                                Spicetify.Platform.History.push(`/album/${res.obj.trueAlbumId}`);
+                                            } else {
+                                                try {
+                                                    const freshR = await getTrackDetailsWithTrueReleaseDate(res.trackObjForFetch, true);
+                                                    const clickAlbId = freshR.trueAlbumId || t.album?.id || res.trackObjForFetch.albumId;
+                                                    if (clickAlbId) Spicetify.Platform.History.push(`/album/${clickAlbId}`);
+                                                    else showNotification("Album not found.", true);
+                                                } catch (_) {
+                                                    showNotification("Failed to find album.", true);
+                                                }
+                                            }
+                                        };
+                                    }
+                                } else if (c.type === 'popularity') {
+                                    updateDisplay(dEl, resolvedVals.popularity, c.type, c.format);
+                                } else if (c.type === 'scrobbles' || c.type === 'personalScrobbles' || c.type === 'lastScrobbled') {
+                                    if (resolvedVals.info) bindLfmClick(dEl, resolvedVals.info);
+                                    updateDisplay(dEl, resolvedVals[c.type], c.type, c.format);
+                                }
+                            }
                         }
-                    }
-                };
+                    };
 
-                const fetchAndProcessInternal = async () => {
-                    const currentUri = getCurrentUri();
-                    const isAlbum = Spicetify.URI.isAlbum(currentUri);
-                    const albumIdFromUrl = isAlbum ? currentUri.split(':')[2] : null;
-
-                    const processItem = async (id) => {
-                        let t = null;
-                        const props = propsMap.get(id);
-                        
+                    const fetchAndProcessInternal = async () => {
+                        const isAlbum = Spicetify.URI.isAlbum(currentUri);
+                        const albumIdFromUrl = isAlbum ? currentUri.split(':')[2] : null;
                         const needsPopularity = nonAudioConfigs.some(c => c.type === 'popularity');
                         const needsReleaseDate = nonAudioConfigs.some(c => c.type === 'releaseDate');
 
-                        if (props) {
-                            const albId = props.album?.uri ? props.album.uri.split(':')[2] : albumIdFromUrl;
-                            const hasReleaseDate = props.album?.release_date;
-                            
-                            if (albId && (!needsPopularity) && (!needsReleaseDate || hasReleaseDate)) {
-                                t = {
-                                    id: id,
-                                    name: props.name,
-                                    album: { id: albId, release_date: props.album?.release_date },
-                                    artists: props.artists || [],
-                                    uri: `spotify:track:${id}`
-                                };
-                            }
-                        }
-                        
-                        if (!t) {
-                            t = await fetchInternalTrackMetadata(id);
-                            if (t) {
-                                const cacheData = formatTrackCacheData(t);
-                                const existing = dataMap.metadata ? dataMap.metadata.get(id) : null;
-                                if (existing) {
-                                    if (existing.external_ids) {
-                                        cacheData.external_ids = { ...existing.external_ids, ...cacheData.external_ids };
-                                    }
-                                    if (existing.album) {
-                                        cacheData.album = { ...existing.album, ...cacheData.album };
-                                        if (existing.album.album_type) {
-                                            cacheData.album.album_type = existing.album.album_type;
-                                        }
-                                    }
-                                    if (existing.albumType) {
-                                        cacheData.albumType = existing.albumType;
-                                    }
+                        const processItem = async (id) => {
+                            let t = null;
+                            const props = propsMap.get(id);
+                            if (props) {
+                                const albId = props.album?.uri ? props.album.uri.split(':')[2] : albumIdFromUrl;
+                                const hasReleaseDate = props.album?.release_date;
+                                if (albId && !needsPopularity && (!needsReleaseDate || hasReleaseDate)) {
+                                    t = {
+                                        id,
+                                        name: props.name,
+                                        album: { id: albId, release_date: props.album?.release_date },
+                                        artists: props.artists || [],
+                                        uri: `spotify:track:${id}`
+                                    };
                                 }
-                                idb.set('trackMetadata', t.id, cacheData);
                             }
-                        }
-                        await processTrackData(t);
+                            if (!t) {
+                                t = await fetchInternalTrackMetadata(id);
+                                if (t) {
+                                    const cacheData = formatTrackCacheData(t);
+                                    const existing = dataMap.metadata?.get(id);
+                                    if (existing) {
+                                        if (existing.external_ids) cacheData.external_ids = { ...existing.external_ids, ...cacheData.external_ids };
+                                        if (existing.album) {
+                                            cacheData.album = { ...existing.album, ...cacheData.album };
+                                            if (existing.album.album_type) cacheData.album.album_type = existing.album.album_type;
+                                        }
+                                        if (existing.albumType) cacheData.albumType = existing.albumType;
+                                    }
+                                    idb.set('trackMetadata', t.id, cacheData);
+                                    if (t.popularity !== undefined && t.popularity !== null) setExtraColMem('popularity', t.id, t.popularity);
+                                }
+                            }
+                            await processTrackData(t);
+                        };
+
+                        const hasLfmCol = nonAudioConfigs.some(c => c.type === 'scrobbles' || (hasLfmUser && (c.type === 'personalScrobbles' || c.type === 'lastScrobbled')));
+                        if (hasLfmCol && L_F_M_Key_Pool.length === 0) await fetchLastFmKeys();
+                        const validLfmKeys = Math.max(1, L_F_M_Key_Pool.length - revokedLfmKeys.size);
+                        const CONCURRENCY_LIMIT = hasLfmCol ? Math.min(25, Math.max(5, validLfmKeys * 2)) : 5;
+                        const queue = [...nonAudioFetchIds];
+                        const workers = Array(Math.min(CONCURRENCY_LIMIT, queue.length)).fill(null).map(async () => {
+                            while (queue.length > 0) {
+                                const id = queue.shift();
+                                if (id) await processItem(id);
+                            }
+                        });
+                        await Promise.all(workers);
                     };
 
-                    const hasLfmCol = nonAudioConfigs.some(c => c.type === 'scrobbles' || c.type === 'personalScrobbles' || c.type === 'lastScrobbled');
-                    if (hasLfmCol && L_F_M_Key_Pool.length === 0) await fetchLastFmKeys();
-                    const validLfmKeys = Math.max(1, L_F_M_Key_Pool.length - revokedLfmKeys.size);
-                    const CONCURRENCY_LIMIT = hasLfmCol ? Math.min(25, Math.max(5, validLfmKeys * 2)) : 5;
-                    const queue = [...idsToFetchFromApi];
-                    const workers = Array(Math.min(CONCURRENCY_LIMIT, queue.length)).fill(null).map(async () => {
-                        while (queue.length > 0) {
-                            const id = queue.shift();
-                            if (id) await processItem(id);
-                        }
-                    });
-                    
-                    await Promise.all(workers);
-                };
-
-                await fetchAndProcessInternal();
-            }
-            
-            idsToFetchFromApi.forEach(id => {
-                const els = elementsToFetchFromApi.get(id) || [];
-                els.forEach(el => {
-                    if (el && el.dataset.spColTypes === expectedCols) {
-                        el.classList.remove('sort-play-processing');
+                    apiTasks.push(fetchAndProcessInternal());
                     }
+                }
+
+                await Promise.all(apiTasks);
+
+                idsToFetchFromApi.forEach(id => {
+                    const els = elementsToFetchFromApi.get(id) || [];
+                    els.forEach(el => {
+                        if (el && el.dataset.spColTypes === expectedCols) el.classList.remove('sort-play-processing');
+                    });
                 });
-            });
+            }
+        }
+    } finally {
+        for (const { element } of spotifyTracksToProcess) {
+            if (element.dataset.spColTypes === expectedCols) element.classList.remove('sort-play-processing');
         }
     }
   }
 
-  function updateDisplay(element, value, type) {
+  function updateDisplay(element, value, type, formatOverride = null, options = null) {
     if (!element) return;
     element.dataset.spProcessed = "true";
 
     if (value && typeof value === 'object' && value.error) {
-        const label = value.errorLabel || "Error";
-        element.innerHTML = `
-            <span class="sort-play-failed-cell">
-                ${label}
-                <span class="sort-play-tooltip">${value.error}</span>
-            </span>
-        `;
-        element.style.fontSize = "14px";
-        element.style.fontWeight = "400";
-        element.style.color = "var(--spice-subtext)";
-        return; 
+        const label = escapeHtml(value.errorLabel || "Error");
+        const errText = escapeHtml(value.error);
+        element.innerHTML = `<span class="sort-play-failed-cell">${label}<span class="sort-play-tooltip">${errText}</span></span>`;
+        return;
     }
 
     let displayValue = "";
 
     if (type === 'playCount') {
-        if (value > 0 && !isNaN(value)) {
-            displayValue = new Intl.NumberFormat('en-US').format(value);
-        } else {
+        if (value === null || value === undefined || value === "―" || value === "N/A") {
             displayValue = "―";
+        } else {
+            const num = Number(value);
+            if (!Number.isFinite(num) || num < 0) displayValue = "―";
+            else if (num === 0) {
+                const fmt = formatOverride || 'raw';
+                displayValue = options?.isPlayable === false ? "―" : ((fmt === 'abbreviated' || fmt === 'rounded_abbreviated') ? '<1K' : '<1,000');
+            } else {
+                displayValue = formatExtraColumnNumber(num, formatOverride || 'raw');
+            }
         }
     } else if (type === 'personalScrobbles') {
-        if (value === 0) {
+        if (value === "―") {
             displayValue = "―";
-        } else if (value > 0 && !isNaN(value)) {
-            if (myScrobblesDisplayMode === 'sign') {
-                displayValue = '\u2705';
-            } else { 
-                displayValue = new Intl.NumberFormat('en-US').format(value);
-            }
+        } else if (typeof value === 'number' && Number.isFinite(value) && value >= 0) {
+            const mode = formatOverride || myScrobblesDisplayMode;
+            if (mode === 'sign') displayValue = value > 0 ? '\u2705' : "―";
+            else displayValue = formatExtraColumnNumber(value, mode === 'abbreviated' ? 'abbreviated' : 'raw', true);
         } else {
-            displayValue = "Err"; 
+            displayValue = "Err";
         }
     } else if (type === 'lastScrobbled') {
-        if (value && typeof value === 'object' && value.error) {
-        } else {
-            displayValue = formatLastScrobbled(value, lastScrobbledFormat);
-        }
+        displayValue = formatLastScrobbled(value, formatOverride || lastScrobbledFormat);
     } else if (type === 'scrobbles') {
-        if (value !== null && value !== undefined && !isNaN(value) && value !== -1) {
-            if (value > 0) {
-                displayValue = new Intl.NumberFormat('en-US').format(value);
-            } else {
-                displayValue = "―";
-            }
+        if (value === "―") {
+            displayValue = "―";
+        } else if (value !== null && value !== undefined && !isNaN(Number(value)) && Number(value) >= 0) {
+            displayValue = formatExtraColumnNumber(value, formatOverride || 'raw', true);
         } else {
-             displayValue = "Err";
+            displayValue = "Err";
         }
     } else if (type === 'releaseDate' || type === 'trueReleaseDate') {
-        displayValue = formatReleaseDate(value, releaseDateFormat);
+        displayValue = formatReleaseDate(value, formatOverride || releaseDateFormat);
     } else if (type === 'addedAt') {
         displayValue = formatSpotifyDateAdded(value);
     } else if (type === 'djInfo') {
         if (value && typeof value === 'object') {
             const parts = [];
-            const k = formatKey(value.key_raw, value.mode, keyDisplayMode, value.camelot);
+            const k = formatKey(value.key_raw, value.mode, formatOverride || keyDisplayMode, value.camelot);
             if (k && k !== '―') parts.push(k);
-            if (value.tempo) parts.push(`${value.tempo}♫`);
-            if (value.energy) parts.push(`E${value.energy}`);
-            if (parts.length > 0) {
-                displayValue = parts.join(' | ');
-            } else {
-                displayValue = "―";
-            }
+            if (typeof value.tempo === 'number' && Number.isFinite(value.tempo) && value.tempo > 0) parts.push(`${value.tempo}♫`);
+            if (typeof value.energy === 'number' && Number.isFinite(value.energy)) parts.push(`E${value.energy}`);
+            displayValue = parts.length > 0 ? parts.join(' | ') : "―";
         } else {
             displayValue = "―";
         }
     } else if (type === 'key') {
-        if (value && typeof value === 'object') {
-            displayValue = formatKey(value.key_raw, value.mode, keyDisplayMode, value.camelot);
-        } else if (value !== null && value !== undefined) {
-            displayValue = String(value);
-        } else {
-            displayValue = "―";
-        }
-    } else if (['tempo', 'energy', 'danceability', 'valence', 'popularity'].includes(type)) {
-        if (value !== null && value !== undefined) {
-            displayValue = String(value);
-        } else {
-            displayValue = "―";
-        }
+        if (value && typeof value === 'object') displayValue = formatKey(value.key_raw, value.mode, formatOverride || keyDisplayMode, value.camelot);
+        else if (value !== null && value !== undefined) displayValue = String(value);
+        else displayValue = "―";
+    } else if (type === 'tempo') {
+        const tNum = Number(value);
+        displayValue = (value !== null && value !== undefined && value !== "―" && Number.isFinite(tNum) && tNum > 0) ? String(value) : "―";
+    } else if (['energy', 'danceability', 'valence', 'popularity'].includes(type)) {
+        displayValue = (value !== null && value !== undefined) ? String(value) : "―";
     }
 
     element.textContent = displayValue;
-    element.style.fontSize = "14px";
-    element.style.fontWeight = "400";
-    element.style.color = "var(--spice-subtext)";
   }
-  
+
   function updateTracklist() {
     const currentUri = getCurrentUri();
     const isSearch = Spicetify.Platform.History.location?.pathname?.startsWith('/search');
-
     const isValidPlaylistPage = currentUri && (URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri) || isLocalFilesPage(currentUri));
 
-    if (!showAdditionalColumn && !showSecondAdditionalColumn) {
-        const gridStyleEl = document.getElementById("sort-play-grid-style");
-        if (gridStyleEl) gridStyleEl.innerHTML = "";
-    }
-
-    if (!isValidPlaylistPage && !isSearch) {
-      return;
-    }
-  
+    if (!isValidPlaylistPage && !isSearch) return;
     if (isUpdatingTracklist) return;
     isUpdatingTracklist = true;
 
     try {
-      const tracklists = Array.from(document.querySelectorAll('.main-trackList-indexable, main [role="grid"]:not([aria-colcount="1"])')).filter(t => !t.closest('[data-testid="recommended-track"]'));
-      if (tracklists.length) {
-        for (const tracklist_ of tracklists) {
-          if (!tracklist_ || tracklist_.querySelectorAll('[role="row"]').length <= 1) continue;
-    
-          updateTracklistStructure(tracklist_);
+      const activeCols = getActiveExtraColumns('playlist');
+      const tracklists = Array.from(document.querySelectorAll('.main-trackList-indexable, main [role="grid"]:not([aria-colcount="1"])'))
+        .filter(t => isTracklistGrid(t) && !t.closest('[data-testid="recommended-track"]'));
+      let primaryTracklist = null;
+
+      for (const tracklist_ of tracklists) {
+        if (!tracklist_) continue;
+        if (activeCols.length === 0) {
+          clearTracklistExtraColumns(tracklist_);
+          continue;
+        }
+        if (tracklist_.querySelectorAll('[role="row"]').length <= 1) continue;
+        if (updateTracklistStructure(tracklist_)) {
+          if (!primaryTracklist) primaryTracklist = tracklist_;
           loadAdditionalColumnData(tracklist_);
         }
       }
@@ -66986,9 +70842,12 @@ shadowRoot.innerHTML = `
       const recommendationContainer = document.querySelector('[data-testid="recommended-track"]');
       if (recommendationContainer) {
         const recTracklist = recommendationContainer.querySelector('.main-trackList-trackList, [role="grid"]');
-        if (recTracklist) {
-          updateRecommendationTracklistStructure(recTracklist);
-          loadAdditionalColumnData(recTracklist);
+        if (recTracklist && isTracklistGrid(recTracklist)) {
+          if (activeCols.length === 0) {
+            clearTracklistExtraColumns(recTracklist);
+          } else if (updateRecommendationTracklistStructure(recTracklist, primaryTracklist)) {
+            loadAdditionalColumnData(recTracklist);
+          }
         }
       }
     } finally {
@@ -67059,828 +70918,1268 @@ shadowRoot.innerHTML = `
     }
   }
 
-  function updateTracklistStructure(tracklist_) {
-    const currentUri = getCurrentUri();
-    const isSearch = Spicetify.Platform.History.location?.pathname?.startsWith('/search');
-    
-    const isValidPlaylistPage = currentUri && (URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri) || isLocalFilesPage(currentUri));
-    
-    if (!isValidPlaylistPage && !isSearch) return;
+  function isTracklistGrid(el) {
+    if (!el || el.nodeType !== Node.ELEMENT_NODE) return false;
+    if (el.classList.contains('main-trackList-trackList') || el.classList.contains('main-trackList-indexable')) return true;
+    return Boolean(el.querySelector('.main-trackList-trackListHeaderRow, .main-trackList-trackListRow, [role="columnheader"]'));
+  }
 
-    const tracklistHeader = tracklist_.querySelector('.main-trackList-trackListHeaderRow, [role="row"][aria-rowindex="1"], [role="row"]:has([role="columnheader"])');
-    if (!tracklistHeader) return;
-
-    tracklist_.querySelectorAll('.sort-play-album-col-header, .sort-play-album-col, .sort-play-artist-header-wrapper, .sort-play-artist-col').forEach(el => el.remove());
-
-    const currentPlaylistName = getCurrentPlaylistName();
-    const isExcludedPlaylist = excludedPlaylistNames.includes(currentPlaylistName);
-    const shouldRemoveDateAdded = !isSearch && removeDateAdded && !isExcludedPlaylist;
-
-    const nativeHeaders = Array.from(tracklistHeader.querySelectorAll('[role="columnheader"]'))
-        .filter(el => !el.classList.contains('sort-play-column') && !el.classList.contains('sort-play-second-column'));
-    
-    if (nativeHeaders.length === 0) return;
-    
-    const endHeaderCell = tracklistHeader.querySelector(".main-trackList-rowSectionEnd") || nativeHeaders[nativeHeaders.length - 1];
-    let dateAddedHeaderCell = nativeHeaders.find(el => {
-        const txt = el.textContent || '';
-        return txt.includes('Date added') || txt.includes('Date Added') || txt.includes('Added');
-    }) || null;
-    if (!dateAddedHeaderCell) {
-        const variableHeaders = nativeHeaders.filter(el => el.classList.contains('main-trackList-rowSectionVariable'));
-        if (variableHeaders.length > 0) dateAddedHeaderCell = variableHeaders[variableHeaders.length - 1];
+  function getNativeColumnType(el) {
+    if (!el) return 'UNKNOWN';
+    if (el.dataset?.spArtistPlays === 'true') return 'PLAYS';
+    const fiberKey = Object.keys(el).find(k => k.startsWith('__reactFiber$'));
+    if (fiberKey) {
+      let curr = el[fiberKey];
+      for (let d = 0; curr && d < 6; d++, curr = curr.return) {
+        const ct = curr.memoizedProps?.columnType || curr.pendingProps?.columnType;
+        if (typeof ct === 'string' && ct) return ct;
+      }
     }
+    if (el.classList.contains('main-trackList-rowSectionIndex')) return 'INDEX';
+    if (el.classList.contains('main-trackList-rowSectionStart')) return 'TITLE_AND_ARTIST';
+    if (el.classList.contains('main-trackList-rowSectionEnd')) return 'DURATION';
+    const txt = (el.textContent || '').trim().toUpperCase().replace(/\s+/g, '_');
+    if (/DATE_ADDED|^ADDED$/.test(txt)) return 'ADDED_AT';
+    return txt || 'VAR';
+  }
 
-    const skeletonDateAddedIndex = nativeHeaders.indexOf(dateAddedHeaderCell);
-    const dateAddedIndexAttr = skeletonDateAddedIndex !== -1 ? (skeletonDateAddedIndex + 1).toString() : null;
+  function getNativeColumnSizing(nativeType, context, endMinW) {
+    if (nativeType === 'INDEX') return { minW: 16, weight: 0 };
+    if (nativeType === 'TITLE_AND_ARTIST') return { minW: 150, weight: (context === 'album' || context === 'artist') ? 5.5 : 4.2 };
+    if (nativeType === 'DURATION' || nativeType === 'ADD') return { minW: endMinW, weight: 1.2 };
+    if (nativeType === 'ALBUM') return { minW: 100, weight: 2.3 };
+    if (nativeType === 'ADDED_AT') return { minW: 96, weight: 1.7 };
+    if (nativeType === 'PLAYS') return { minW: 120, weight: 1.8 };
+    if (nativeType === 'WAVEFORM') return { minW: 140, weight: 2.8 };
+    if (nativeType === 'BPM' || nativeType === 'KEY') return { minW: 64, weight: 0.95 };
+    if (nativeType === 'RELEASE_DATE') return { minW: 92, weight: 1.4 };
+    return { minW: 84, weight: (context === 'album' || context === 'artist') ? 1.8 : 1.6 };
+  }
 
-    let existingHeaderColumn = tracklistHeader.querySelector(".sort-play-column");
-    const headerTextSpan = existingHeaderColumn?.querySelector("span");
-    let existingSecondHeaderColumn = tracklistHeader.querySelector(".sort-play-second-column");
-    const secondHeaderTextSpan = existingSecondHeaderColumn?.querySelector("span");
-
-    const expectedHeaderText = {
-        'playCount': "Plays", 'popularity': "Popularity", 'releaseDate': "Rel. Date", 'trueReleaseDate': "True Date",
-        'scrobbles': "Scrobbles", 'personalScrobbles': myScrobblesDisplayMode === 'sign' ? "Listened" : "My Scrobbles",
-        'lastScrobbled': "Last Played", 'djInfo': "DJ Info", 'key': "Key", 'tempo': "BPM", 'energy': "Energy",
-        'danceability': "Dance", 'valence': "Valence"
-    }[selectedColumnType] || "Plays";
-    const columnTypeChanged = existingHeaderColumn && headerTextSpan?.innerText !== expectedHeaderText;
-
-    const expectedSecondHeaderText = {
-        'playCount': "Plays", 'popularity': "Popularity", 'releaseDate': "Rel. Date", 'trueReleaseDate': "True Date",
-        'scrobbles': "Scrobbles", 'personalScrobbles': myScrobblesDisplayMode === 'sign' ? "Listened" : "My Scrobbles",
-        'lastScrobbled': "Last Played", 'djInfo': "DJ Info", 'key': "Key", 'tempo': "BPM", 'energy': "Energy",
-        'danceability': "Dance", 'valence': "Valence"
-    }[selectedSecondColumnType] || "Popularity";
-    const secondColumnTypeChanged = existingSecondHeaderColumn && secondHeaderTextSpan?.innerText !== expectedSecondHeaderText;
-
-    const getDynamicGridTemplate = (totalCols) => {
-        if (totalCols <= 4) return "[index] 16px [first] 4fr [var1] 2fr [last] minmax(120px,1fr)";
-        if (totalCols === 5) return "[index] 16px [first] 4fr [var1] 2fr [var2] 2fr [last] minmax(120px,1fr)";
-        if (totalCols === 6) return "[index] 16px [first] 5fr [var1] 3fr [var2] 2fr [var3] 2fr [last] minmax(120px,1fr)";
-        if (totalCols === 7) return "[index] 16px [first] 5fr [var1] 3fr [var2] 2fr [var3] 2fr [var4] 2fr [last] minmax(120px,1fr)";
-        
-        let template = "[index] 16px [first] 5fr ";
-        for (let i = 1; i < totalCols - 2; i++) {
-            template += `[var${i}] 2fr `;
-        }
-        template += "[last] minmax(120px,1fr)";
-        return template;
-    };
-
-    if (dateAddedHeaderCell) {
-        dateAddedHeaderCell.style.display = shouldRemoveDateAdded ? 'none' : '';
+  function findDateAddedHeader(nativeHeaders) {
+    for (const el of nativeHeaders) {
+      if (getNativeColumnType(el) === 'ADDED_AT') return el;
     }
+    const tagged = nativeHeaders.find(el => el.dataset.spDateAdded === 'true');
+    if (tagged) return tagged;
+    const byText = nativeHeaders.find(el => /date\s*added|\badded\b/i.test((el.textContent || '').trim()));
+    if (byText) return byText;
+    const varHeaders = nativeHeaders.filter(el => el.classList.contains('main-trackList-rowSectionVariable'));
+    return varHeaders.length >= 2 ? varHeaders[varHeaders.length - 1] : null;
+  }
 
-    const createHeaderColumn = (className, headerText, contextType) => {
-        const headerColumn = document.createElement("div");
-        headerColumn.className = `main-trackList-rowSectionVariable ${className}`;
-        headerColumn.setAttribute("role", "columnheader");
-        headerColumn.style.cssText = "display: flex; justify-content: center; align-items: center;";
-        
-        const btn = document.createElement("button");
-        btn.className = "sort-play-column-header";
-        btn.onclick = (e) => showColumnSelector(e, contextType);
-        const title = document.createElement("span");
-        title.className = "TypeElement-mesto-type standalone-ellipsis-one-line";
-        title.innerText = headerText;
-        btn.appendChild(title);
-        headerColumn.appendChild(btn);
-        return headerColumn;
-    };
+  function isColElVisible(el) {
+    return !!(el && el.style.display !== 'none' && el.getAttribute('data-hidden') !== 'true' && el.getAttribute('data-sp-overflow-hidden') !== 'true');
+  }
 
-    if (showAdditionalColumn) {
-        if (!existingHeaderColumn) {
-            const headerColumn = createHeaderColumn('sort-play-column', expectedHeaderText, 'playlist1');
-            if (endHeaderCell) tracklistHeader.insertBefore(headerColumn, endHeaderCell);
-            else tracklistHeader.appendChild(headerColumn);
-            existingHeaderColumn = headerColumn;
-        } else {
-            if (endHeaderCell && existingHeaderColumn.nextElementSibling !== endHeaderCell) {
-                tracklistHeader.insertBefore(existingHeaderColumn, endHeaderCell);
-            }
-            if (columnTypeChanged) {
-                if (headerTextSpan) headerTextSpan.innerText = expectedHeaderText;
-                tracklist_.querySelectorAll('.sort-play-data').forEach(cell => { 
-                    cell.textContent = ""; 
-                    delete cell.dataset.spProcessed; 
-                    cell.onclick = null;
-                    cell.onmouseover = null;
-                    cell.onmouseout = null;
-                    cell.style.cursor = "default";
-                    cell.style.textDecoration = "none";
-                    cell.removeAttribute('title');
-                });
-            }
-        }
-    } else if (existingHeaderColumn) {
-        existingHeaderColumn.remove();
-        existingHeaderColumn = null;
+  function getHeaderColumnElements(headerRow) {
+    return Array.from(headerRow.children).filter(el =>
+      el.getAttribute('role') === 'columnheader' ||
+      el.classList.contains('main-trackList-rowSectionVariable') ||
+      el.classList.contains('sp-extra-col-header') ||
+      el.classList.contains('djInfoList') ||
+      el.classList.contains('starRatings')
+    );
+  }
+
+  function createExtraColumnResizer() {
+    const sep = document.createElement('div');
+    sep.setAttribute('role', 'separator');
+    sep.setAttribute('aria-orientation', 'horizontal');
+    sep.setAttribute('aria-label', 'Resize columns');
+    sep.setAttribute('tabindex', '0');
+    sep.setAttribute('draggable', 'false');
+    sep.setAttribute('data-skip-in-keyboard-nav', 'true');
+    sep.className = 'main-trackList-rowSeperator sp-col-resizer';
+    return sep;
+  }
+
+  function getSavedOrSeededFrs(layoutSig, colKeys, defaultFrs) {
+    const saved = extraColumnWidths?.layouts?.[layoutSig];
+    if (Array.isArray(saved) && saved.length === defaultFrs.length && saved.every(v => typeof v === 'number' && Number.isFinite(v) && v > 0)) {
+      const total = saved.reduce((a, b) => a + b, 0) || 100;
+      return saved.map(v => Number(((v / total) * 100).toFixed(4)));
     }
-
-    if (showSecondAdditionalColumn) {
-        const insertBeforeNode = existingHeaderColumn || endHeaderCell;
-        if (!existingSecondHeaderColumn) {
-            const headerColumn = createHeaderColumn('sort-play-second-column', expectedSecondHeaderText, 'playlist2');
-            if (insertBeforeNode) tracklistHeader.insertBefore(headerColumn, insertBeforeNode);
-            else tracklistHeader.appendChild(headerColumn);
-            existingSecondHeaderColumn = headerColumn;
-        } else {
-            if (insertBeforeNode && existingSecondHeaderColumn.nextElementSibling !== insertBeforeNode) {
-                tracklistHeader.insertBefore(existingSecondHeaderColumn, insertBeforeNode);
-            }
-            if (secondColumnTypeChanged) {
-                if (secondHeaderTextSpan) secondHeaderTextSpan.innerText = expectedSecondHeaderText;
-                tracklist_.querySelectorAll('.sort-play-second-data').forEach(cell => { 
-                    cell.textContent = ""; 
-                    delete cell.dataset.spProcessed; 
-                    cell.onclick = null;
-                    cell.onmouseover = null;
-                    cell.onmouseout = null;
-                    cell.style.cursor = "default";
-                    cell.style.textDecoration = "none";
-                    cell.removeAttribute('title');
-                });
-            }
-        }
-    } else if (existingSecondHeaderColumn) {
-        existingSecondHeaderColumn.remove();
-        existingSecondHeaderColumn = null;
+    const colPrefs = extraColumnWidths?.cols;
+    if (colPrefs && colKeys.some(k => typeof colPrefs[k] === 'number' && Number.isFinite(colPrefs[k]) && colPrefs[k] > 0)) {
+      const seeded = colKeys.map((k, i) => {
+        const savedCol = colPrefs[k];
+        return (typeof savedCol === 'number' && Number.isFinite(savedCol) && savedCol > 0) ? savedCol : defaultFrs[i];
+      });
+      const total = seeded.reduce((a, b) => a + b, 0) || 100;
+      return seeded.map(v => Number(((v / total) * 100).toFixed(4)));
     }
+    return defaultFrs;
+  }
 
-    let currentHeaderCols = Array.from(tracklistHeader.querySelectorAll('[role="columnheader"]')).filter(el => el.style.display !== 'none');
-    currentHeaderCols.forEach((el, index) => {
-        const newIndex = (index + 1).toString();
-        if (el.getAttribute("aria-colindex") !== newIndex) {
-            el.setAttribute("aria-colindex", newIndex);
-        }
+  function syncTracklistRowOverflowAndAria(tracklist_, headerRow, layout) {
+    const hiddenColIds = layout?.hiddenColIds || new Set();
+    const totalVisibleCols = (layout?.resizableCols?.length || 0) + (layout?.hasIndex ? 1 : 0);
+    tracklist_.querySelectorAll('[data-sp-col-cell], [data-sp-skel-col]').forEach(el => {
+      const id = el.dataset.spColCell || el.dataset.spSkelCol;
+      if (hiddenColIds.has(id)) el.setAttribute('data-sp-overflow-hidden', 'true');
+      else el.removeAttribute('data-sp-overflow-hidden');
     });
-    
-    const maxCols = currentHeaderCols.length;
-    tracklist_.setAttribute('data-sp-max-cols', maxCols.toString());
-
-    const expectedColCount = maxCols.toString();
-    if (tracklist_.getAttribute('aria-colcount') !== expectedColCount) {
-        tracklist_.setAttribute('aria-colcount', expectedColCount);
-    }
-    
-    let gridStyleEl = document.getElementById("sort-play-grid-style");
-    if (!gridStyleEl) {
-        gridStyleEl = document.createElement("style");
-        gridStyleEl.id = "sort-play-grid-style";
-        document.head.appendChild(gridStyleEl);
-    }
-
-    if (showAdditionalColumn || showSecondAdditionalColumn) {
-        tracklist_.setAttribute('data-sp-grid', 'playlist');
-        const newHeaderTemplate = getDynamicGridTemplate(maxCols);
-        const cssString = `html body div.main-trackList-trackList[data-sp-grid="playlist"] .main-trackList-trackListHeaderRow, html body div[role="grid"][data-sp-grid="playlist"] [role="row"]:has([role="columnheader"]), html body div.main-trackList-trackList[data-sp-grid="playlist"] .main-trackList-trackListRow, html body div.main-trackList-trackList[data-sp-grid="playlist"] .main-trackList-trackListRowGrid, html body div[role="grid"][data-sp-grid="playlist"] [role="row"] > div:has([role="gridcell"]) { grid-template-columns: ${newHeaderTemplate} !important; }`;
-        if (gridStyleEl.innerHTML !== cssString) {
-            gridStyleEl.innerHTML = cssString;
-        }
-    } else {
-        tracklist_.removeAttribute('data-sp-grid');
-        gridStyleEl.innerHTML = "";
-    }
-
-    const createDataColumn = (className, dataClassName) => {
-        const dataColumn = document.createElement("div");
-        dataColumn.className = `main-trackList-rowSectionVariable ${className}`;
-        dataColumn.setAttribute("role", "gridcell");
-        dataColumn.style.cssText = "display: flex; justify-content: center; align-items: center;";
-        dataColumn.innerHTML = `<span class="${dataClassName}" style="font-size: 14px; font-weight: 400; color: var(--spice-subtext);"></span>`;
-        return dataColumn;
-    };
-
-    const skeletonRows = tracklist_.querySelectorAll(".main-trackList-trackListRowGrid:not(.main-trackList-trackListRow):not(.main-trackList-trackListHeaderRow)");
-    for (const skeleton of skeletonRows) {
-        if (skeletonDateAddedIndex !== -1 && skeletonDateAddedIndex < skeleton.children.length) {
-            const skeletonDateAddedCell = skeleton.children[skeletonDateAddedIndex];
-            if (skeletonDateAddedCell && skeletonDateAddedCell.classList.contains("main-trackList-rowSectionVariable")) {
-                skeletonDateAddedCell.style.display = shouldRemoveDateAdded ? 'none' : '';
-            }
-        }
-
-        const endCell = skeleton.querySelector(".main-trackList-rowSectionEnd");
-        const existingExtra = skeleton.querySelector(".sort-play-skeleton-col");
-        const existingSecondExtra = skeleton.querySelector(".sort-play-second-skeleton-col");
-
-        if (showAdditionalColumn) {
-            if (!existingExtra) {
-                const skeletonCell = document.createElement("div");
-                const varCell = skeleton.querySelector(".main-trackList-rowSectionVariable");
-                const baseClass = varCell ? varCell.className.split(' ').filter(c => !c.includes('sort-play')).join(' ') : "ojrBmBNrA3EfuQlTYybV main-trackList-rowSectionVariable r5OS0NnS9c7LAEJKIri1";
-                skeletonCell.className = `${baseClass} sort-play-skeleton-col`;
-                if (endCell) skeleton.insertBefore(skeletonCell, endCell);
-                else skeleton.appendChild(skeletonCell);
-            }
-        } else if (existingExtra) {
-            existingExtra.remove();
-        }
-
-        if (showSecondAdditionalColumn) {
-            if (!existingSecondExtra) {
-                const skeletonCell = document.createElement("div");
-                const varCell = skeleton.querySelector(".main-trackList-rowSectionVariable");
-                const baseClass = varCell ? varCell.className.split(' ').filter(c => !c.includes('sort-play')).join(' ') : "ojrBmBNrA3EfuQlTYybV main-trackList-rowSectionVariable r5OS0NnS9c7LAEJKIri1";
-                skeletonCell.className = `${baseClass} sort-play-second-skeleton-col`;
-                
-                const firstExtra = skeleton.querySelector(".sort-play-skeleton-col");
-                const insertBeforeNode = firstExtra || endCell;
-                if (insertBeforeNode) skeleton.insertBefore(skeletonCell, insertBeforeNode);
-                else skeleton.appendChild(skeletonCell);
-            }
-        } else if (existingSecondExtra) {
-            existingSecondExtra.remove();
-        }
-    }
-    
-    const allRows = Array.from(tracklist_.querySelectorAll('.main-trackList-trackListRow, [role="row"]:not([aria-rowindex="1"])')).filter(r => r !== tracklistHeader);
-    for (const track of allRows) {
-        const cellContainer = (track.children.length === 1 && track.firstElementChild?.querySelector('[role="gridcell"]')) ? track.firstElementChild : track;
-        let existingDataColumn = cellContainer.querySelector(".sort-play-data-column");
-        let existingSecondDataColumn = cellContainer.querySelector(".sort-play-second-data-column");
-        
-        const dateAddedCell = dateAddedIndexAttr ? cellContainer.querySelector(`[aria-colindex="${dateAddedIndexAttr}"]`) : null;
-        if (dateAddedCell && !dateAddedCell.classList.contains('sort-play-data-column') && !dateAddedCell.classList.contains('sort-play-second-data-column')) {
-            dateAddedCell.style.display = shouldRemoveDateAdded ? 'none' : '';
-        }
-
-        const endCell = cellContainer.querySelector(".main-trackList-rowSectionEnd") || Array.from(cellContainer.children).filter(el => !el.classList.contains('sort-play-data-column') && !el.classList.contains('sort-play-second-data-column')).pop();
-
-        if (showAdditionalColumn) {
-            if (!existingDataColumn) {
-                existingDataColumn = createDataColumn('sort-play-data-column sort-play-column', 'sort-play-data');
-            } else if (columnTypeChanged) {
-                const dataSpan = existingDataColumn.querySelector('.sort-play-data');
-                if (dataSpan) {
-                    dataSpan.textContent = "";
-                    delete dataSpan.dataset.spProcessed;
-                    dataSpan.onclick = null;
-                    dataSpan.onmouseover = null;
-                    dataSpan.onmouseout = null;
-                    dataSpan.style.cursor = "default";
-                    dataSpan.style.textDecoration = "none";
-                    dataSpan.removeAttribute('title');
-                }
-            }
-            if (endCell && existingDataColumn.nextElementSibling !== endCell) {
-                cellContainer.insertBefore(existingDataColumn, endCell);
-            } else if (!endCell && existingDataColumn.parentElement !== cellContainer) {
-                cellContainer.appendChild(existingDataColumn);
-            }
-        } else if (existingDataColumn) {
-            existingDataColumn.remove();
-            existingDataColumn = null;
-        }
-
-        if (showSecondAdditionalColumn) {
-            if (!existingSecondDataColumn) {
-                existingSecondDataColumn = createDataColumn('sort-play-second-data-column sort-play-second-column', 'sort-play-second-data');
-            } else if (secondColumnTypeChanged) {
-                const dataSpan = existingSecondDataColumn.querySelector('.sort-play-second-data');
-                if (dataSpan) {
-                    dataSpan.textContent = "";
-                    delete dataSpan.dataset.spProcessed;
-                    dataSpan.onclick = null;
-                    dataSpan.onmouseover = null;
-                    dataSpan.onmouseout = null;
-                    dataSpan.style.cursor = "default";
-                    dataSpan.style.textDecoration = "none";
-                    dataSpan.removeAttribute('title');
-                }
-            }
-            const targetNode = existingDataColumn || endCell;
-            if (targetNode && existingSecondDataColumn.nextElementSibling !== targetNode) {
-                cellContainer.insertBefore(existingSecondDataColumn, targetNode);
-            } else if (!targetNode && existingSecondDataColumn.parentElement !== cellContainer) {
-                cellContainer.appendChild(existingSecondDataColumn);
-            }
-        } else if (existingSecondDataColumn) {
-            existingSecondDataColumn.remove();
-            existingSecondDataColumn = null;
-        }
+    if (totalVisibleCols <= 0) return;
+    const rows = Array.from(tracklist_.querySelectorAll('.main-trackList-trackListRow, [role="row"]:not([aria-rowindex="1"])'))
+      .filter(r => r !== headerRow && !r.querySelector('[role="columnheader"]'));
+    for (const row of rows) {
+      const cellContainer = (row.children.length === 1 && row.firstElementChild?.querySelector('[role="gridcell"]')) ? row.firstElementChild : row;
+      const endCell = cellContainer.querySelector('.main-trackList-rowSectionEnd');
+      if (!endCell) continue;
+      const visibleExtra = Array.from(cellContainer.querySelectorAll(':scope > .sp-extra-col-cell')).filter(el => el.getAttribute('data-sp-overflow-hidden') !== 'true');
+      const startExtraIdx = Math.max(1, totalVisibleCols - visibleExtra.length);
+      visibleExtra.forEach((el, i) => {
+        const ci = (startExtraIdx + i).toString();
+        if (el.getAttribute('aria-colindex') !== ci) el.setAttribute('aria-colindex', ci);
+      });
+      if (endCell.getAttribute('aria-colindex') !== totalVisibleCols.toString()) {
+        endCell.setAttribute('aria-colindex', totalVisibleCols.toString());
+      }
     }
   }
 
-  function updateRecommendationTracklistStructure(tracklist_) {
-    const currentUri = getCurrentUri();
-    if (!currentUri || !URI.isPlaylistV1OrV2(currentUri)) return;
-    
-    if (!showAdditionalColumn && !showSecondAdditionalColumn) {
-        tracklist_.removeAttribute('data-sp-grid-rec');
-        tracklist_.removeAttribute('data-sp-max-cols-rec');
-        const gridStyleEl = document.getElementById("sort-play-rec-grid-style");
-        if (gridStyleEl) gridStyleEl.innerHTML = "";
-        tracklist_.querySelectorAll('.sort-play-data-column, .sort-play-second-data-column, .sort-play-rec-index-spacer, .sort-play-skeleton-col, .sort-play-second-skeleton-col').forEach(el => el.remove());
-        tracklist_.querySelectorAll('[role="gridcell"]').forEach(c => { if (c.style.display === 'none') c.style.display = ''; });
+  function mirrorGridLayoutToRec(sourceTracklist) {
+    const layout = sourceTracklist?._spLayout;
+    if (!layout) return;
+    const recTracklist = document.querySelector('[data-testid="recommended-track"] .main-trackList-trackList, [data-testid="recommended-track"] [role="grid"]');
+    if (!recTracklist || !isTracklistGrid(recTracklist)) return;
+
+    const firstRecRow = recTracklist.querySelector('.main-trackList-trackListRow, [role="row"]');
+    const recCellContainer = firstRecRow ? ((firstRecRow.children.length === 1 && firstRecRow.firstElementChild?.querySelector('[role="gridcell"]')) ? firstRecRow.firstElementChild : firstRecRow) : null;
+
+    recTracklist.querySelectorAll('[data-sp-col-cell], [data-sp-skel-col]').forEach(el => {
+      const id = el.dataset.spColCell || el.dataset.spSkelCol;
+      if (layout.hiddenColIds?.has(id)) el.setAttribute('data-sp-overflow-hidden', 'true');
+      else el.removeAttribute('data-sp-overflow-hidden');
+    });
+
+    const primaryTracks = layout.resizableCols.length + (layout.hasIndex ? 1 : 0);
+    const recVisibleCells = recCellContainer ? Array.from(recCellContainer.children).filter(isColElVisible).length : 0;
+    const recTracks = recVisibleCells > 0 ? recVisibleCells + 1 : 0;
+
+    if (recTracks > 0 && recTracks === primaryTracks) {
+      const tpl = sourceTracklist.style.getPropertyValue('--sp-grid-template');
+      const gap = sourceTracklist.style.getPropertyValue('--sp-grid-gap');
+      if (!tpl) return;
+      recTracklist.style.setProperty('--sp-grid-template', tpl);
+      if (gap) recTracklist.style.setProperty('--sp-grid-gap', gap);
+      for (let i = 0; i < layout.resizableCols.length; i++) {
+        const v = sourceTracklist.style.getPropertyValue(`--sp-col-${i}`);
+        if (v) recTracklist.style.setProperty(`--sp-col-${i}`, v);
+      }
+      for (let i = layout.resizableCols.length; i < 24; i++) {
+        recTracklist.style.removeProperty(`--sp-col-${i}`);
+      }
+      recTracklist.setAttribute('data-sp-grid', 'rec');
+      recTracklist.setAttribute('aria-colcount', primaryTracks.toString());
+    } else if (recTracks > 0) {
+      applyStandaloneRecGridLayout(recTracklist, recVisibleCells, layout.hiddenColIds);
+    }
+  }
+
+  function applyStandaloneRecGridLayout(recTracklist, visibleCellCount, hiddenColIds = null) {
+    const activeCols = getActiveExtraColumns('playlist').filter(c => !hiddenColIds?.has(c.id));
+    const totalTracks = visibleCellCount + 1;
+    const nativeMiddleCount = Math.max(0, visibleCellCount - 2 - activeCols.length);
+    const endMinW = 120;
+    const cols = [
+      { minW: 150, weight: 4.2, key: 'playlist:native:TITLE_AND_ARTIST' },
+      ...Array.from({ length: nativeMiddleCount }, (_, i) => ({ minW: 96, weight: i === 0 ? 2.3 : 1.7, key: i === 0 ? 'playlist:native:ALBUM' : 'playlist:native:ADDED_AT' })),
+      ...activeCols.map(c => ({ minW: c.minW, weight: c.weight, key: `playlist:extra:${c.type}${c.fmtBucket ? `:${c.fmtBucket}` : ''}` })),
+      { minW: endMinW, weight: 1.2, key: 'playlist:native:DURATION' }
+    ];
+    const totalWeight = cols.reduce((s, c) => s + c.weight, 0) || 1;
+    const defaultFrs = cols.map(c => Number(((c.weight / totalWeight) * 100).toFixed(4)));
+    const activeFrs = getSavedOrSeededFrs(`rec|n:${nativeMiddleCount}|e:${activeCols.map(c => `${c.type}${c.fmtBucket ? `:${c.fmtBucket}` : ''}`).join(',')}`, cols.map(c => c.key), defaultFrs);
+    const containerW = recTracklist.clientWidth || 0;
+    let gap = 16;
+    if (containerW > 200) {
+      const sumMin = 16 + cols.reduce((s, c) => s + c.minW, 0) + 32;
+      if (sumMin + cols.length * 16 > containerW) gap = (sumMin + cols.length * 12 <= containerW) ? 12 : 8;
+    }
+    let template = '[index] var(--index-column-width, 16px) ';
+    for (let i = 0; i < cols.length; i++) {
+      const name = i === 0 ? '[first]' : (i === cols.length - 1 ? '[last]' : `[var${i}]`);
+      template += `${name} minmax(${cols[i].minW}px, var(--sp-col-${i}, ${defaultFrs[i]}fr)) `;
+      recTracklist.style.setProperty(`--sp-col-${i}`, `${activeFrs[i]}fr`);
+    }
+    for (let i = cols.length; i < 24; i++) recTracklist.style.removeProperty(`--sp-col-${i}`);
+    recTracklist.style.setProperty('--sp-grid-template', template.trim());
+    recTracklist.style.setProperty('--sp-grid-gap', `${gap}px`);
+    recTracklist.setAttribute('data-sp-grid', 'rec');
+    recTracklist.setAttribute('aria-colcount', totalTracks.toString());
+  }
+
+  function bindTracklistColumnResize(tracklist_, headerRow) {
+    if (!headerRow || headerRow._spResizeBound) return;
+    headerRow._spResizeBound = true;
+    let suppressNextClick = false;
+
+    const applyCascadeDelta = (initialWidths, minWidths, idx, delta) => {
+      const next = initialWidths.slice();
+      if (delta > 0) {
+        let remaining = delta;
+        let taken = 0;
+        for (let j = idx + 1; j < next.length && remaining > 0; j++) {
+          const avail = Math.max(0, next[j] - minWidths[j]);
+          const take = Math.min(avail, remaining);
+          next[j] -= take;
+          taken += take;
+          remaining -= take;
+        }
+        next[idx] += taken;
+      } else if (delta < 0) {
+        let need = -delta;
+        let taken = 0;
+        for (let j = idx; j >= 0 && need > 0; j--) {
+          const avail = Math.max(0, next[j] - minWidths[j]);
+          const take = Math.min(avail, need);
+          next[j] -= take;
+          taken += take;
+          need -= take;
+        }
+        next[idx + 1] += taken;
+      }
+      return next;
+    };
+
+    const syncSiblingGrids = (layout, frs) => {
+      if (layout.context === 'playlist') {
+        mirrorGridLayoutToRec(tracklist_);
+      } else if (layout.context === 'artist') {
+        document.querySelectorAll('div[data-sp-grid="artist"]').forEach(g => {
+          if (g === tracklist_ || g._spLayout?.layoutSig !== layout.layoutSig) return;
+          for (let k = 0; k < frs.length; k++) g.style.setProperty(`--sp-col-${k}`, `${frs[k]}fr`);
+        });
+      }
+    };
+
+    const writeFrWidths = (layout, widthsPx) => {
+      const total = widthsPx.reduce((a, b) => a + b, 0) || 1;
+      const frs = widthsPx.map(w => Number(((w / total) * 100).toFixed(4)));
+      for (let k = 0; k < frs.length; k++) {
+        tracklist_.style.setProperty(`--sp-col-${k}`, `${frs[k]}fr`);
+      }
+      syncSiblingGrids(layout, frs);
+      return frs;
+    };
+
+    const commitFrWidths = (layout, widthsPx) => {
+      const frs = writeFrWidths(layout, widthsPx);
+      extraColumnWidths.layouts[layout.layoutSig] = frs;
+      for (let k = 0; k < layout.colKeys.length; k++) {
+        extraColumnWidths.cols[layout.colKeys[k]] = frs[k];
+      }
+      saveExtraColumnWidthsDebounced();
+      syncOpenExtraColumnsUi();
+    };
+
+    headerRow.addEventListener('click', (e) => {
+      if (!suppressNextClick) return;
+      suppressNextClick = false;
+      e.preventDefault();
+      e.stopPropagation();
+    }, true);
+
+    headerRow.addEventListener('mousedown', (e) => {
+      if (e.button !== 0 || !tracklist_.hasAttribute('data-sp-grid')) return;
+      const sep = e.target?.closest?.('[role="separator"]');
+      if (!sep || !headerRow.contains(sep)) return;
+      const layout = tracklist_._spLayout;
+      if (!layout) return;
+      const ownerCol = sep.closest('[role="columnheader"]');
+      const idx = layout.resizableCols.findIndex(c => c.el === ownerCol);
+      if (idx === -1 || idx >= layout.resizableCols.length - 1) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      const isRtl = getComputedStyle(headerRow).direction === 'rtl';
+      const initialWidths = layout.resizableCols.map((c, i) => {
+        const w = c.el.getBoundingClientRect().width;
+        return w > 0 ? w : layout.minWidths[i];
+      });
+      const effMins = layout.minWidths.map((m, i) => Math.min(m, initialWidths[i]));
+      const startX = e.clientX;
+      let currentWidths = initialWidths.slice();
+      let moved = false;
+
+      tracklist_.classList.add('sp-col-resizing');
+      headerRow.querySelectorAll('.sp-hdr-tight-hover').forEach(el => syncExtraColHeaderHoverLock(el, false, true));
+      sep.classList.add('sp-resizer-active');
+      document.body.style.cursor = 'col-resize';
+
+      const onMove = (ev) => {
+        const rawDelta = ev.clientX - startX;
+        const delta = isRtl ? -rawDelta : rawDelta;
+        if (Math.abs(delta) > 2) moved = true;
+        currentWidths = applyCascadeDelta(initialWidths, effMins, idx, delta);
+        writeFrWidths(layout, currentWidths);
+      };
+
+      const onUp = () => {
+        window.removeEventListener('mousemove', onMove, true);
+        window.removeEventListener('mouseup', onUp, true);
+        tracklist_.classList.remove('sp-col-resizing');
+        sep.classList.remove('sp-resizer-active');
+        document.body.style.cursor = '';
+        if (moved) {
+          suppressNextClick = true;
+          setTimeout(() => { suppressNextClick = false; }, 120);
+          commitFrWidths(layout, currentWidths);
+        }
+        headerRow.querySelectorAll('.sp-extra-col-header').forEach(el => {
+          if (el.classList.contains('sp-col-menu-open') || el.classList.contains('sp-col-loading') || el.matches(':hover')) {
+            syncExtraColHeaderHoverLock(el, true);
+          }
+        });
+      };
+
+      window.addEventListener('mousemove', onMove, true);
+      window.addEventListener('mouseup', onUp, true);
+    }, true);
+
+    headerRow.addEventListener('dblclick', (e) => {
+      if (!tracklist_.hasAttribute('data-sp-grid')) return;
+      const sep = e.target?.closest?.('[role="separator"]');
+      if (!sep || !headerRow.contains(sep)) return;
+      const layout = tracklist_._spLayout;
+      if (!layout) return;
+      e.preventDefault();
+      e.stopPropagation();
+      delete extraColumnWidths.layouts[layout.layoutSig];
+      for (const k of layout.colKeys) delete extraColumnWidths.cols[k];
+      saveExtraColumnWidthsDebounced();
+      for (let k = 0; k < layout.defaultFrs.length; k++) {
+        tracklist_.style.setProperty(`--sp-col-${k}`, `${layout.defaultFrs[k]}fr`);
+      }
+      syncSiblingGrids(layout, layout.defaultFrs);
+      syncOpenExtraColumnsUi();
+    }, true);
+
+    headerRow.addEventListener('keydown', (e) => {
+      if (!tracklist_.hasAttribute('data-sp-grid')) return;
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      const sep = e.target?.closest?.('[role="separator"]');
+      if (!sep || !headerRow.contains(sep)) return;
+      const layout = tracklist_._spLayout;
+      if (!layout) return;
+      const ownerCol = sep.closest('[role="columnheader"]');
+      const idx = layout.resizableCols.findIndex(c => c.el === ownerCol);
+      if (idx === -1 || idx >= layout.resizableCols.length - 1) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const isRtl = getComputedStyle(headerRow).direction === 'rtl';
+      const initialWidths = layout.resizableCols.map((c, i) => {
+        const w = c.el.getBoundingClientRect().width;
+        return w > 0 ? w : layout.minWidths[i];
+      });
+      const effMins = layout.minWidths.map((m, i) => Math.min(m, initialWidths[i]));
+      const step = (e.key === 'ArrowLeft' ? -12 : 12) * (isRtl ? -1 : 1);
+      const nextWidths = applyCascadeDelta(initialWidths, effMins, idx, step);
+      commitFrWidths(layout, nextWidths);
+    }, true);
+  }
+
+  function ensureTracklistResizeObserver(tracklist_, headerRow, context) {
+    if (typeof ResizeObserver === 'undefined' || !tracklist_) return;
+    const existing = extraColResizeObservers.get(tracklist_);
+    if (existing) {
+      existing.headerRow = headerRow;
+      existing.context = context;
+      return;
+    }
+    const entry = { headerRow, context, lastWidth: tracklist_.clientWidth || 0, timer: null, ro: null };
+    entry.ro = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect?.width ?? tracklist_.clientWidth;
+      if (!tracklist_.hasAttribute('data-sp-grid') || tracklist_.classList.contains('sp-col-resizing')) return;
+      if (Math.abs(w - entry.lastWidth) < 4) return;
+      entry.lastWidth = w;
+      clearTimeout(entry.timer);
+      entry.timer = setTimeout(() => {
+        if (tracklist_.isConnected && entry.headerRow?.isConnected && tracklist_.hasAttribute('data-sp-grid')) {
+          applyTracklistGridLayout(tracklist_, entry.headerRow, entry.context, true);
+        }
+      }, 32);
+    });
+    entry.ro.observe(tracklist_);
+    extraColResizeObservers.set(tracklist_, entry);
+  }
+
+  function applyTracklistGridLayout(tracklist_, headerRow, context, force = false) {
+    if (!tracklist_ || !headerRow) return null;
+    const allHeaders = getHeaderColumnElements(headerRow)
+      .filter(el => el.style.display !== 'none' && el.getAttribute('data-hidden') !== 'true');
+    if (allHeaders.length === 0) return null;
+
+    const endMinW = (showLikeButton && likeButtonConfig?.trackRows) ? 142 : 120;
+    const containerW = tracklist_.clientWidth || headerRow.clientWidth || 0;
+    const headerSig = allHeaders.map(el => el.classList.contains('sp-extra-col-header') ? `e:${el.dataset.spColId}:${el.dataset.spColType}:${el.dataset.spColFmtBucket || ''}` : `n:${getNativeColumnType(el)}`).join(',');
+    const layoutKey = `${context}|${Math.round(containerW / 4)}|${endMinW}|${headerSig}`;
+    if (!force && tracklist_._spLayoutKey === layoutKey && tracklist_._spLayout && tracklist_.getAttribute('data-sp-grid') === context) {
+      return tracklist_._spLayout;
+    }
+
+    const hasIndex = allHeaders[0].classList.contains('main-trackList-rowSectionIndex') || allHeaders[0].textContent?.trim() === '#';
+    const endHeader = headerRow.querySelector('.main-trackList-rowSectionEnd') || allHeaders[allHeaders.length - 1];
+
+    const descriptors = allHeaders.map((el, i) => {
+      const isIndex = hasIndex && i === 0;
+      const isFirst = hasIndex ? i === 1 : i === 0;
+      const isEnd = el === endHeader;
+      const isExtra = el.classList.contains('sp-extra-col-header');
+      const colId = el.dataset.spColId || null;
+      const colType = el.dataset.spColType || null;
+      const colFmt = el.dataset.spColFormat || null;
+      const nativeType = isExtra ? null : getNativeColumnType(el);
+      let minW;
+      let weight;
+      let fmtBucket = '';
+      if (isExtra) {
+        const sizing = getExtraColumnSizing(colType, colFmt);
+        minW = sizing.minW;
+        weight = sizing.weight;
+        fmtBucket = sizing.fmtBucket;
+      } else {
+        const sizing = getNativeColumnSizing(isIndex ? 'INDEX' : (isFirst ? 'TITLE_AND_ARTIST' : (isEnd ? 'DURATION' : nativeType)), context, endMinW);
+        minW = sizing.minW;
+        weight = sizing.weight;
+      }
+      const colKey = isExtra ? `${context}:extra:${colType}${fmtBucket ? `:${fmtBucket}` : ''}` : `${context}:native:${nativeType}`;
+      return { el, isIndex, isFirst, isEnd, isExtra, colId, colType, fmtBucket, nativeType, colKey, minW, weight };
+    });
+
+    const hiddenColIds = new Set();
+    const active = descriptors.slice();
+    const pickGapForList = (list) => {
+      if (containerW <= 200) return 16;
+      const sumMin = list.reduce((s, d) => s + d.minW, 0) + 32;
+      const gaps = Math.max(0, list.length - 1);
+      if (sumMin + gaps * 16 <= containerW) return 16;
+      if (sumMin + gaps * 12 <= containerW) return 12;
+      return 8;
+    };
+
+    if (containerW > 200) {
+      while (active.length > 2) {
+        const minGap = 8;
+        const minTotal = active.reduce((s, d) => s + d.minW, 0) + (active.length - 1) * minGap + 32;
+        if (minTotal <= containerW) break;
+        let hideIdx = -1;
+        for (let i = active.length - 1; i >= 0; i--) {
+          if (active[i].isExtra) { hideIdx = i; break; }
+        }
+        if (hideIdx === -1) break;
+        const [removed] = active.splice(hideIdx, 1);
+        if (removed.colId) hiddenColIds.add(removed.colId);
+      }
+    }
+
+    const prevHidden = tracklist_._spLayout?.hiddenColIds;
+    const hiddenChanged = !prevHidden || prevHidden.size !== hiddenColIds.size || Array.from(hiddenColIds).some(id => !prevHidden.has(id));
+
+    const firstVisibleExtraIdx = active.findIndex(d => d.isExtra);
+    const beforeExtraEl = (firstVisibleExtraIdx > 0 && !active[firstVisibleExtraIdx - 1].isIndex) ? active[firstVisibleExtraIdx - 1].el : null;
+    for (const d of descriptors) {
+      if (d.el === beforeExtraEl) d.el.setAttribute('data-sp-before-extra', 'true');
+      else d.el.removeAttribute('data-sp-before-extra');
+      if (!d.isExtra) continue;
+      if (d.el.classList.contains('sp-hdr-tight-hover')) syncExtraColHeaderHoverLock(d.el, false, true);
+      if (hiddenColIds.has(d.colId)) d.el.setAttribute('data-sp-overflow-hidden', 'true');
+      else d.el.removeAttribute('data-sp-overflow-hidden');
+    }
+
+    active.forEach((d, idx) => {
+      const colIdx = (idx + 1).toString();
+      if (d.el.getAttribute('aria-colindex') !== colIdx) d.el.setAttribute('aria-colindex', colIdx);
+    });
+    const colCountStr = active.length.toString();
+    if (tracklist_.getAttribute('aria-colcount') !== colCountStr) tracklist_.setAttribute('aria-colcount', colCountStr);
+
+    const resizableCols = active.filter(d => !d.isIndex);
+    const gap = pickGapForList(active);
+    const nativeSig = resizableCols.filter(d => !d.isFirst && !d.isEnd && !d.isExtra).map(d => d.nativeType).join(',');
+    const extraSig = resizableCols.filter(d => d.isExtra).map(d => `${d.colType}${d.fmtBucket ? `:${d.fmtBucket}` : ''}`).join(',');
+    const layoutSig = `${context}|n:${nativeSig}|e:${extraSig}`;
+    const colKeys = resizableCols.map(d => d.colKey);
+
+    const totalWeight = resizableCols.reduce((s, d) => s + d.weight, 0) || 1;
+    const defaultFrs = resizableCols.map(d => Number(((d.weight / totalWeight) * 100).toFixed(4)));
+    const activeFrs = getSavedOrSeededFrs(layoutSig, colKeys, defaultFrs);
+
+    let template = hasIndex ? '[index] var(--index-column-width, 16px) ' : '';
+    for (let i = 0; i < resizableCols.length; i++) {
+      const name = i === 0 ? '[first]' : (i === resizableCols.length - 1 ? '[last]' : `[var${i}]`);
+      template += `${name} minmax(${resizableCols[i].minW}px, var(--sp-col-${i}, ${defaultFrs[i]}fr)) `;
+      tracklist_.style.setProperty(`--sp-col-${i}`, `${activeFrs[i]}fr`);
+    }
+    for (let i = resizableCols.length; i < 24; i++) {
+      tracklist_.style.removeProperty(`--sp-col-${i}`);
+    }
+    tracklist_.style.setProperty('--sp-grid-template', template.trim());
+    tracklist_.style.setProperty('--sp-grid-gap', `${gap}px`);
+    tracklist_.setAttribute('data-sp-grid', context);
+    for (const d of active) {
+      if (d.isExtra && (d.el.classList.contains('sp-col-menu-open') || d.el.classList.contains('sp-col-loading') || d.el.matches(':hover'))) {
+        syncExtraColHeaderHoverLock(d.el, true);
+      }
+    }
+
+    const layout = { context, layoutSig, colKeys, gap, hasIndex, resizableCols, minWidths: resizableCols.map(d => d.minW), defaultFrs, hiddenColIds };
+    tracklist_._spLayout = layout;
+    tracklist_._spLayoutKey = layoutKey;
+
+    if (hiddenChanged || force) syncTracklistRowOverflowAndAria(tracklist_, headerRow, layout);
+
+    bindTracklistColumnResize(tracklist_, headerRow);
+    ensureTracklistResizeObserver(tracklist_, headerRow, context);
+    if (context === 'playlist') mirrorGridLayoutToRec(tracklist_);
+    return layout;
+  }
+
+  function clearTracklistExtraColumns(tracklist_) {
+    if (!tracklist_) return;
+    const roEntry = extraColResizeObservers.get(tracklist_);
+    if (roEntry) {
+      clearTimeout(roEntry.timer);
+      roEntry.ro?.disconnect?.();
+      extraColResizeObservers.delete(tracklist_);
+    }
+    tracklist_.removeAttribute('data-sp-grid');
+    tracklist_.removeAttribute('data-sp-grid-rec');
+    tracklist_.removeAttribute('data-sp-max-cols');
+    tracklist_.removeAttribute('data-sp-max-cols-rec');
+    tracklist_.classList.remove('sp-col-resizing');
+    tracklist_.style.removeProperty('--sp-grid-template');
+    tracklist_.style.removeProperty('--sp-grid-gap');
+    for (let i = 0; i < 24; i++) tracklist_.style.removeProperty(`--sp-col-${i}`);
+    delete tracklist_._spLayout;
+    delete tracklist_._spLayoutKey;
+
+    tracklist_.querySelectorAll('.sp-extra-col-header, .sp-extra-col-cell, .sp-extra-col-skel, .sp-artist-header-wrapper, .sort-play-column, .sort-play-second-column, .sort-play-album-col-header, .sort-play-album-col, .sort-play-artist-header-wrapper, .sort-play-artist-col, .sort-play-skeleton-col, .sort-play-second-skeleton-col, .sort-play-album-skeleton-col, .sort-play-artist-skeleton-col, .sort-play-rec-index-spacer').forEach(el => el.remove());
+
+    tracklist_.querySelectorAll('[data-sp-before-extra="true"]').forEach(el => el.removeAttribute('data-sp-before-extra'));
+    tracklist_.querySelectorAll('[data-sp-date-added="true"]').forEach(el => {
+      el.style.display = '';
+      delete el.dataset.spDateAdded;
+    });
+
+    tracklist_.querySelectorAll('.main-trackList-trackListRow, [role="row"]').forEach(row => {
+      if (row.style.gridTemplateColumns) row.style.gridTemplateColumns = '';
+      delete row.dataset.spColTypes;
+      delete row.dataset.spRowSig;
+      row.classList.remove('sort-play-processing');
+      row.removeAttribute('data-sp-fetch-failed');
+    });
+
+    const headerRow = tracklist_.querySelector('.main-trackList-trackListHeaderRow, [role="row"][aria-rowindex="1"], [role="row"]:has([role="columnheader"])');
+    if (headerRow) {
+      if (headerRow.style.gridTemplateColumns) headerRow.style.gridTemplateColumns = '';
+      const remaining = Array.from(headerRow.querySelectorAll('[role="columnheader"]')).filter(isColElVisible);
+      remaining.forEach((el, idx) => el.setAttribute('aria-colindex', (idx + 1).toString()));
+      if (remaining.length > 0) tracklist_.setAttribute('aria-colcount', remaining.length.toString());
+    } else if (tracklist_.querySelector('.main-trackList-trackListRow')) {
+      const firstRow = tracklist_.querySelector('.main-trackList-trackListRow');
+      const cells = firstRow ? Array.from(firstRow.querySelectorAll('[role="gridcell"]')).filter(isColElVisible).length : 0;
+      if (cells > 0) tracklist_.setAttribute('aria-colcount', cells.toString());
+    }
+    if (!tracklist_.closest?.('[data-testid="recommended-track"]')) {
+      tracklist_.querySelectorAll('.main-trackList-trackListRow').forEach(row => {
+        const cc = (row.children.length === 1 && row.firstElementChild?.querySelector('[role="gridcell"]')) ? row.firstElementChild : row;
+        Array.from(cc.querySelectorAll(':scope > [role="gridcell"]')).filter(isColElVisible).forEach((c, idx) => {
+          c.setAttribute('aria-colindex', (idx + 1).toString());
+        });
+      });
+    }
+
+    ['sort-play-grid-style', 'sort-play-rec-grid-style', 'sort-play-album-grid-style', 'sort-play-artist-grid-style'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.remove();
+    });
+  }
+
+  function syncExtraColHeaderHoverLock(headerCol, shouldLock, forceUnlock = false, deferFade = !forceUnlock) {
+    if (!headerCol) return;
+    if (headerCol._spHdrUnlockCancel) {
+      headerCol._spHdrUnlockCancel();
+      headerCol._spHdrUnlockCancel = null;
+    }
+    if (!shouldLock) {
+      const isBusy = () => headerCol.classList.contains('sp-col-menu-open') || headerCol.classList.contains('sp-col-loading') || headerCol.matches(':hover');
+      if (!forceUnlock && isBusy()) return;
+      const unlockNow = () => {
+        headerCol.classList.remove('sp-hdr-tight-hover');
+        headerCol.style.removeProperty('--sp-hdr-lock-left');
+      };
+      if (!deferFade || !headerCol.classList.contains('sp-hdr-tight-hover')) {
+        unlockNow();
         return;
+      }
+      const menuBtn = headerCol.querySelector('.sort-play-col-menu-btn');
+      if (!menuBtn || parseFloat(getComputedStyle(menuBtn).opacity) <= 0.01) {
+        unlockNow();
+        return;
+      }
+      const finish = () => {
+        if (headerCol._spHdrUnlockCancel) {
+          headerCol._spHdrUnlockCancel();
+          headerCol._spHdrUnlockCancel = null;
+        }
+        if (isBusy()) return;
+        unlockNow();
+      };
+      const onEnd = (e) => {
+        if (e.target === menuBtn && e.propertyName === 'opacity') finish();
+      };
+      menuBtn.addEventListener('transitionend', onEnd);
+      const timer = setTimeout(finish, 180);
+      headerCol._spHdrUnlockCancel = () => {
+        clearTimeout(timer);
+        menuBtn.removeEventListener('transitionend', onEnd);
+      };
+      return;
+    }
+    if (!headerCol.classList.contains('sp-sortable-col') || headerCol.classList.contains('sp-hdr-tight-hover')) return;
+    const wrap = headerCol.querySelector('.sort-play-col-header-wrap');
+    const btn = headerCol.querySelector('.sort-play-column-header');
+    if (!wrap || !btn) return;
+    const wr = wrap.getBoundingClientRect();
+    const br = btn.getBoundingClientRect();
+    if (wr.width <= 0) return;
+    const isRtl = getComputedStyle(wrap).direction === 'rtl';
+    const idleStart = Math.max(0, isRtl ? (wr.right - br.right) : (br.left - wr.left));
+    const idleEnd = isRtl ? (wr.right - br.left) : (br.right - wr.left);
+    const align = headerCol.dataset.spAlign || 'center';
+    if (align === 'right') {
+      if (idleStart < 15.5) headerCol.classList.add('sp-hdr-tight-hover');
+      return;
+    }
+    if (idleEnd + 16 > wr.width + 0.5) {
+      if (align === 'center') headerCol.style.setProperty('--sp-hdr-lock-left', `${idleStart.toFixed(2)}px`);
+      headerCol.classList.add('sp-hdr-tight-hover');
+    }
+  }
+
+  function createExtraColumnHeaderEl(col, context) {
+    const headerColumn = document.createElement('div');
+    headerColumn.className = 'main-trackList-rowSectionVariable sp-extra-col-header';
+    headerColumn.dataset.spColId = col.id;
+    headerColumn.dataset.spColType = col.type;
+    headerColumn.dataset.spColFormat = col.format || '';
+    headerColumn.dataset.spColFmtBucket = col.fmtBucket || '';
+    headerColumn.dataset.spSlot = col.id;
+    if (col.align === 'left' || col.align === 'right') headerColumn.dataset.spAlign = col.align;
+    headerColumn.setAttribute('role', 'columnheader');
+    headerColumn.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      showColumnSelector(e, context, col.id);
+    });
+
+    const wrap = document.createElement('div');
+    wrap.className = 'sort-play-col-header-wrap';
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sort-play-column-header';
+    btn.onclick = (e) => {
+      const pageUri = getCurrentUri();
+      if (context === 'playlist' && pageUri && URI.isPlaylistV1OrV2(pageUri)) {
+        e.stopPropagation();
+        handleExtraColumnHeaderSortClick(col.id);
+      } else {
+        showColumnSelector(e, context, col.id);
+      }
+    };
+
+    const title = document.createElement('span');
+    title.className = 'sort-play-col-title encore-text-body-small standalone-ellipsis-one-line';
+    title.textContent = col.label;
+    const arrow = document.createElement('span');
+    arrow.className = 'sort-play-sort-arrow';
+    btn.appendChild(title);
+    btn.appendChild(arrow);
+    wrap.appendChild(btn);
+
+    if (context === 'playlist') {
+      const menuBtn = document.createElement('button');
+      menuBtn.type = 'button';
+      menuBtn.className = 'sort-play-col-menu-btn';
+      menuBtn.setAttribute('aria-label', 'Change column');
+      menuBtn.innerHTML = viewSortDotsSvg;
+      menuBtn.onclick = (e) => {
+        e.stopPropagation();
+        const pageUri = getCurrentUri();
+        const activeJob = pageUri ? playlistViewSortLoading.get(pageUri) : null;
+        if (activeJob && activeJob.slot === col.id) {
+          if (activeJob.spinnerVisible) {
+            menuBtn.classList.add('sp-col-aborting');
+            cancelPlaylistViewSort(pageUri);
+            return;
+          }
+          cancelPlaylistViewSort(pageUri);
+        }
+        showColumnSelector(e, 'playlist', col.id);
+      };
+      wrap.appendChild(menuBtn);
+      headerColumn.addEventListener('mouseenter', () => syncExtraColHeaderHoverLock(headerColumn, true));
+      headerColumn.addEventListener('focusin', () => syncExtraColHeaderHoverLock(headerColumn, true));
+      headerColumn.addEventListener('mouseleave', () => {
+        if (!headerColumn.classList.contains('sp-col-menu-open') && !headerColumn.classList.contains('sp-col-loading')) {
+          syncExtraColHeaderHoverLock(headerColumn, false, true, true);
+        }
+      });
+      headerColumn.addEventListener('focusout', () => syncExtraColHeaderHoverLock(headerColumn, false));
+    }
+
+    headerColumn.appendChild(wrap);
+    headerColumn.appendChild(createExtraColumnResizer());
+    return headerColumn;
+  }
+
+  function syncHeaderExtraColumns(tracklist_, headerRow, activeCols, endHeaderCell, context) {
+    const activeIds = new Set(activeCols.map(c => c.id));
+    headerRow.querySelectorAll('.sp-extra-col-header, .sort-play-column, .sort-play-second-column, .sort-play-album-col-header, .sort-play-artist-col-header').forEach(el => {
+      if (!el.classList.contains('sp-extra-col-header') || !activeIds.has(el.dataset.spColId)) {
+        el.remove();
+      }
+    });
+
+    const headerEls = [];
+    for (const col of activeCols) {
+      let el = headerRow.querySelector(`.sp-extra-col-header[data-sp-col-id="${col.id}"]`);
+      if (!el) {
+        el = createExtraColumnHeaderEl(col, context);
+      } else {
+        if (el.dataset.spColType !== col.type || (el.dataset.spColFormat || '') !== (col.format || '')) {
+          el.dataset.spColType = col.type;
+          el.dataset.spColFormat = col.format || '';
+          el.dataset.spColFmtBucket = col.fmtBucket || '';
+          tracklist_.querySelectorAll(`[data-sp-col-val="${col.id}"]`).forEach(resetExtraColumnCell);
+        } else if ((el.dataset.spColFmtBucket || '') !== (col.fmtBucket || '')) {
+          el.dataset.spColFmtBucket = col.fmtBucket || '';
+        }
+        const nextAlign = (col.align === 'left' || col.align === 'right') ? col.align : '';
+        if ((el.dataset.spAlign || '') !== nextAlign) {
+          if (nextAlign) el.dataset.spAlign = nextAlign;
+          else delete el.dataset.spAlign;
+          syncExtraColHeaderHoverLock(el, false, true);
+          if (el.classList.contains('sp-col-menu-open') || el.classList.contains('sp-col-loading') || el.matches(':hover')) {
+            syncExtraColHeaderHoverLock(el, true);
+          }
+        }
+        const titleEl = el.querySelector('.sort-play-col-title');
+        if (titleEl && titleEl.textContent !== col.label) titleEl.textContent = col.label;
+        if (!el.querySelector('.sp-col-resizer')) el.appendChild(createExtraColumnResizer());
+      }
+      headerEls.push(el);
+    }
+
+    let anchor = endHeaderCell || null;
+    for (let i = headerEls.length - 1; i >= 0; i--) {
+      const el = headerEls[i];
+      if (anchor) {
+        if (el.nextElementSibling !== anchor) headerRow.insertBefore(el, anchor);
+      } else if (el.parentElement !== headerRow) {
+        headerRow.appendChild(el);
+      }
+      anchor = el;
+    }
+  }
+
+  function createExtraColumnCellEl(col) {
+    const cell = document.createElement('div');
+    cell.className = 'main-trackList-rowSectionVariable sp-extra-col-cell';
+    cell.setAttribute('role', 'gridcell');
+    cell.dataset.spColCell = col.id;
+    cell.dataset.spColType = col.type;
+    if (col.align === 'left' || col.align === 'right') cell.dataset.spAlign = col.align;
+    if (EXTRA_COLUMN_TYPES[col.type]?.numeric) cell.dataset.spNumeric = 'true';
+    const span = document.createElement('span');
+    span.className = 'sp-extra-col-val';
+    span.dataset.spColVal = col.id;
+    cell.appendChild(span);
+    return cell;
+  }
+
+  function syncRowExtraColumnCells(cellContainer, activeCols, endCell, hiddenColIds) {
+    const activeIds = new Set(activeCols.map(c => c.id));
+    cellContainer.querySelectorAll('.sp-extra-col-cell, .sort-play-data-column, .sort-play-second-data-column, .sort-play-album-col, .sort-play-artist-col').forEach(el => {
+      if (!el.classList.contains('sp-extra-col-cell') || !activeIds.has(el.dataset.spColCell)) {
+        el.remove();
+      }
+    });
+
+    const cellEls = [];
+    for (const col of activeCols) {
+      let cell = cellContainer.querySelector(`.sp-extra-col-cell[data-sp-col-cell="${col.id}"]`);
+      if (!cell) {
+        cell = createExtraColumnCellEl(col);
+      } else {
+        if (cell.dataset.spColType !== col.type) {
+          cell.dataset.spColType = col.type;
+          resetExtraColumnCell(cell.querySelector('.sp-extra-col-val'));
+        }
+        if (col.align === 'left' || col.align === 'right') {
+          if (cell.dataset.spAlign !== col.align) cell.dataset.spAlign = col.align;
+        } else if (cell.dataset.spAlign) {
+          delete cell.dataset.spAlign;
+        }
+        if (EXTRA_COLUMN_TYPES[col.type]?.numeric) {
+          if (cell.dataset.spNumeric !== 'true') cell.dataset.spNumeric = 'true';
+        } else if (cell.dataset.spNumeric) {
+          delete cell.dataset.spNumeric;
+        }
+      }
+      if (hiddenColIds?.has(col.id)) cell.setAttribute('data-sp-overflow-hidden', 'true');
+      else cell.removeAttribute('data-sp-overflow-hidden');
+      cellEls.push(cell);
+    }
+
+    let anchor = endCell || null;
+    for (let i = cellEls.length - 1; i >= 0; i--) {
+      const el = cellEls[i];
+      if (anchor) {
+        if (el.nextElementSibling !== anchor) cellContainer.insertBefore(el, anchor);
+      } else if (el.parentElement !== cellContainer) {
+        cellContainer.appendChild(el);
+      }
+      anchor = el;
+    }
+    return cellEls;
+  }
+
+  function syncSkeletonExtraColumnCells(skeleton, activeCols, endCell, hiddenColIds) {
+    const activeIds = new Set(activeCols.map(c => c.id));
+    skeleton.querySelectorAll('.sp-extra-col-skel, .sort-play-skeleton-col, .sort-play-second-skeleton-col, .sort-play-album-skeleton-col, .sort-play-artist-skeleton-col').forEach(el => {
+      if (!el.classList.contains('sp-extra-col-skel') || !activeIds.has(el.dataset.spSkelCol)) {
+        el.remove();
+      }
+    });
+
+    const varCell = skeleton.querySelector('.main-trackList-rowSectionVariable:not(.sp-extra-col-skel)');
+    const baseClass = varCell ? varCell.className.split(' ').filter(c => !c.includes('sort-play') && !c.includes('sp-extra')).join(' ') : 'main-trackList-rowSectionVariable';
+
+    const skelEls = [];
+    for (const col of activeCols) {
+      let skel = skeleton.querySelector(`.sp-extra-col-skel[data-sp-skel-col="${col.id}"]`);
+      if (!skel) {
+        skel = document.createElement('div');
+        skel.className = `${baseClass} sp-extra-col-skel`;
+        skel.dataset.spSkelCol = col.id;
+      }
+      if (hiddenColIds?.has(col.id)) skel.setAttribute('data-sp-overflow-hidden', 'true');
+      else skel.removeAttribute('data-sp-overflow-hidden');
+      skelEls.push(skel);
+    }
+
+    let anchor = endCell || null;
+    for (let i = skelEls.length - 1; i >= 0; i--) {
+      const el = skelEls[i];
+      if (anchor) {
+        if (el.nextElementSibling !== anchor) skeleton.insertBefore(el, anchor);
+      } else if (el.parentElement !== skeleton) {
+        skeleton.appendChild(el);
+      }
+      anchor = el;
+    }
+  }
+
+  function syncTracklistBodyRows(tracklist_, headerRow, activeCols, layout, dateAddedNativeIdx = -1, shouldRemoveDateAdded = false) {
+    const hiddenColIds = layout?.hiddenColIds;
+    const totalVisibleCols = (layout?.resizableCols?.length || 0) + (layout?.hasIndex ? 1 : 0);
+    const rowSig = `${activeCols.map(c => `${c.id}:${c.type}:${c.align || 'c'}`).join(',')}|${hiddenColIds ? Array.from(hiddenColIds).join(',') : ''}|${totalVisibleCols}|${dateAddedNativeIdx}|${shouldRemoveDateAdded ? 1 : 0}`;
+
+    const skeletonRows = tracklist_.querySelectorAll('.main-trackList-trackListRowGrid:not(.main-trackList-trackListRow):not(.main-trackList-trackListHeaderRow)');
+    for (const skeleton of skeletonRows) {
+      if (dateAddedNativeIdx !== -1) {
+        const nativeSkelCells = Array.from(skeleton.children).filter(el => !el.classList.contains('sp-extra-col-skel'));
+        const skelDateCell = skeleton.querySelector('[data-sp-date-added="true"]') || nativeSkelCells[dateAddedNativeIdx];
+        if (skelDateCell && skelDateCell.classList.contains('main-trackList-rowSectionVariable')) {
+          if (shouldRemoveDateAdded) {
+            skelDateCell.dataset.spDateAdded = 'true';
+            skelDateCell.style.display = 'none';
+          } else if (skelDateCell.dataset.spDateAdded === 'true') {
+            skelDateCell.style.display = '';
+            delete skelDateCell.dataset.spDateAdded;
+          }
+        }
+      }
+      const endCell = skeleton.querySelector('.main-trackList-rowSectionEnd');
+      if (endCell) syncSkeletonExtraColumnCells(skeleton, activeCols, endCell, hiddenColIds);
+    }
+
+    const allRows = Array.from(tracklist_.querySelectorAll('.main-trackList-trackListRow, [role="row"]:not([aria-rowindex="1"])'))
+      .filter(r => r !== headerRow && !r.querySelector('[role="columnheader"]'));
+
+    for (const track of allRows) {
+      if (track.style.gridTemplateColumns) track.style.gridTemplateColumns = '';
+      const cellContainer = (track.children.length === 1 && track.firstElementChild?.querySelector('[role="gridcell"]')) ? track.firstElementChild : track;
+      const endCell = cellContainer.querySelector('.main-trackList-rowSectionEnd');
+      if (!endCell) continue;
+
+      if (track.dataset.spRowSig === rowSig && cellContainer.querySelectorAll(':scope > .sp-extra-col-cell').length === activeCols.length) {
+        const lastExtra = cellContainer.querySelectorAll(':scope > .sp-extra-col-cell')[activeCols.length - 1];
+        if (lastExtra && lastExtra.nextElementSibling === endCell) continue;
+      }
+
+      if (dateAddedNativeIdx !== -1) {
+        const nativeRowCells = Array.from(cellContainer.children).filter(el => !el.classList.contains('sp-extra-col-cell') && !el.classList.contains('sort-play-data-column') && !el.classList.contains('sort-play-second-data-column'));
+        const dateAddedCell = cellContainer.querySelector('[data-sp-date-added="true"]') || nativeRowCells[dateAddedNativeIdx];
+        if (dateAddedCell && !dateAddedCell.classList.contains('main-trackList-rowSectionEnd')) {
+          if (shouldRemoveDateAdded) {
+            dateAddedCell.dataset.spDateAdded = 'true';
+            dateAddedCell.style.display = 'none';
+          } else if (dateAddedCell.dataset.spDateAdded === 'true') {
+            dateAddedCell.style.display = '';
+            delete dateAddedCell.dataset.spDateAdded;
+          }
+        }
+      }
+
+      const cellEls = syncRowExtraColumnCells(cellContainer, activeCols, endCell, hiddenColIds);
+      if (totalVisibleCols > 0) {
+        const visibleExtra = cellEls.filter(el => el.getAttribute('data-sp-overflow-hidden') !== 'true');
+        const startExtraIdx = Math.max(1, totalVisibleCols - visibleExtra.length);
+        visibleExtra.forEach((el, i) => {
+          const ci = (startExtraIdx + i).toString();
+          if (el.getAttribute('aria-colindex') !== ci) el.setAttribute('aria-colindex', ci);
+        });
+        if (endCell.getAttribute('aria-colindex') !== totalVisibleCols.toString()) {
+          endCell.setAttribute('aria-colindex', totalVisibleCols.toString());
+        }
+      }
+      track.dataset.spRowSig = rowSig;
+    }
+  }
+
+  function updateTracklistStructure(tracklist_) {
+    const currentUri = getCurrentUri();
+    const isSearch = Spicetify.Platform.History.location?.pathname?.startsWith('/search');
+    const isPlaylistOrLiked = !!(currentUri && (URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri)));
+    const isValidPlaylistPage = isPlaylistOrLiked || (currentUri && isLocalFilesPage(currentUri));
+
+    if (!isValidPlaylistPage && !isSearch) return false;
+
+    const activeCols = getActiveExtraColumns('playlist');
+    if (activeCols.length === 0) {
+      clearTracklistExtraColumns(tracklist_);
+      return false;
+    }
+
+    const tracklistHeader = tracklist_.querySelector('.main-trackList-trackListHeaderRow, [role="row"][aria-rowindex="1"], [role="row"]:has([role="columnheader"])');
+    if (!tracklistHeader) return false;
+
+    tracklist_.querySelectorAll('.sp-artist-header-wrapper, .sort-play-artist-header-wrapper').forEach(el => el.remove());
+
+    const nativeHeaders = getHeaderColumnElements(tracklistHeader)
+      .filter(el => !el.classList.contains('sp-extra-col-header') && !el.classList.contains('sort-play-column') && !el.classList.contains('sort-play-second-column'));
+    if (nativeHeaders.length === 0) return false;
+
+    const currentPlaylistName = getCurrentPlaylistName();
+    const isExcludedPlaylist = excludedPlaylistNames.includes(currentPlaylistName);
+    const shouldRemoveDateAdded = isPlaylistOrLiked && removeDateAdded && !isExcludedPlaylist;
+
+    const endHeaderCell = tracklistHeader.querySelector('.main-trackList-rowSectionEnd') || nativeHeaders[nativeHeaders.length - 1];
+    const dateAddedHeaderCell = isPlaylistOrLiked ? findDateAddedHeader(nativeHeaders) : null;
+    const dateAddedNativeIdx = dateAddedHeaderCell ? nativeHeaders.indexOf(dateAddedHeaderCell) : -1;
+
+    if (dateAddedHeaderCell) {
+      if (shouldRemoveDateAdded) {
+        dateAddedHeaderCell.dataset.spDateAdded = 'true';
+        dateAddedHeaderCell.style.display = 'none';
+      } else if (dateAddedHeaderCell.dataset.spDateAdded === 'true') {
+        dateAddedHeaderCell.style.display = '';
+        delete dateAddedHeaderCell.dataset.spDateAdded;
+      }
+    }
+
+    syncHeaderExtraColumns(tracklist_, tracklistHeader, activeCols, endHeaderCell, 'playlist');
+    syncPlaylistViewSortHeaders(tracklistHeader);
+    const layout = applyTracklistGridLayout(tracklist_, tracklistHeader, 'playlist');
+    syncTracklistBodyRows(tracklist_, tracklistHeader, activeCols, layout, dateAddedNativeIdx, shouldRemoveDateAdded);
+    return true;
+  }
+
+  function updateRecommendationTracklistStructure(tracklist_, primaryTracklist = null) {
+    const currentUri = getCurrentUri();
+    if (!currentUri || !URI.isPlaylistV1OrV2(currentUri)) return false;
+
+    const activeCols = getActiveExtraColumns('playlist');
+    if (activeCols.length === 0) {
+      clearTracklistExtraColumns(tracklist_);
+      return false;
     }
 
     const currentPlaylistName = getCurrentPlaylistName();
     const isExcludedPlaylist = excludedPlaylistNames.includes(currentPlaylistName);
-    const isSearch = Spicetify.Platform.History.location?.pathname?.startsWith('/search');
-    const shouldRemoveDateAdded = !isSearch && removeDateAdded && !isExcludedPlaylist;
+    const shouldRemoveDateAdded = removeDateAdded && !isExcludedPlaylist;
+    const hiddenColIds = primaryTracklist?._spLayout?.hiddenColIds || null;
 
     const allRows = Array.from(tracklist_.querySelectorAll('.main-trackList-trackListRow, [role="row"]')).filter(r => !r.querySelector('[role="columnheader"]'));
     let maxVisibleCells = 0;
 
-    const createDataColumn = (className, dataClassName) => {
-        const col = document.createElement("div");
-        col.className = `main-trackList-rowSectionVariable ${className}`;
-        col.setAttribute("role", "gridcell");
-        col.style.cssText = "display: flex; justify-content: center; align-items: center;";
-        col.innerHTML = `<span class="${dataClassName}" style="font-size: 14px; font-weight: 400; color: var(--spice-subtext);"></span>`;
-        return col;
-    };
-    
     for (const track of allRows) {
-        track.querySelectorAll('.sort-play-skeleton-col, .sort-play-second-skeleton-col, .sort-play-rec-index-spacer').forEach(el => el.remove());
+      if (track.style.gridTemplateColumns) track.style.gridTemplateColumns = '';
+      track.querySelectorAll('.sort-play-rec-index-spacer').forEach(el => el.remove());
 
-        const cellContainer = (track.children.length === 1 && track.firstElementChild?.querySelector('[role="gridcell"]')) ? track.firstElementChild : track;
-        let existingDataColumn = cellContainer.querySelector(".sort-play-data-column");
-        let existingSecondDataColumn = cellContainer.querySelector(".sort-play-second-data-column");
+      const cellContainer = (track.children.length === 1 && track.firstElementChild?.querySelector('[role="gridcell"]')) ? track.firstElementChild : track;
+      const endCell = cellContainer.querySelector('.main-trackList-rowSectionEnd') || cellContainer.querySelector(':has([data-testid="add-to-playlist-button"])') || cellContainer.lastElementChild;
+      if (!endCell) continue;
 
-        const endCell = cellContainer.querySelector(".main-trackList-rowSectionEnd") || cellContainer.querySelector(':has([data-testid="add-to-playlist-button"])') || cellContainer.lastElementChild;
-        if (!endCell) continue;
-
-        const allGridCells = Array.from(cellContainer.children);
-        const spacerCell = allGridCells.find(c => c !== endCell && c !== existingDataColumn && c !== existingSecondDataColumn && c.textContent.trim() === '' && !c.querySelector('button, input, a, img, svg'));
-        if (spacerCell) {
-            spacerCell.style.display = shouldRemoveDateAdded ? 'none' : '';
+      const spacerCell = cellContainer.querySelector('[data-sp-date-added="true"]') || Array.from(cellContainer.children).find(c => c !== endCell && !c.classList.contains('sp-extra-col-cell') && c.textContent.trim() === '' && !c.querySelector('button, input, a, img, svg'));
+      if (spacerCell) {
+        if (shouldRemoveDateAdded) {
+          spacerCell.dataset.spDateAdded = 'true';
+          spacerCell.style.display = 'none';
+        } else if (spacerCell.dataset.spDateAdded === 'true') {
+          spacerCell.style.display = '';
+          delete spacerCell.dataset.spDateAdded;
         }
+      }
 
-        if (showAdditionalColumn) {
-            if (!existingDataColumn) {
-                existingDataColumn = createDataColumn('sort-play-data-column sort-play-column', 'sort-play-data');
-                cellContainer.insertBefore(existingDataColumn, endCell);
-            }
-        } else if (existingDataColumn) {
-            existingDataColumn.remove();
-            existingDataColumn = null;
-        }
-        
-        if (showSecondAdditionalColumn) {
-            if (!existingSecondDataColumn) {
-                existingSecondDataColumn = createDataColumn('sort-play-second-data-column sort-play-second-column', 'sort-play-second-data');
-                const targetNext = existingDataColumn || endCell;
-                cellContainer.insertBefore(existingSecondDataColumn, targetNext);
-            }
-        } else if (existingSecondDataColumn) {
-            existingSecondDataColumn.remove();
-            existingSecondDataColumn = null;
-        }
-        
-        const visibleCols = Array.from(cellContainer.children).filter(el => el.style.display !== 'none').length;
-        if (visibleCols > maxVisibleCells) maxVisibleCells = visibleCols;
+      syncRowExtraColumnCells(cellContainer, activeCols, endCell, hiddenColIds);
 
-        let colIdx = 1;
-        Array.from(cellContainer.children).filter(el => el.style.display !== 'none').forEach((c, idx) => {
-            c.setAttribute('aria-colindex', colIdx.toString());
-            colIdx += (idx === 0 ? 2 : 1);
-        });
+      const visibleCells = Array.from(cellContainer.children).filter(isColElVisible);
+      if (visibleCells.length > maxVisibleCells) maxVisibleCells = visibleCells.length;
+
+      let colIdx = 1;
+      visibleCells.forEach((c, idx) => {
+        c.setAttribute('aria-colindex', colIdx.toString());
+        colIdx += (idx === 0 ? 2 : 1);
+      });
     }
 
-    const maxPossibleGridCols = 4 + (shouldRemoveDateAdded ? 0 : 1) + (showAdditionalColumn ? 1 : 0) + (showSecondAdditionalColumn ? 1 : 0);
-    let totalGridCols = maxVisibleCells > 0 ? maxVisibleCells + 1 : 0;
-    
-    let storedMax = parseInt(tracklist_.getAttribute('data-sp-max-cols-rec') || "0");
-    if (storedMax > maxPossibleGridCols) storedMax = maxPossibleGridCols;
-    if (totalGridCols > storedMax) storedMax = totalGridCols;
-    totalGridCols = Math.min(Math.max(totalGridCols, storedMax), maxPossibleGridCols);
-    tracklist_.setAttribute('data-sp-max-cols-rec', totalGridCols.toString());
-
-    if (totalGridCols > 0) {
-        let template;
-        if (totalGridCols <= 4) template = "[index] 16px [first] 4fr [var1] 2fr [last] minmax(120px,1fr)";
-        else if (totalGridCols === 5) template = "[index] 16px [first] 4fr [var1] 2fr [var2] 2fr [last] minmax(120px,1fr)";
-        else if (totalGridCols === 6) template = "[index] 16px [first] 5fr [var1] 3fr [var2] 2fr [var3] 2fr [last] minmax(120px,1fr)";
-        else if (totalGridCols === 7) template = "[index] 16px [first] 5fr [var1] 3fr [var2] 2fr [var3] 2fr [var4] 2fr [last] minmax(120px,1fr)";
-        else {
-            template = "[index] 16px [first] 5fr [var1] 3fr ";
-            for (let i = 2; i < totalGridCols - 2; i++) {
-                template += `[var${i}] 2fr `;
-            }
-            template += "[last] minmax(120px,1fr)";
-        }
-        
-        tracklist_.setAttribute('data-sp-grid-rec', 'true');
-        tracklist_.setAttribute('aria-colcount', totalGridCols.toString());
-        let gridStyleEl = document.getElementById("sort-play-rec-grid-style");
-        if (!gridStyleEl) {
-            gridStyleEl = document.createElement("style");
-            gridStyleEl.id = "sort-play-rec-grid-style";
-            document.head.appendChild(gridStyleEl);
-        }
-        
-        const cssString = `html body div[data-sp-grid-rec="true"] .main-trackList-trackListRow, html body div[data-sp-grid-rec="true"] [role="row"] > div:has([role="gridcell"]), html body div[data-sp-grid-rec="true"] [role="row"] { grid-template-columns: ${template} !important; }\nhtml body div[data-sp-grid-rec="true"] [role="row"] > div:has([role="gridcell"]) > :first-child, html body div[data-sp-grid-rec="true"] [role="row"] > :first-child, html body div.main-trackList-trackList[data-sp-grid-rec="true"] .main-trackList-trackListRow > :first-child { grid-column: 1 / 3 !important; }`;
-        if (gridStyleEl.innerHTML !== cssString) {
-            gridStyleEl.innerHTML = cssString;
-        }
-
-        for (const track of allRows) {
-            if (track.style.gridTemplateColumns) track.style.gridTemplateColumns = '';
-        }
-
-        const legacySkeletonRows = Array.from(tracklist_.querySelectorAll('.main-trackList-trackListRowGrid:not(.main-trackList-trackListRow):not([role="row"])'));
-        for (const skeleton of legacySkeletonRows) {
-            if (skeleton.style.gridTemplateColumns) skeleton.style.gridTemplateColumns = '';
-            
-            const endCell = skeleton.querySelector(".main-trackList-rowSectionEnd") || skeleton.lastElementChild;
-            if (!endCell) continue;
-
-            let existingDataColumn = skeleton.querySelector(".sort-play-skeleton-col");
-            let existingSecondDataColumn = skeleton.querySelector(".sort-play-second-skeleton-col");
-
-            if (showAdditionalColumn && !existingDataColumn) {
-                existingDataColumn = document.createElement("div");
-                existingDataColumn.className = "main-trackList-rowSectionVariable sort-play-skeleton-col";
-                skeleton.insertBefore(existingDataColumn, endCell);
-            } else if (!showAdditionalColumn && existingDataColumn) {
-                existingDataColumn.remove();
-            }
-
-            if (showSecondAdditionalColumn && !existingSecondDataColumn) {
-                existingSecondDataColumn = document.createElement("div");
-                existingSecondDataColumn.className = "main-trackList-rowSectionVariable sort-play-second-skeleton-col";
-                const targetNext = existingDataColumn || endCell;
-                skeleton.insertBefore(existingSecondDataColumn, targetNext);
-            } else if (!showSecondAdditionalColumn && existingSecondDataColumn) {
-                existingSecondDataColumn.remove();
-            }
-        }
+    const skeletonRows = Array.from(tracklist_.querySelectorAll('.main-trackList-trackListRowGrid:not(.main-trackList-trackListRow):not([role="row"])'));
+    for (const skeleton of skeletonRows) {
+      if (skeleton.style.gridTemplateColumns) skeleton.style.gridTemplateColumns = '';
+      const endCell = skeleton.querySelector('.main-trackList-rowSectionEnd') || skeleton.lastElementChild;
+      if (endCell) syncSkeletonExtraColumnCells(skeleton, activeCols, endCell, hiddenColIds);
     }
+
+    if (primaryTracklist?._spLayout) {
+      mirrorGridLayoutToRec(primaryTracklist);
+    } else if (maxVisibleCells > 0) {
+      applyStandaloneRecGridLayout(tracklist_, maxVisibleCells, hiddenColIds);
+    }
+    return true;
   }
 
   function updateAlbumTracklist() {
+    const currentUri = getCurrentUri();
+    if (!currentUri || !URI.isAlbum(currentUri)) return;
     if (isUpdatingAlbumTracklist) return;
     isUpdatingAlbumTracklist = true;
 
-    requestAnimationFrame(() => {
-      try {
-        const tracklistContainer = document.querySelector('.main-trackList-trackList.main-trackList-indexable, main [role="grid"]:not([aria-colcount="1"])');
-        if (!tracklistContainer) return;
+    try {
+      const tracklists = Array.from(document.querySelectorAll('.main-trackList-trackList.main-trackList-indexable, main [role="grid"]:not([aria-colcount="1"])')).filter(isTracklistGrid);
+      if (tracklists.length === 0) return;
 
-        const currentUri = getCurrentUri();
+      const activeCols = getActiveExtraColumns('album');
 
-        if (!showAlbumColumn || !currentUri || !URI.isAlbum(currentUri)) {
-            const existingHeader = tracklistContainer.querySelector('.sort-play-album-col-header');
-            if (existingHeader) {
-                const headerRow = existingHeader.parentElement;
-                existingHeader.remove();
-                if (headerRow) {
-                    headerRow.style.gridTemplateColumns = "";
-                    const remainingHeaders = Array.from(headerRow.querySelectorAll('[role="columnheader"]')).filter(el => el.style.display !== 'none');
-                    remainingHeaders.forEach((el, idx) => el.setAttribute('aria-colindex', (idx + 1).toString()));
-                    tracklistContainer.setAttribute('aria-colcount', remainingHeaders.length.toString());
-                }
-                tracklistContainer.querySelectorAll('.sort-play-album-col, .sort-play-album-skeleton-col').forEach(el => el.remove());
-                tracklistContainer.querySelectorAll('.main-trackList-trackListRow, [role="row"]').forEach(row => {
-                    row.style.gridTemplateColumns = "";
-                });
-            }
-            tracklistContainer.removeAttribute('data-sp-grid');
-            tracklistContainer.removeAttribute('data-sp-max-cols');
-            let gridStyleEl = document.getElementById("sort-play-album-grid-style");
-            if (gridStyleEl) gridStyleEl.innerHTML = "";
-            return;
+      for (const tracklistContainer of tracklists) {
+        if (activeCols.length === 0) {
+          clearTracklistExtraColumns(tracklistContainer);
+          continue;
         }
 
         const headerRow = tracklistContainer.querySelector('.main-trackList-trackListHeaderRow, [role="row"][aria-rowindex="1"], [role="row"]:has([role="columnheader"])');
-        if (!headerRow) return;
+        if (!headerRow) continue;
 
-        let expectedHeaderText;
-        switch (selectedAlbumColumnType) {
-            case 'playCount': expectedHeaderText = "Plays"; break;
-            case 'popularity': expectedHeaderText = "Popularity"; break;
-            case 'releaseDate': expectedHeaderText = "Rel. Date"; break;
-            case 'trueReleaseDate': expectedHeaderText = "True Date"; break;
-            case 'scrobbles': expectedHeaderText = "Scrobbles"; break;
-            case 'personalScrobbles': expectedHeaderText = myScrobblesDisplayMode === 'sign' ? "Listened" : "My Scrobbles"; break;
-            case 'lastScrobbled': expectedHeaderText = "Last Played"; break;
-            case 'djInfo': expectedHeaderText = "DJ Info"; break;
-            case 'key': expectedHeaderText = "Key"; break;
-            case 'tempo': expectedHeaderText = "BPM"; break;
-            case 'energy': expectedHeaderText = "Energy"; break;
-            case 'danceability': expectedHeaderText = "Dance"; break;
-            case 'valence': expectedHeaderText = "Valence"; break;
-            default: expectedHeaderText = "Plays";
-        }
-
-        let existingHeader = headerRow.querySelector('.sort-play-album-col-header');
-        const nativeHeaders = Array.from(headerRow.querySelectorAll('[role="columnheader"]')).filter(el => !el.classList.contains('sort-play-album-col-header'));
+        const nativeHeaders = getHeaderColumnElements(headerRow).filter(el => !el.classList.contains('sp-extra-col-header') && !el.classList.contains('sort-play-album-col-header'));
         const endHeaderCell = headerRow.querySelector('.main-trackList-rowSectionEnd') || nativeHeaders[nativeHeaders.length - 1];
 
-        if (!existingHeader) {
-            existingHeader = document.createElement('div');
-            existingHeader.className = 'main-trackList-rowSectionVariable sort-play-album-col-header';
-            existingHeader.innerHTML = `<button class="sort-play-column-header"><span class="encore-text-body-small">${expectedHeaderText}</span></button>`;
-            existingHeader.setAttribute('role', 'columnheader');
-            existingHeader.firstChild.onclick = (e) => showColumnSelector(e, 'album');
-            existingHeader.style.cssText = 'display: flex; justify-content: center; align-items: center;';
-
-            if (endHeaderCell) {
-                headerRow.insertBefore(existingHeader, endHeaderCell);
-            } else {
-                headerRow.appendChild(existingHeader);
-            }
-        } else {
-            if (endHeaderCell && existingHeader.nextElementSibling !== endHeaderCell) {
-                headerRow.insertBefore(existingHeader, endHeaderCell);
-            }
-            const headerTextSpan = existingHeader.querySelector('span');
-            if (headerTextSpan && headerTextSpan.innerText !== expectedHeaderText) {
-                headerTextSpan.innerText = expectedHeaderText;
-                const allCells = tracklistContainer.querySelectorAll('.sort-play-album-col .sort-play-data');
-                allCells.forEach(cell => {
-                    cell.textContent = "";
-                    delete cell.dataset.spProcessed;
-                    cell.onclick = null;
-                    cell.onmouseover = null;
-                    cell.onmouseout = null;
-                    cell.style.cursor = "default";
-                    cell.style.textDecoration = "none";
-                    cell.removeAttribute('title');
-                });
-            }
-        }
-
-        const currentHeaderCols = Array.from(headerRow.querySelectorAll('[role="columnheader"]')).filter(el => el.style.display !== 'none');
-        currentHeaderCols.forEach((el, idx) => {
-            const colIdx = (idx + 1).toString();
-            if (el.getAttribute('aria-colindex') !== colIdx) el.setAttribute('aria-colindex', colIdx);
-        });
-
-        const maxCols = currentHeaderCols.length;
-        tracklistContainer.setAttribute('data-sp-max-cols', maxCols.toString());
-        tracklistContainer.setAttribute('aria-colcount', maxCols.toString());
-
-        let newGridTemplate = "[index] 16px [first] 6fr ";
-        for (let i = 1; i < maxCols - 2; i++) {
-            newGridTemplate += `[var${i}] 3fr `;
-        }
-        newGridTemplate += "[last] minmax(120px,1fr)";
-        
-        let gridStyleEl = document.getElementById("sort-play-album-grid-style");
-        if (!gridStyleEl) {
-            gridStyleEl = document.createElement("style");
-            gridStyleEl.id = "sort-play-album-grid-style";
-            document.head.appendChild(gridStyleEl);
-        }
-        tracklistContainer.setAttribute('data-sp-grid', 'album');
-        const cssString = `html body div.main-trackList-trackList[data-sp-grid="album"] .main-trackList-trackListHeaderRow, html body div[role="grid"][data-sp-grid="album"] [role="row"]:has([role="columnheader"]), html body div.main-trackList-trackList[data-sp-grid="album"] .main-trackList-trackListRow, html body div.main-trackList-trackList[data-sp-grid="album"] .main-trackList-trackListRowGrid, html body div[role="grid"][data-sp-grid="album"] [role="row"] > div:has([role="gridcell"]) { grid-template-columns: ${newGridTemplate} !important; }`;
-        if (gridStyleEl.innerHTML !== cssString) {
-            gridStyleEl.innerHTML = cssString;
-        }
-        
-        const headerIndex = Array.from(headerRow.children).indexOf(existingHeader);
-        
-        const skeletonRows = tracklistContainer.querySelectorAll(".main-trackList-trackListRowGrid:not(.main-trackList-trackListRow):not(.main-trackList-trackListHeaderRow)");
-        for (const skeleton of skeletonRows) {
-            if (skeleton.querySelector('.sort-play-album-skeleton-col')) continue;
-            const endCell = skeleton.querySelector(".main-trackList-rowSectionEnd");
-            const skeletonCell = document.createElement("div");
-            const varCell = skeleton.querySelector(".main-trackList-rowSectionVariable");
-            const baseClass = varCell ? varCell.className.split(' ').filter(c => !c.includes('sort-play')).join(' ') : "ojrBmBNrA3EfuQlTYybV main-trackList-rowSectionVariable r5OS0NnS9c7LAEJKIri1";
-            skeletonCell.className = `${baseClass} sort-play-album-skeleton-col`;
-            
-            if (endCell) skeleton.insertBefore(skeletonCell, endCell);
-            else skeleton.appendChild(skeletonCell);
-        }
-
-        const trackRows = Array.from(tracklistContainer.querySelectorAll('.main-trackList-trackListRow, [role="row"]:not([aria-rowindex="1"])')).filter(r => r !== headerRow);
-        trackRows.forEach(row => {
-            row.style.gridTemplateColumns = ""; 
-            const cellContainer = (row.children.length === 1 && row.firstElementChild?.querySelector('[role="gridcell"]')) ? row.firstElementChild : row;
-            let newCell = cellContainer.querySelector('.sort-play-album-col');
-            
-            if (!newCell) {
-                newCell = document.createElement('div');
-                newCell.className = 'main-trackList-rowSectionVariable sort-play-album-col';
-                newCell.innerHTML = `<span class="sort-play-data encore-text-body-small encore-internal-color-text-subdued" data-encore-id="text"></span>`;
-                newCell.setAttribute('role', 'gridcell');
-                newCell.setAttribute('aria-colindex', '4');
-                newCell.style.display = 'flex';
-                newCell.style.alignItems = 'center';
-                newCell.style.justifyContent = 'center';
-            }
-            
-            const endCell = cellContainer.querySelector('.main-trackList-rowSectionEnd') || Array.from(cellContainer.children).filter(el => !el.classList.contains('sort-play-album-col')).pop();
-            if (endCell && newCell.nextElementSibling !== endCell) {
-                cellContainer.insertBefore(newCell, endCell);
-            } else if (!endCell && newCell.parentElement !== cellContainer) {
-                cellContainer.appendChild(newCell);
-            }
-            
-            newCell.setAttribute('aria-colindex', (headerIndex + 1).toString());
-            if (endCell) endCell.setAttribute('aria-colindex', maxCols.toString());
-        });
-
+        syncHeaderExtraColumns(tracklistContainer, headerRow, activeCols, endHeaderCell, 'album');
+        const layout = applyTracklistGridLayout(tracklistContainer, headerRow, 'album');
+        syncTracklistBodyRows(tracklistContainer, headerRow, activeCols, layout);
         loadAdditionalColumnData(tracklistContainer);
-      } finally {
-        isUpdatingAlbumTracklist = false;
       }
-    });
+    } finally {
+      isUpdatingAlbumTracklist = false;
+    }
+  }
+
+  function ensureArtistSyntheticHeader(tracklistContainer) {
+    tracklistContainer.querySelectorAll('.sort-play-artist-header-wrapper:not(.sp-artist-header-wrapper)').forEach(el => el.remove());
+    const sampleRow = tracklistContainer.querySelector('.main-trackList-trackListRow');
+    const sampleContainer = sampleRow ? ((sampleRow.children.length === 1 && sampleRow.firstElementChild?.querySelector('[role="gridcell"]')) ? sampleRow.firstElementChild : sampleRow) : null;
+    const hasNativePlays = sampleContainer
+      ? Array.from(sampleContainer.querySelectorAll(':scope > .main-trackList-rowSectionVariable:not(.sp-extra-col-cell):not(.sort-play-data-column):not(.sort-play-second-data-column):not(.sort-play-artist-col)')).some(isColElVisible)
+      : true;
+
+    const createPlaysCol = () => {
+      const playsCol = document.createElement('div');
+      playsCol.className = 'main-trackList-rowSectionVariable';
+      playsCol.dataset.spArtistPlays = 'true';
+      playsCol.setAttribute('role', 'columnheader');
+      playsCol.innerHTML = '<span class="encore-text-body-small sp-artist-plays-hdr">Plays</span>';
+      playsCol.appendChild(createExtraColumnResizer());
+      return playsCol;
+    };
+
+    let headerWrapper = tracklistContainer.querySelector('.sp-artist-header-wrapper');
+    if (!headerWrapper) {
+      headerWrapper = document.createElement('div');
+      headerWrapper.className = 'main-trackList-trackListHeader sp-artist-header-wrapper sort-play-artist-header-wrapper';
+
+      const headerRowEl = document.createElement('div');
+      headerRowEl.className = 'main-trackList-trackListHeaderRow main-trackList-trackListRowGrid sp-artist-header-row';
+      headerRowEl.setAttribute('role', 'row');
+      headerRowEl.setAttribute('aria-rowindex', '1');
+
+      const idxCol = document.createElement('div');
+      idxCol.className = 'main-trackList-rowSectionIndex';
+      idxCol.setAttribute('role', 'columnheader');
+      idxCol.innerHTML = '<div>#</div>';
+
+      const titleCol = document.createElement('div');
+      titleCol.className = 'main-trackList-rowSectionStart';
+      titleCol.setAttribute('role', 'columnheader');
+      titleCol.innerHTML = '<span class="encore-text-body-small standalone-ellipsis-one-line" style="color:inherit;padding-inline-end:12px;">Title</span>';
+      titleCol.appendChild(createExtraColumnResizer());
+
+      const durCol = document.createElement('div');
+      durCol.className = 'main-trackList-rowSectionEnd';
+      durCol.setAttribute('role', 'columnheader');
+      durCol.innerHTML = '<div aria-label="Duration" class="main-trackList-column main-trackList-durationHeader"><svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true" style="display:block;"><path d="M8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8z"></path><path d="M8 3.25a.75.75 0 0 1 .75.75v3.25H11a.75.75 0 0 1 0 1.5H7.25V4A.75.75 0 0 1 8 3.25z"></path></svg></div>';
+
+      headerRowEl.appendChild(idxCol);
+      headerRowEl.appendChild(titleCol);
+      if (hasNativePlays) headerRowEl.appendChild(createPlaysCol());
+      headerRowEl.appendChild(durCol);
+      headerWrapper.appendChild(headerRowEl);
+
+      const rootlistWrapper = tracklistContainer.querySelector('.main-rootlist-wrapper');
+      if (rootlistWrapper) tracklistContainer.insertBefore(headerWrapper, rootlistWrapper);
+      else tracklistContainer.prepend(headerWrapper);
+      return headerRowEl;
+    }
+
+    const headerRowEl = headerWrapper.querySelector('.sp-artist-header-row');
+    if (headerRowEl) {
+      const existingPlays = headerRowEl.querySelector('[data-sp-artist-plays="true"]');
+      if (hasNativePlays && !existingPlays) {
+        const titleCol = headerRowEl.querySelector('.main-trackList-rowSectionStart');
+        if (titleCol?.nextSibling) headerRowEl.insertBefore(createPlaysCol(), titleCol.nextSibling);
+        else headerRowEl.appendChild(createPlaysCol());
+      } else if (!hasNativePlays && existingPlays) {
+        existingPlays.remove();
+      }
+    }
+    return headerRowEl;
   }
 
   function updateArtistTracklist() {
+    const currentUri = getCurrentUri();
+    if (!currentUri || !URI.isArtist(currentUri)) return;
     if (isUpdatingArtistTracklist) return;
     isUpdatingArtistTracklist = true;
 
-    requestAnimationFrame(() => {
-      try {
-        let tracklistContainer = document.querySelector('div.main-trackList-trackList[aria-label="popular tracks"], div.main-trackList-trackList[aria-label="Popular tracks"], div.main-trackList-trackList[aria-label="Popular Tracks"]');
-        if (!tracklistContainer) {
-            const h2s = Array.from(document.querySelectorAll('h2')).filter(h2 => h2.innerText.trim().toLowerCase() === 'popular');
-            if (h2s.length > 0) {
-                tracklistContainer = h2s[0].parentElement.querySelector('.main-trackList-trackList, [role="grid"]:not([aria-colcount="1"])');
-            }
-            if (!tracklistContainer) {
-                tracklistContainer = document.querySelector('.main-trackList-trackList.main-trackList-indexable, main [role="grid"]:not([aria-colcount="1"])');
-            }
-        }
-        if (!tracklistContainer) return;
+    try {
+      const pathname = Spicetify.Platform.History.location?.pathname || '';
+      const isDiscographyPage = pathname.includes('/discography');
+      const activeCols = getActiveExtraColumns('artist');
 
-        const currentUri = getCurrentUri();
-
-        if (!showArtistColumn || !currentUri || !URI.isArtist(currentUri)) {
-            const existingHeaderWrapper = tracklistContainer.querySelector('.sort-play-artist-header-wrapper');
-            if (existingHeaderWrapper) {
-                existingHeaderWrapper.remove();
-                tracklistContainer.setAttribute('aria-colcount', '4');
-                tracklistContainer.querySelectorAll('.sort-play-artist-col, .sort-play-artist-skeleton-col').forEach(el => el.remove());
-                tracklistContainer.querySelectorAll('.main-trackList-trackListRow, [role="row"]').forEach(row => {
-                    row.style.gridTemplateColumns = "";
-                });
-            }
-            tracklistContainer.removeAttribute('data-sp-grid');
-            tracklistContainer.removeAttribute('data-sp-max-cols');
-            let gridStyleEl = document.getElementById("sort-play-artist-grid-style");
-            if (gridStyleEl) gridStyleEl.innerHTML = "";
-            return;
+      let containers = [];
+      if (isDiscographyPage) {
+        containers = Array.from(document.querySelectorAll('main .main-trackList-trackList, main [role="grid"]:not([aria-colcount="1"])')).filter(isTracklistGrid);
+      } else {
+        let popularGrid = null;
+        const popularHeading = Array.from(document.querySelectorAll('main h2, section h2')).find(h2 => h2.textContent.trim().toLowerCase() === 'popular');
+        if (popularHeading) {
+          const section = popularHeading.closest('section') || popularHeading.parentElement?.parentElement || popularHeading.parentElement;
+          popularGrid = section?.querySelector('.main-trackList-trackList, [role="grid"]:not([aria-colcount="1"])') || null;
         }
-
-        let expectedHeaderText;
-        switch (selectedArtistColumnType) {
-            case 'playCount': expectedHeaderText = "Plays"; break;
-            case 'popularity': expectedHeaderText = "Popularity"; break;
-            case 'releaseDate': expectedHeaderText = "Rel. Date"; break;
-            case 'trueReleaseDate': expectedHeaderText = "True Date"; break;
-            case 'scrobbles': expectedHeaderText = "Scrobbles"; break;
-            case 'personalScrobbles': expectedHeaderText = myScrobblesDisplayMode === 'sign' ? "Listened" : "My Scrobbles"; break;
-            case 'lastScrobbled': expectedHeaderText = "Last Played"; break;
-            case 'djInfo': expectedHeaderText = "DJ Info"; break;
-            case 'key': expectedHeaderText = "Key"; break;
-            case 'tempo': expectedHeaderText = "BPM"; break;
-            case 'energy': expectedHeaderText = "Energy"; break;
-            case 'danceability': expectedHeaderText = "Dance"; break;
-            case 'valence': expectedHeaderText = "Valence"; break;
-            default: expectedHeaderText = "Plays";
+        if (!popularGrid) {
+          popularGrid = document.querySelector('div.main-trackList-trackList[aria-label="popular tracks" i], .main-trackList-trackList.main-trackList-indexable, main [role="grid"]:not([aria-colcount="1"])');
         }
-        
-        const existingHeaderWrapperCheck = tracklistContainer.querySelector('.sort-play-artist-header-wrapper');
-        let maxCols = 4; 
-        if (!existingHeaderWrapperCheck) maxCols += 1;
-        
-        const sampleRows = tracklistContainer.querySelectorAll('.main-trackList-trackListRow, [role="row"]:not([aria-rowindex="1"])');
-        for (let i = 0; i < sampleRows.length; i++) {
-            let rowCols = Array.from(sampleRows[i].querySelectorAll('[role="gridcell"]')).filter(el => el.style.display !== 'none').length;
-            if (!sampleRows[i].querySelector('.sort-play-artist-col')) rowCols += 1;
-            if (rowCols > maxCols) maxCols = rowCols;
-        }
-        
-        let storedMax = parseInt(tracklistContainer.getAttribute('data-sp-max-cols') || "0");
-        if (maxCols > storedMax) {
-            storedMax = maxCols;
-            tracklistContainer.setAttribute('data-sp-max-cols', storedMax.toString());
-        }
-        maxCols = Math.max(maxCols, storedMax);
-
-        let newGridTemplate = "[index] 16px [first] 6fr ";
-        for (let i = 1; i < maxCols - 2; i++) {
-            newGridTemplate += `[var${i}] 3fr `;
-        }
-        newGridTemplate += "[last] minmax(120px,1fr)";
-        
-        let gridStyleEl = document.getElementById("sort-play-artist-grid-style");
-        if (!gridStyleEl) {
-            gridStyleEl = document.createElement("style");
-            gridStyleEl.id = "sort-play-artist-grid-style";
-            document.head.appendChild(gridStyleEl);
-        }
-        tracklistContainer.setAttribute('data-sp-grid', 'artist');
-        const cssString = `html body div.main-trackList-trackList[data-sp-grid="artist"] .main-trackList-trackListHeaderRow, html body div[role="grid"][data-sp-grid="artist"] [role="row"]:has([role="columnheader"]), html body div.main-trackList-trackList[data-sp-grid="artist"] .main-trackList-trackListRow, html body div.main-trackList-trackList[data-sp-grid="artist"] .main-trackList-trackListRowGrid, html body div[role="grid"][data-sp-grid="artist"] [role="row"] > div:has([role="gridcell"]) { display: grid !important; grid-template-columns: ${newGridTemplate} !important; column-gap: var(--grid-gap, 16px) !important; }`;
-        if (gridStyleEl.innerHTML !== cssString) {
-            gridStyleEl.innerHTML = cssString;
-        }
-
-        let existingHeaderWrapper = tracklistContainer.querySelector('.sort-play-artist-header-wrapper');
-
-        if (!existingHeaderWrapper) {
-            tracklistContainer.setAttribute('aria-colcount', '5');
-            existingHeaderWrapper = document.createElement('div');
-            existingHeaderWrapper.className = 'main-trackList-trackListHeader sort-play-artist-header-wrapper';
-            existingHeaderWrapper.innerHTML = `<div class="main-trackList-trackListHeaderRow main-trackList-trackListRowGrid" role="row" style="display: grid !important; height: 36px; column-gap: 16px; padding: 0 16px; align-items: center; box-sizing: border-box;">
-                <div class="main-trackList-rowSectionIndex" role="columnheader" aria-colindex="1" style="display: flex; align-items: center; justify-content: center; color: var(--text-subdued, #b3b3b3); font-size: 14px; font-weight: 400;">#</div>
-                <div class="main-trackList-rowSectionStart" role="columnheader" aria-colindex="2" style="display: flex; align-items: center; justify-content: flex-start; color: var(--text-subdued, #b3b3b3); font-size: 14px; font-weight: 400;"><span class="encore-text-body-small" style="color: inherit; font-size: inherit;">Title</span></div>
-                <div class="main-trackList-rowSectionVariable" role="columnheader" aria-colindex="3" style="display: flex; align-items: center; justify-content: flex-start; padding-left: 36px; color: var(--text-subdued, #b3b3b3); font-size: 14px; font-weight: 400;"><span class="encore-text-body-small" style="color: inherit; font-size: inherit;">Plays</span></div>
-                <div class="main-trackList-rowSectionVariable sort-play-artist-col-header" role="columnheader" aria-colindex="4" style="display: flex; justify-content: center; align-items: center;"><button class="sort-play-column-header"><span class="encore-text-body-small" style="color: var(--text-subdued, #b3b3b3); font-size: 14px; font-weight: 400;">${expectedHeaderText}</span></button></div>
-                <div class="main-trackList-rowSectionEnd" role="columnheader" aria-colindex="5" style="display: flex; align-items: center; justify-content: flex-end; padding-right: 32px; color: var(--text-subdued, #b3b3b3);"><svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" style="display: block;"><path d="M8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8z"></path><path d="M8 3.25a.75.75 0 0 1 .75.75v3.25H11a.75.75 0 0 1 0 1.5H7.25V4A.75.75 0 0 1 8 3.25z"></path></svg></div>
-            </div>`;
-            existingHeaderWrapper.style.cssText = 'border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 8px; box-sizing: border-box;';
-            existingHeaderWrapper.querySelector('.sort-play-artist-col-header button').onclick = (e) => showColumnSelector(e, 'artist');
-            const rootlistWrapper = tracklistContainer.querySelector('.main-rootlist-wrapper');
-            if (rootlistWrapper) {
-                tracklistContainer.insertBefore(existingHeaderWrapper, rootlistWrapper);
-            } else {
-                tracklistContainer.prepend(existingHeaderWrapper);
-            }
-        } else {
-            const headerTextSpan = existingHeaderWrapper.querySelector('.sort-play-artist-col-header span');
-            if (headerTextSpan && headerTextSpan.innerText !== expectedHeaderText) {
-                headerTextSpan.innerText = expectedHeaderText;
-                const allCells = tracklistContainer.querySelectorAll('.sort-play-artist-col .sort-play-data');
-                allCells.forEach(cell => {
-                    cell.textContent = "";
-                    delete cell.dataset.spProcessed;
-                    cell.onclick = null;
-                    cell.onmouseover = null;
-                    cell.onmouseout = null;
-                    cell.style.cursor = "default";
-                    cell.style.textDecoration = "none";
-                    cell.removeAttribute('title');
-                });
-            }
-        }
-        
-        let headerIndex = -1;
-        if (existingHeaderWrapper) {
-            const headerRow = existingHeaderWrapper.querySelector('.main-trackList-trackListHeaderRow');
-            const headerCol = headerRow.querySelector('.sort-play-artist-col-header');
-            if (headerRow && headerCol) headerIndex = Array.from(headerRow.children).indexOf(headerCol);
-        }
-
-        const skeletonRows = tracklistContainer.querySelectorAll(".main-trackList-trackListRowGrid:not(.main-trackList-trackListRow):not(.main-trackList-trackListHeaderRow)");
-        for (const skeleton of skeletonRows) {
-            if (skeleton.querySelector('.sort-play-artist-skeleton-col')) continue;
-            const endCell = skeleton.querySelector(".main-trackList-rowSectionEnd");
-            const skeletonCell = document.createElement("div");
-            const varCell = skeleton.querySelector(".main-trackList-rowSectionVariable");
-            const baseClass = varCell ? varCell.className.split(' ').filter(c => !c.includes('sort-play')).join(' ') : "ojrBmBNrA3EfuQlTYybV main-trackList-rowSectionVariable r5OS0NnS9c7LAEJKIri1";
-            skeletonCell.className = `${baseClass} sort-play-artist-skeleton-col`;
-            
-            if (endCell) skeleton.insertBefore(skeletonCell, endCell);
-            else skeleton.appendChild(skeletonCell);
-        }
-
-        const trackRows = Array.from(tracklistContainer.querySelectorAll('.main-trackList-trackListRow, [role="row"]:not([aria-rowindex="1"])')).filter(r => r !== existingHeaderWrapper && !r.querySelector('[role="columnheader"]'));
-        trackRows.forEach(row => {
-            row.style.gridTemplateColumns = "";
-            const cellContainer = (row.children.length === 1 && row.firstElementChild?.querySelector('[role="gridcell"]')) ? row.firstElementChild : row;
-            let newCell = cellContainer.querySelector('.sort-play-artist-col');
-            
-            if (!newCell) {
-                newCell = document.createElement('div');
-                newCell.className = 'main-trackList-rowSectionVariable sort-play-artist-col';
-                newCell.innerHTML = `<span class="sort-play-data encore-text-body-small encore-internal-color-text-subdued" data-encore-id="text"></span>`;
-                newCell.setAttribute('role', 'gridcell');
-                newCell.setAttribute('aria-colindex', '4');
-                newCell.style.display = 'flex';
-                newCell.style.alignItems = 'center';
-                newCell.style.justifyContent = 'center';
-            }
-
-            const endSection = cellContainer.querySelector('.main-trackList-rowSectionEnd') || Array.from(cellContainer.children).filter(el => !el.classList.contains('sort-play-artist-col')).pop();
-            if (endSection && newCell.nextElementSibling !== endSection) {
-                cellContainer.insertBefore(newCell, endSection);
-            } else if (!endSection && newCell.parentElement !== cellContainer) {
-                cellContainer.appendChild(newCell);
-            }
-            
-            if (endSection) endSection.setAttribute('aria-colindex', '5');
-        });
-
-        loadAdditionalColumnData(tracklistContainer);
-      } finally {
-        isUpdatingArtistTracklist = false;
+        if (popularGrid && isTracklistGrid(popularGrid)) containers.push(popularGrid);
       }
-    });
+
+      if (containers.length === 0) return;
+
+      for (const tracklistContainer of containers) {
+        if (activeCols.length === 0) {
+          clearTracklistExtraColumns(tracklistContainer);
+          continue;
+        }
+
+        const nativeHeaderRow = tracklistContainer.querySelector('.main-trackList-trackListHeaderRow:not(.sp-artist-header-row), [role="row"]:not(.sp-artist-header-row):has([role="columnheader"])');
+        let headerRow;
+        if (nativeHeaderRow) {
+          tracklistContainer.querySelectorAll('.sp-artist-header-wrapper, .sort-play-artist-header-wrapper').forEach(el => el.remove());
+          headerRow = nativeHeaderRow;
+        } else {
+          headerRow = ensureArtistSyntheticHeader(tracklistContainer);
+        }
+        if (!headerRow) continue;
+
+        const nativeHeaders = getHeaderColumnElements(headerRow).filter(el => !el.classList.contains('sp-extra-col-header') && !el.classList.contains('sort-play-artist-col-header'));
+        const endHeaderCell = headerRow.querySelector('.main-trackList-rowSectionEnd') || nativeHeaders[nativeHeaders.length - 1];
+
+        syncHeaderExtraColumns(tracklistContainer, headerRow, activeCols, endHeaderCell, 'artist');
+        const layout = applyTracklistGridLayout(tracklistContainer, headerRow, 'artist');
+        syncTracklistBodyRows(tracklistContainer, headerRow, activeCols, layout);
+        loadAdditionalColumnData(tracklistContainer);
+      }
+    } finally {
+      isUpdatingArtistTracklist = false;
+    }
   }
-  
+
   function createTracklistMutationHandler(updateFn) {
+    const isOwnNode = (node) => !!(node?.classList && (
+      node.classList.contains('sp-extra-col-header') ||
+      node.classList.contains('sp-extra-col-cell') ||
+      node.classList.contains('sp-extra-col-skel') ||
+      node.classList.contains('sp-col-resizer') ||
+      node.classList.contains('sp-artist-header-wrapper') ||
+      node.classList.contains('likeControl-wrapper') ||
+      node.classList.contains('sort-play-like-button')
+    ));
+    const isRelevantNode = (node) => {
+      if (node.nodeType !== Node.ELEMENT_NODE || isOwnNode(node)) return false;
+      const cl = node.classList;
+      const role = node.getAttribute?.('role');
+      if (cl?.contains('main-trackList-trackListRow') || cl?.contains('main-trackList-trackListRowGrid') || role === 'row' || cl?.contains('main-trackList-rowSectionVariable') || role === 'gridcell' || role === 'columnheader' || cl?.contains('djInfoList') || cl?.contains('starRatings') || cl?.contains('main-trackList-trackList') || role === 'grid') {
+        return true;
+      }
+      return Boolean(node.querySelector?.('.main-trackList-trackListRow, .main-trackList-trackList, .main-trackList-trackListRowGrid, .main-trackList-rowSectionVariable, [role="gridcell"], [role="row"], [role="columnheader"], .djInfoList, .starRatings'));
+    };
+
+    let lastRun = 0;
+    let trailingTimer = null;
+    let trailingRaf = null;
+    const flush = () => {
+      if (trailingTimer) { clearTimeout(trailingTimer); trailingTimer = null; }
+      if (trailingRaf) { cancelAnimationFrame(trailingRaf); trailingRaf = null; }
+      lastRun = performance.now();
+      updateFn();
+    };
+
     return (mutations) => {
       let shouldUpdate = false;
       for (const mutation of mutations) {
-        for (const node of mutation.addedNodes) {
-          if (node.nodeType === Node.ELEMENT_NODE) {
-            const isRow = node.classList?.contains('main-trackList-trackListRow') || node.classList?.contains('main-trackList-trackListRowGrid') || node.getAttribute?.('role') === 'row';
-            const isCell = node.classList?.contains('main-trackList-rowSectionVariable') || node.getAttribute?.('role') === 'gridcell' || node.classList?.contains('djInfoList') || node.classList?.contains('starRatings');
-            if (isRow || isCell || node.classList?.contains('main-trackList-trackList') || node.getAttribute?.('role') === 'grid') {
+        if (mutation.type === 'attributes') {
+          const target = mutation.target;
+          if (target?.nodeType === Node.ELEMENT_NODE && !isOwnNode(target)) {
+            const role = target.getAttribute?.('role');
+            if (role === 'columnheader' || role === 'gridcell' || target.classList?.contains('main-trackList-rowSectionVariable')) {
               shouldUpdate = true;
               break;
             }
-            if (node.querySelector && node.querySelector('.main-trackList-trackListRow, .main-trackList-trackList, .main-trackList-trackListRowGrid, .main-trackList-rowSectionVariable, [role="gridcell"], [role="row"], .djInfoList, .starRatings')) {
+          }
+          continue;
+        }
+        for (const node of mutation.addedNodes) {
+          if (isRelevantNode(node)) { shouldUpdate = true; break; }
+        }
+        if (shouldUpdate) break;
+        for (const node of mutation.removedNodes) {
+          if (node.nodeType === Node.ELEMENT_NODE && !isOwnNode(node)) {
+            const role = node.getAttribute?.('role');
+            if (role === 'columnheader' || node.classList?.contains('djInfoList') || node.classList?.contains('starRatings')) {
               shouldUpdate = true;
               break;
             }
@@ -67888,9 +72187,13 @@ shadowRoot.innerHTML = `
         }
         if (shouldUpdate) break;
       }
-      if (shouldUpdate) {
-        clearTimeout(updateDebounceTimeout);
-        updateDebounceTimeout = setTimeout(updateFn, 15);
+      if (!shouldUpdate) return;
+      const now = performance.now();
+      if (now - lastRun >= 16) {
+        flush();
+      } else if (!trailingTimer && !trailingRaf) {
+        trailingRaf = requestAnimationFrame(flush);
+        trailingTimer = setTimeout(flush, 32);
       }
     };
   }
@@ -67903,8 +72206,8 @@ shadowRoot.innerHTML = `
 
     const mainView = document.querySelector("main");
     if (!mainView) {
-        setTimeout(initializeTracklistObserver, 250);
-        return;
+      setTimeout(initializeTracklistObserver, 250);
+      return;
     }
 
     updateTracklist();
@@ -67912,7 +72215,7 @@ shadowRoot.innerHTML = `
     if (tracklistObserver) tracklistObserver.disconnect();
 
     tracklistObserver = new MutationObserver(createTracklistMutationHandler(updateTracklist));
-    tracklistObserver.observe(mainView, { childList: true, subtree: true });
+    tracklistObserver.observe(mainView, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-hidden'] });
   }
 
   async function initializeAlbumTracklistObserver() {
@@ -67921,8 +72224,8 @@ shadowRoot.innerHTML = `
 
     const mainView = document.querySelector("main");
     if (!mainView) {
-        setTimeout(initializeAlbumTracklistObserver, 250);
-        return;
+      setTimeout(initializeAlbumTracklistObserver, 250);
+      return;
     }
 
     updateAlbumTracklist();
@@ -67930,7 +72233,7 @@ shadowRoot.innerHTML = `
     if (albumTracklistObserver) albumTracklistObserver.disconnect();
 
     albumTracklistObserver = new MutationObserver(createTracklistMutationHandler(updateAlbumTracklist));
-    albumTracklistObserver.observe(mainView, { childList: true, subtree: true });
+    albumTracklistObserver.observe(mainView, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-hidden'] });
   }
 
   async function initializeArtistTracklistObserver() {
@@ -67939,8 +72242,8 @@ shadowRoot.innerHTML = `
 
     const mainView = document.querySelector("main");
     if (!mainView) {
-        setTimeout(initializeArtistTracklistObserver, 250);
-        return;
+      setTimeout(initializeArtistTracklistObserver, 250);
+      return;
     }
 
     updateArtistTracklist();
@@ -67948,7 +72251,7 @@ shadowRoot.innerHTML = `
     if (artistTracklistObserver) artistTracklistObserver.disconnect();
 
     artistTracklistObserver = new MutationObserver(createTracklistMutationHandler(updateArtistTracklist));
-    artistTracklistObserver.observe(mainView, { childList: true, subtree: true });
+    artistTracklistObserver.observe(mainView, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-hidden'] });
   }
     
   function insertButton() {
@@ -70141,6 +74444,7 @@ shadowRoot.innerHTML = `
         likeButton_initiateLikedSongs();
 
         const handleNativeLikeChange = () => {
+            if (isSyntheticViewSortUpdate) return;
             invalidateLikedSongsCache();
             clearTimeout(likeButton_resyncDebounceTimer);
             likeButton_resyncDebounceTimer = setTimeout(() => {
@@ -70440,7 +74744,7 @@ shadowRoot.innerHTML = `
         mountLikeButtonNowPlayingView();
         mountLikeButtonWatchFeed();
     
-        const INTERNAL_LIKE_SELECTOR = '.likeControl-wrapper, .likeControl-wrapper-npv, .likeControl-wrapper-wf, .like-button-tooltip, .sort-play-custom-tooltip, .sort-play-like-menu-root';
+        const INTERNAL_LIKE_SELECTOR = '.likeControl-wrapper, .likeControl-wrapper-npv, .likeControl-wrapper-wf, .like-button-tooltip, .sort-play-custom-tooltip, .sort-play-like-menu-root, .sp-extra-col-header, .sp-extra-col-cell, .sp-extra-col-skel, .sp-col-resizer, .sp-artist-header-wrapper';
         const isInternalLikeElement = (el) => Boolean(
             el?.classList && (
                 el.classList.contains('likeControl-wrapper') ||
@@ -70448,7 +74752,12 @@ shadowRoot.innerHTML = `
                 el.classList.contains('likeControl-wrapper-wf') ||
                 el.classList.contains('like-button-tooltip') ||
                 el.classList.contains('sort-play-custom-tooltip') ||
-                el.classList.contains('sort-play-like-menu-root')
+                el.classList.contains('sort-play-like-menu-root') ||
+                el.classList.contains('sp-extra-col-header') ||
+                el.classList.contains('sp-extra-col-cell') ||
+                el.classList.contains('sp-extra-col-skel') ||
+                el.classList.contains('sp-col-resizer') ||
+                el.classList.contains('sp-artist-header-wrapper')
             )
         );
 
@@ -70562,6 +74871,11 @@ shadowRoot.innerHTML = `
     const mainView = document.querySelector("main");
 
     if (currentUri !== lastObservedUri || path !== lastObservedPath || mainView !== lastObservedMainView) {
+        if (currentUri !== lastObservedUri) {
+            for (const uri of Array.from(playlistViewSortLoading.keys())) {
+                if (uri !== currentUri) cancelPlaylistViewSort(uri);
+            }
+        }
         lastObservedUri = currentUri;
         lastObservedPath = path;
         lastObservedMainView = mainView;
@@ -70743,6 +75057,7 @@ shadowRoot.innerHTML = `
   
   startScheduler();
   initializeSongChangeWatcher();
+  installPlaylistViewSortHooks();
   
   Spicetify.Player.addEventListener("songchange", async () => {
       const currentTrack = Spicetify.Player.data?.item;
