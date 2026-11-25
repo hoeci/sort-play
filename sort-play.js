@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "6.14.0";
+  const SORT_PLAY_VERSION = "6.15.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -141,7 +141,6 @@
   const STORAGE_KEY_LOCAL_FILES_HANDLING = "sort-play-local-files-handling";
   const STORAGE_KEY_FOLLOWED_RELEASES_CONFIG = "sort-play-followed-releases-config";
   const STORAGE_KEY_TASTE_PROFILE = "sort-play-taste-profile";
-  const STORAGE_KEY_CF_FETCH_POPULARITY = "sort-play-cf-fetch-popularity";
   const STORAGE_KEY_CF_FETCH_LASTFM = "sort-play-cf-fetch-lastfm";
   const STORAGE_KEY_COLUMN_LAYOUT = "sort-play-column-layout";
   const STORAGE_KEY_CF_RELEASE_DATE_FORMAT = "sort-play-cf-release-date-format";
@@ -215,7 +214,7 @@
     STORAGE_KEY_AUTO_HIDE_DISCOGRAPHY_NOTIFICATION, STORAGE_KEY_GENRE_SEPARATOR,
     STORAGE_KEY_RANGE_EXCLUDE_UNLISTENED, STORAGE_KEY_GENRE_FILTER_SOURCES,
     STORAGE_KEY_LOCAL_FILES_HANDLING, STORAGE_KEY_FOLLOWED_RELEASES_CONFIG,
-    STORAGE_KEY_CF_FETCH_POPULARITY, STORAGE_KEY_CF_FETCH_LASTFM, STORAGE_KEY_COLUMN_LAYOUT,
+    STORAGE_KEY_CF_FETCH_LASTFM, STORAGE_KEY_COLUMN_LAYOUT,
     STORAGE_KEY_CF_RELEASE_DATE_FORMAT, STORAGE_KEY_CF_MY_SCROBBLES_MODE, STORAGE_KEY_CF_KEY_MODE,
     STORAGE_KEY_PRESERVE_DATE_ADDED, STORAGE_KEY_DEDICATED_OVERRIDES, STORAGE_KEY_BACKUP_UNAVAILABLE_ON_REMOVE,
     STORAGE_KEY_BACKUP_DUPLICATES_ON_REMOVE, STORAGE_KEY_GENRE_BLACKLIST, STORAGE_KEY_GENRE_BLACKLIST_ENABLED,
@@ -332,7 +331,8 @@
     personalScrobbles: new Map(),
     lastScrobbled: new Map(),
     popularity: new Map(),
-    aiStats: new Map()
+    aiStats: new Map(),
+    tempoKey: new Map()
   };
   let extraColumnsConfig = {
     playlist: { enabled: true, columns: [{ id: 'playlist2', type: 'releaseDate', enabled: false }, { id: 'playlist1', type: 'playCount', enabled: false }] },
@@ -412,7 +412,6 @@
   let genreSourcesApEveryNoise = true;
   let autoUpdateGenreModal = false;
   let autoHideDiscographyNotification = false;
-  let cfFetchPopularity = false;
   let cfFetchLastFm = false;
   let genreSeparator = ',';
   let followedReleasesConfig = { ...DEFAULT_FR_CONFIG };
@@ -468,6 +467,8 @@
   let isSyntheticViewSortUpdate = false;
   let playlistViewSortSeq = 0;
   let internalTokenRefreshPromise = null;
+  let cachedSpotifyAccessToken = null;
+  let cachedSpotifyAccessTokenExp = 0;
   let s_Access_Token = null;
   let s_Token_Exp = 0;
   let lfmKeyIndex = 0;
@@ -3232,7 +3233,7 @@
     "nature": { M: 1.0 }, "rain": { M: 1.0 }, "lullaby": { M: 1.0 }, "chanson": { M: 0.7, S: 0.3 }, "spiritual": { M: 0.6, U: 0.4 }, "soulful": { M: 0.6, S: 0.4 },
     "country": { U: 1.0 }, "singer-songwriter": { U: 0.7, M: 0.3 }, "folk": { U: 0.9, M: 0.1 }, "americana": { U: 1.0 },
     "gospel": { U: 0.8, S: 0.2 }, "bluegrass": { S: 0.6, U: 0.4 }, "worship": { U: 0.8, M: 0.2 }, "devotional": { U: 0.8, M: 0.2 }, "ccm": { U: 0.6, C: 0.4 }, "sertanejo": { U: 1.0 },
-    "tejano": { U: 1.0 }, "norte": { U: 1.0 }, "sierre": { U: 1.0 }, "banda": { U: 1.0 }, "country blues": { U: 0.7, S: 0.3 },
+    "tejano": { U: 1.0 }, "norteno": { U: 1.0 }, "sierreno": { U: 1.0 }, "banda": { U: 1.0 }, "country blues": { U: 0.7, S: 0.3 },
     "classical": { S: 1.0 }, "jazz": { S: 1.0 }, "blues": { S: 0.8, U: 0.2 }, "classy": { S: 1.0 },
     "soundtrack": { S: 0.8, M: 0.2 }, "soul funk": { S: 0.6, C: 0.4 }, "latin": { S: 0.5, C: 0.5 },
     "orchestral": { S: 1.0 }, "symphony": { S: 1.0 }, "acid jazz": { S: 0.7, C: 0.3 }, "epic": { S: 0.6, I: 0.4 },
@@ -3242,7 +3243,7 @@
     "cabaret": { S: 1.0 }, "minimalism": { S: 0.8, M: 0.2 }, "opera": { S: 1.0 }, "musicals": { S: 0.8, M: 0.2 }, "a cappella": { S: 0.7, M: 0.3 }, "progressive rock": { S: 0.7, I: 0.3 },
     "rock": { I: 1.0 }, "rock and roll": { U: 0.6, I: 0.4 }, "metal": { I: 1.0 }, "hard rock": { I: 1.0 },
     "aggressive": { I: 1.0 }, "punk": { I: 1.0 }, "angst": { I: 1.0 }, "emo": { I: 0.7, M: 0.3 },
-    "heavy metal": { I: 1.0 }, "angry": { I: 1.0 }, "nu metal": { I: 0.9, C: 0.1 }, "alternative metal": { I: 0.9, C: 0.1 }, "rock en espa": { I: 0.9, C: 0.1 },
+    "heavy metal": { I: 1.0 }, "angry": { I: 1.0 }, "nu metal": { I: 0.9, C: 0.1 }, "alternative metal": { I: 0.9, C: 0.1 }, "rock en espanol": { I: 0.9, C: 0.1 },
     "grunge": { I: 1.0 }, "death metal": { I: 1.0 }, "metalcore": { I: 1.0 }, "screamo": { I: 1.0 }, "post-hardcore": { I: 0.9, C: 0.1 },
     "rockabilly": { I: 0.8, U: 0.2 }, "industrial": { I: 0.8, C: 0.2 }, "hardcore punk": { I: 1.0 },
     "black metal": { I: 1.0 }, "doom metal": { I: 1.0 }, "southern rock": { I: 0.7, U: 0.3 },
@@ -3747,14 +3748,18 @@
   }
 
   function formatTrackCacheData(trackData) {
+      const albumType = trackData.album?.album_type || trackData.albumType || undefined;
       return {
           name: trackData.name,
           album: {
               name: trackData.album?.name,
               id: trackData.album?.id,
               uri: trackData.album?.uri || (trackData.album?.id ? `spotify:album:${trackData.album.id}` : null),
-              release_date: trackData.album?.release_date,
-              album_type: trackData.album?.album_type || trackData.albumType || 'album'
+              release_date: trackData.album?.release_date ?? trackData.releaseDate ?? null,
+              release_date_precision: trackData.album?.release_date_precision || trackData.datePrecision || null,
+              album_type: albumType || 'album',
+              ...(trackData.album?.label ? { label: trackData.album.label } : {}),
+              ...(Array.isArray(trackData.album?.images) ? { images: trackData.album.images } : {})
           },
           artists: (trackData.artists || []).map(a => ({
               id: a.id,
@@ -3769,7 +3774,55 @@
           external_ids: trackData.external_ids || {},
           id: trackData.id,
           uri: trackData.uri || `spotify:track:${trackData.id}`,
-          albumType: trackData.album?.album_type || trackData.albumType || 'album'
+          albumType: albumType || 'album'
+      };
+  }
+
+  function mergeTrackCacheData(existing, incomingRaw, hasExplicitAlbumType = true) {
+      const incoming = formatTrackCacheData(incomingRaw);
+      if (!existing) return incoming;
+
+      const exAlb = existing.album || {};
+      const inAlb = incoming.album || {};
+      const mergedAlbum = { ...exAlb };
+      if (inAlb.id) mergedAlbum.id = inAlb.id;
+      if (inAlb.uri) mergedAlbum.uri = inAlb.uri;
+      if (inAlb.name) mergedAlbum.name = inAlb.name;
+      if (inAlb.label) mergedAlbum.label = inAlb.label;
+      if (inAlb.release_date) mergedAlbum.release_date = inAlb.release_date;
+      if (inAlb.release_date_precision) mergedAlbum.release_date_precision = inAlb.release_date_precision;
+      if (hasExplicitAlbumType && inAlb.album_type) mergedAlbum.album_type = inAlb.album_type;
+      else if (exAlb.album_type) mergedAlbum.album_type = exAlb.album_type;
+      else if (inAlb.album_type) mergedAlbum.album_type = inAlb.album_type;
+      if (Array.isArray(inAlb.images) && inAlb.images.length > 0) mergedAlbum.images = inAlb.images;
+      else if (Array.isArray(exAlb.images)) mergedAlbum.images = exAlb.images;
+      else if (Array.isArray(inAlb.images)) mergedAlbum.images = inAlb.images;
+
+      const mergedExtIds = { ...(existing.external_ids || {}) };
+      if (incoming.external_ids) {
+          for (const [k, v] of Object.entries(incoming.external_ids)) {
+              if (v !== undefined && v !== null && v !== '') mergedExtIds[k] = v;
+          }
+      }
+
+      const finalAlbumType = (hasExplicitAlbumType && incoming.albumType)
+          ? incoming.albumType
+          : (existing.albumType || mergedAlbum.album_type || incoming.albumType || 'album');
+
+      return {
+          ...existing,
+          id: incoming.id || existing.id,
+          uri: incoming.uri || existing.uri,
+          name: incoming.name || existing.name,
+          artists: incoming.artists?.length ? incoming.artists : (existing.artists || []),
+          duration_ms: incoming.duration_ms ?? existing.duration_ms,
+          popularity: (incoming.popularity !== undefined && incoming.popularity !== null) ? incoming.popularity : existing.popularity,
+          trackNumber: incoming.trackNumber > 0 ? incoming.trackNumber : (existing.trackNumber || 0),
+          discNumber: incoming.discNumber || existing.discNumber || 1,
+          explicit: incoming.explicit || Boolean(existing.explicit),
+          album: mergedAlbum,
+          albumType: finalAlbumType,
+          external_ids: mergedExtIds
       };
   }
 
@@ -4867,27 +4920,50 @@
       return String(str).replace(/[&<>"']/g, c => HTML_ESCAPE_MAP[c]);
   };
 
+  const protoTextDecoder = new TextDecoder();
+
+  const toUint8Array = (raw) => {
+    if (!raw) return new Uint8Array(0);
+    if (raw instanceof Uint8Array) return raw;
+    if (ArrayBuffer.isView(raw)) return new Uint8Array(raw.buffer, raw.byteOffset, raw.byteLength);
+    if (raw instanceof ArrayBuffer) return new Uint8Array(raw);
+    return new Uint8Array(Array.isArray(raw) ? raw : Object.values(raw));
+  };
+
+  const bytesToHex = (bytes) => {
+    let hex = '';
+    for (let i = 0; i < bytes.length; i++) hex += bytes[i].toString(16).padStart(2, '0');
+    return hex;
+  };
+
   const getWebpackService = (id) => {
     const chunk = window.rspackChunk ?? window.webpackChunkclient_web ?? window.rspackChunkclient_web;
     if (!chunk) return null;
-    
+
     let req = null;
     try {
       const ret = chunk.push([[Symbol()], {}, (r) => { req = r; return r; }]);
       if (!req && typeof ret === "function") req = ret;
-    } catch (e) {
+    } catch {
       return null;
     }
-    if (!req || !req.m) return null;
+    if (!req?.m) return null;
 
-    return Object.values(req.m).flatMap(m => {
-      try { return Object.values(req(Object.keys(req.m).find(k => req.m[k] === m))); } catch { return []; }
-    }).find(c => c?.SERVICE_ID === id);
+    for (const k of Object.keys(req.m)) {
+      if (!String(req.m[k]).includes(id)) continue;
+      try {
+        const mod = req(k);
+        if (!mod || typeof mod !== "object") continue;
+        const svc = Object.values(mod).find(c => c?.SERVICE_ID === id);
+        if (svc) return svc;
+      } catch {}
+    }
+    return null;
   };
-  
+
   const parseVarint = (obj) => {
     if (!obj) return null;
-    const bytes = obj instanceof Uint8Array ? obj : Object.values(obj);
+    const bytes = toUint8Array(obj);
     const len = bytes.length;
     if (len < 2) return null;
     let i = 0;
@@ -4902,7 +4978,6 @@
       }
       return null;
     };
-    let field1Fallback = null;
     while (i < len) {
       const tagBig = readVarint();
       if (tagBig === null) break;
@@ -4913,10 +4988,7 @@
         const vBig = readVarint();
         if (vBig === null) break;
         const v = Number(vBig);
-        if (Number.isFinite(v) && v >= 0) {
-          if (field === 3) return v;
-          if (field === 1 && field1Fallback === null) field1Fallback = v;
-        }
+        if (field === 3 && Number.isFinite(v) && v >= 0) return v;
       } else if (wire === 1) {
         if (i + 8 > len) break;
         i += 8;
@@ -4931,52 +5003,75 @@
         break;
       }
     }
-    return field1Fallback;
+    return null;
   };
 
   const getMetadataClient = () => {
-      if (metadataServiceClient) return metadataServiceClient;
-      try {
-          const MetadataService = getWebpackService("spotify.mdata_esperanto.proto.MetadataService");
-          if (!MetadataService) return null;
-          
-          const transport = Spicetify.Platform?.ProductStateAPI?.productStateApi?.transport
-            || Spicetify.Platform?.Transport
-            || Spicetify.Platform?.PlayerAPI?._queue?._client?._transport;
-          if (!transport) return null;
-          metadataServiceClient = new MetadataService(transport);
-      } catch (e) {
-          console.error("[Sort-Play] Failed to initialize MetadataService", e);
+    if (metadataServiceClient) return metadataServiceClient;
+    try {
+      const plat = Spicetify.Platform;
+      const existing = plat?.PlaylistAPI?._metadataExtensionsAPI?._metadataServiceClient
+        || plat?.RecentsAPI?.metadataExtensionsAPI?._metadataServiceClient
+        || plat?.CurationAPI?._metadataExtensionsAPI?._metadataServiceClient
+        || plat?.ShowAPI?._metadataExtensionsAPI?._metadataServiceClient
+        || plat?.SmartShuffleEligibilityAPI?._metadataExtensionsAPI?._metadataServiceClient
+        || plat?.PlaylistMixingAPI?._metadataExtensionsAPI?._metadataServiceClient;
+      if (existing && typeof existing.fetch === "function") {
+        metadataServiceClient = existing;
+        return metadataServiceClient;
       }
-      return metadataServiceClient;
+
+      const MetadataService = getWebpackService("spotify.mdata_esperanto.proto.MetadataService");
+      if (!MetadataService) return null;
+
+      const transport = plat?.ProductStateAPI?.productStateApi?.transport
+        || plat?.Transport
+        || plat?.PlayerAPI?._queue?._client?._transport;
+      if (!transport) return null;
+      metadataServiceClient = new MetadataService(transport);
+    } catch (e) {
+      console.error("[Sort-Play] Failed to initialize MetadataService", e);
+    }
+    return metadataServiceClient;
   };
 
+  function fetchMetadataWithTimeout(client, query, timeoutMs = 20000) {
+    let timerId;
+    return Promise.race([
+      client.fetch(query),
+      new Promise((_, reject) => {
+        timerId = setTimeout(() => reject(new Error("Esperanto metadata fetch timeout")), timeoutMs);
+      })
+    ]).finally(() => clearTimeout(timerId));
+  }
+
   async function fetchPlayCountsBatchNew(uris) {
-      const client = getMetadataClient();
-      if (!client) throw new Error("Metadata client not available");
-      
-      const validUris = uris.filter(uri => uri && uri.startsWith("spotify:track:"));
-      if (validUris.length === 0) return new Map();
+    const client = getMetadataClient();
+    if (!client) throw new Error("Metadata client not available");
 
-      const response = await client.fetch({
-        extensionQuery: [{ extensionKind: 185, entityUri: validUris }],
+    const validUris = uris.filter(uri => uri && uri.startsWith("spotify:track:"));
+    if (validUris.length === 0) return new Map();
+
+    const response = await fetchMetadataWithTimeout(client, {
+      extensionQuery: [{ extensionKind: 185, entityUri: validUris }],
+    });
+
+    const results = new Map();
+    const ext = response?.extension?.find(e => e.extensionKind === 185) || response?.extension?.[0];
+    if (ext?.entityExtension) {
+      ext.entityExtension.forEach(item => {
+        const status = item?.header?.statusCode;
+        if (status !== undefined && status !== 200) return;
+        if (item?.header?.isEmpty) return;
+        const rawVal = item?.extensionData?.value;
+        if (!rawVal) return;
+        const parsed = parseVarint(rawVal);
+        if (parsed !== null && Number.isFinite(parsed) && parsed >= 0) {
+          results.set(item.entityUri, parsed);
+        }
       });
-
-      const results = new Map();
-      if (response?.extension?.[0]?.entityExtension) {
-          response.extension[0].entityExtension.forEach(item => {
-              const status = item?.header?.statusCode;
-              if (status !== undefined && status !== 200) return;
-              if (item?.header?.isEmpty) return;
-              const rawVal = item?.extensionData?.value;
-              if (!rawVal) return;
-              const parsed = parseVarint(rawVal);
-              if (parsed !== null && Number.isFinite(parsed) && parsed >= 0) {
-                  results.set(item.entityUri, parsed);
-              }
-          });
-      }
-      return results;
+    }
+    return results;
   }
 
   const VARIOUS_ARTISTS_URI = "spotify:artist:0LyfQWJT6nXafLPZqxe9Of";
@@ -5092,14 +5187,14 @@
               const batch = missingUris.slice(i, i + BATCH_SIZE);
               const batchResolved = new Set();
               try {
-                  const response = await client.fetch({
+                  const response = await fetchMetadataWithTimeout(client, {
                       extensionQuery: [{ extensionKind: 185, entityUri: batch }]
                   });
-                  const items = response?.extension?.[0]?.entityExtension || [];
+                  const ext = response?.extension?.find(e => e.extensionKind === 185) || response?.extension?.[0];
+                  const items = ext?.entityExtension || [];
                   for (const item of items) {
-                      if (item?.header?.statusCode !== 200 || !item.entityUri) continue;
-                      const raw = item.extensionData?.value;
-                      const bytes = raw ? (ArrayBuffer.isView(raw) ? raw : Object.values(raw)) : [];
+                      if ((item?.header?.statusCode !== undefined && item.header.statusCode !== 200) || item?.header?.isEmpty || !item.entityUri) continue;
+                      const bytes = toUint8Array(item.extensionData?.value);
                       if (bytes.length === 0) continue;
                       const { monthlyListeners, followers } = parseArtistMonthlyListenersFromExt185(bytes);
                       const ml = monthlyListeners !== null ? monthlyListeners : (followers !== null ? 0 : null);
@@ -5358,209 +5453,733 @@
       return true;
   }
 
-  function parseDateProtobuf(bytes) {
+  function parseDateProtobuf(rawBytes) {
+      const bytes = toUint8Array(rawBytes);
       let year = null, month = null, day = null;
       let i = 0;
-      while (i < bytes.length) {
-          const tag = bytes[i++];
-          const field = tag >> 3;
-          const wire = tag & 7;
-          if (wire !== 0) break; 
-          let val = 0;
-          let shift = 0;
-          while (i < bytes.length) {
+      const len = bytes.length;
+      const readVarint = () => {
+          let val = 0n, shift = 0n;
+          while (i < len) {
               const b = bytes[i++];
-              val |= (b & 0x7f) << shift;
-              if (!(b & 0x80)) break;
-              shift += 7;
+              val |= BigInt(b & 0x7f) << shift;
+              if (!(b & 0x80)) return val;
+              shift += 7n;
+              if (shift > 63n) return null;
           }
-          const decoded = (val >>> 1) ^ -(val & 1);
+          return null;
+      };
+      while (i < len) {
+          const tagBig = readVarint();
+          if (tagBig === null) break;
+          const tag = Number(tagBig);
+          const field = tag >>> 3;
+          const wire = tag & 7;
+          if (wire !== 0) break;
+          const vBig = readVarint();
+          if (vBig === null) break;
+          const decoded = Number((vBig >> 1n) ^ -(vBig & 1n));
           if (field === 1) year = decoded;
-          if (field === 2) month = decoded;
-          if (field === 3) day = decoded;
+          else if (field === 2) month = decoded;
+          else if (field === 3) day = decoded;
       }
       if (year) {
           return {
-              date: `${year}-${String(month||1).padStart(2,'0')}-${String(day||1).padStart(2,'0')}`,
+              date: `${year}-${String(month || 1).padStart(2, '0')}-${String(day || 1).padStart(2, '0')}`,
               precision: day ? 'day' : (month ? 'month' : 'year')
           };
       }
       return null;
   }
 
-  function extractCoreMetadataFromExtKind10(bytes) {
+  function extractCoreMetadataFromExtKind10(rawBytes, fallbackTrackId = null) {
+      const bytes = toUint8Array(rawBytes);
+      const len = bytes.length;
+      let pos = 0;
+      const readVarint = (limit = len) => {
+          let val = 0n, shift = 0n;
+          while (pos < limit) {
+              const b = bytes[pos++];
+              val |= BigInt(b & 0x7f) << shift;
+              if (!(b & 0x80)) return val;
+              shift += 7n;
+              if (shift > 63n) return null;
+          }
+          return null;
+      };
+      const decodeSint = (vBig) => Number((vBig >> 1n) ^ -(vBig & 1n));
+      const skipWire = (wire, limit = len) => {
+          if (wire === 0) {
+              if (readVarint(limit) === null) return false;
+          } else if (wire === 1) {
+              if (pos + 8 > limit) return false;
+              pos += 8;
+          } else if (wire === 2) {
+              const lBig = readVarint(limit);
+              if (lBig === null) return false;
+              const l = Number(lBig);
+              if (!Number.isFinite(l) || l < 0 || pos + l > limit) return false;
+              pos += l;
+          } else if (wire === 5) {
+              if (pos + 4 > limit) return false;
+              pos += 4;
+          } else {
+              return false;
+          }
+          return true;
+      };
+      const parseImageGroup = (groupEnd) => {
+          const images = [];
+          while (pos < groupEnd) {
+              const gTagBig = readVarint(groupEnd);
+              if (!gTagBig) break;
+              const gTag = Number(gTagBig);
+              const gField = gTag >>> 3;
+              const gWire = gTag & 7;
+              if (gField === 1 && gWire === 2) {
+                  const iLenBig = readVarint(groupEnd);
+                  if (iLenBig === null) break;
+                  const iLen = Number(iLenBig);
+                  if (iLen < 0 || pos + iLen > groupEnd) break;
+                  const imgEnd = pos + iLen;
+                  let fileHex = null, width = 0, height = 0;
+                  while (pos < imgEnd) {
+                      const imTagBig = readVarint(imgEnd);
+                      if (!imTagBig) break;
+                      const imTag = Number(imTagBig);
+                      const imField = imTag >>> 3;
+                      const imWire = imTag & 7;
+                      if (imField === 1 && imWire === 2) {
+                          const fLenBig = readVarint(imgEnd);
+                          if (fLenBig === null) break;
+                          const fLen = Number(fLenBig);
+                          if (fLen < 0 || pos + fLen > imgEnd) break;
+                          fileHex = bytesToHex(bytes.subarray(pos, pos + fLen));
+                          pos += fLen;
+                      } else if ((imField === 3 || imField === 4) && imWire === 0) {
+                          const vBig = readVarint(imgEnd);
+                          if (vBig === null) break;
+                          const dim = decodeSint(vBig);
+                          if (imField === 3) width = dim;
+                          else height = dim;
+                      } else if (!skipWire(imWire, imgEnd)) {
+                          break;
+                      }
+                  }
+                  pos = imgEnd;
+                  if (fileHex) images.push({ url: `https://i.scdn.co/image/${fileHex}`, width, height });
+              } else if (!skipWire(gWire, groupEnd)) {
+                  break;
+              }
+          }
+          pos = groupEnd;
+          images.sort((a, b) => (b.width || 0) - (a.width || 0));
+          return images;
+      };
+
+      let id = null;
+      let name = null;
       let isrc = null;
       let releaseDate = null;
       let datePrecision = null;
       let albumTypeEnum = 1;
-      
-      for (let i = 0; i < bytes.length - 10; i++) {
-          if (!isrc && bytes[i] === 10 && bytes[i+1] === 4 && bytes[i+2] === 105 && bytes[i+3] === 115 && bytes[i+4] === 114 && bytes[i+5] === 99 && bytes[i+6] === 18) {
-              const len = bytes[i+7];
-              if (len > 0 && len <= 20) {
-                  isrc = String.fromCharCode(...bytes.slice(i+8, i+8+len));
-              }
-          }
-      }
-      
-      let state = { i: 0 };
-      function readVarint() {
-          let val = 0; let shift = 0;
-          while (state.i < bytes.length) {
-              const b = bytes[state.i++];
-              val |= (b & 0x7f) << shift;
-              if (!(b & 0x80)) break;
-              shift += 7;
-          }
-          return val;
-      }
-      function skipWire(wire) {
-          if (wire === 0) { while (state.i < bytes.length && (bytes[state.i++] & 0x80)) {} }
-          else if (wire === 1) { state.i += 8; }
-          else if (wire === 2) { const len = readVarint(); state.i += len; }
-          else if (wire === 5) { state.i += 4; }
-      }
+      let albumId = null;
+      let albumName = null;
+      let albumLabel = null;
+      let albumImages = [];
+      let trackNumber = 0;
+      let discNumber = 1;
+      let durationMs = null;
+      let popularity = null;
+      let explicit = false;
+      let hasLyrics = false;
+      const artists = [];
+      const currentYear = new Date().getFullYear();
 
       try {
-          while (state.i < bytes.length) {
-              const tag = readVarint();
-              const field = tag >> 3;
+          while (pos < len) {
+              const tagBig = readVarint(len);
+              if (!tagBig) break;
+              const tag = Number(tagBig);
+              const field = tag >>> 3;
               const wire = tag & 7;
 
-              if (field === 3 && wire === 2) {
-                  const len = readVarint();
-                  const albumEnd = state.i + len;
-                  while (state.i < albumEnd) {
-                      const aTag = readVarint();
-                      const aField = aTag >> 3;
+              if (field === 1 && wire === 2) {
+                  const fLen = Number(readVarint(len));
+                  if (!Number.isFinite(fLen) || fLen < 0 || pos + fLen > len) break;
+                  if (fLen === 16) id = hexToBase62(bytesToHex(bytes.subarray(pos, pos + fLen)));
+                  pos += fLen;
+              } else if (field === 2 && wire === 2) {
+                  const fLen = Number(readVarint(len));
+                  if (!Number.isFinite(fLen) || fLen < 0 || pos + fLen > len) break;
+                  name = protoTextDecoder.decode(bytes.subarray(pos, pos + fLen));
+                  pos += fLen;
+              } else if (field === 3 && wire === 2) {
+                  const aLen = Number(readVarint(len));
+                  if (!Number.isFinite(aLen) || aLen < 0 || pos + aLen > len) break;
+                  const albumEnd = pos + aLen;
+                  while (pos < albumEnd) {
+                      const aTagBig = readVarint(albumEnd);
+                      if (!aTagBig) break;
+                      const aTag = Number(aTagBig);
+                      const aField = aTag >>> 3;
                       const aWire = aTag & 7;
-                      
-                      if (aField === 4 && aWire === 0) {
-                          albumTypeEnum = readVarint();
+
+                      if (aField === 1 && aWire === 2) {
+                          const gLen = Number(readVarint(albumEnd));
+                          if (!Number.isFinite(gLen) || gLen < 0 || pos + gLen > albumEnd) break;
+                          if (gLen === 16) albumId = hexToBase62(bytesToHex(bytes.subarray(pos, pos + gLen)));
+                          pos += gLen;
+                      } else if (aField === 2 && aWire === 2) {
+                          const nLen = Number(readVarint(albumEnd));
+                          if (!Number.isFinite(nLen) || nLen < 0 || pos + nLen > albumEnd) break;
+                          albumName = protoTextDecoder.decode(bytes.subarray(pos, pos + nLen));
+                          pos += nLen;
+                      } else if (aField === 4 && aWire === 0) {
+                          const vBig = readVarint(albumEnd);
+                          if (vBig === null) break;
+                          albumTypeEnum = Number(vBig);
+                      } else if (aField === 5 && aWire === 2) {
+                          const lLen = Number(readVarint(albumEnd));
+                          if (!Number.isFinite(lLen) || lLen < 0 || pos + lLen > albumEnd) break;
+                          albumLabel = protoTextDecoder.decode(bytes.subarray(pos, pos + lLen));
+                          pos += lLen;
                       } else if (aField === 6 && aWire === 2) {
-                           const dLen = readVarint();
-                           const dBytes = bytes.slice(state.i, state.i + dLen);
-                           state.i += dLen;
-                           if (!releaseDate) {
-                               const parsed = parseDateProtobuf(dBytes);
-                               if (parsed?.date) {
-                                   const currentYear = new Date().getFullYear();
-                                   const parts = parsed.date.split('-');
-                                   if (parts.length === 3) {
-                                       const y = parseInt(parts[0], 10);
-                                       if (y >= 1900 && y <= currentYear + 2) {
-                                           releaseDate = parsed.date;
-                                           datePrecision = parsed.precision;
-                                       }
-                                   }
-                               }
-                           }
-                      } else {
-                          skipWire(aWire);
+                          const dLen = Number(readVarint(albumEnd));
+                          if (!Number.isFinite(dLen) || dLen < 0 || pos + dLen > albumEnd) break;
+                          const dBytes = bytes.subarray(pos, pos + dLen);
+                          pos += dLen;
+                          if (!releaseDate) {
+                              const parsed = parseDateProtobuf(dBytes);
+                              if (parsed?.date) {
+                                  const y = parseInt(parsed.date.split('-')[0], 10);
+                                  if (y >= 1800 && y <= currentYear + 2) {
+                                      releaseDate = parsed.date;
+                                      datePrecision = parsed.precision;
+                                  }
+                              }
+                          }
+                      } else if (aField === 17 && aWire === 2) {
+                          const cLen = Number(readVarint(albumEnd));
+                          if (!Number.isFinite(cLen) || cLen < 0 || pos + cLen > albumEnd) break;
+                          albumImages = parseImageGroup(pos + cLen);
+                      } else if (!skipWire(aWire, albumEnd)) {
+                          break;
                       }
                   }
-              } else if (field === 6 && wire === 2) {
-                   const dLen = readVarint();
-                   const dBytes = bytes.slice(state.i, state.i + dLen);
-                   state.i += dLen;
-                   if (!releaseDate) {
-                       const parsed = parseDateProtobuf(dBytes);
-                       if (parsed?.date) {
-                           const currentYear = new Date().getFullYear();
-                           const parts = parsed.date.split('-');
-                           if (parts.length === 3) {
-                               const y = parseInt(parts[0], 10);
-                               if (y >= 1900 && y <= currentYear + 2) {
-                                   releaseDate = parsed.date;
-                                   datePrecision = parsed.precision;
-                               }
-                           }
-                       }
-                   }
-              } else {
-                  skipWire(wire);
+                  pos = albumEnd;
+              } else if (field === 4 && wire === 2) {
+                  const arLen = Number(readVarint(len));
+                  if (!Number.isFinite(arLen) || arLen < 0 || pos + arLen > len) break;
+                  const arEnd = pos + arLen;
+                  let arId = null, arName = null;
+                  while (pos < arEnd) {
+                      const arTagBig = readVarint(arEnd);
+                      if (!arTagBig) break;
+                      const arTag = Number(arTagBig);
+                      const arField = arTag >>> 3;
+                      const arWire = arTag & 7;
+                      if (arField === 1 && arWire === 2) {
+                          const gLen = Number(readVarint(arEnd));
+                          if (!Number.isFinite(gLen) || gLen < 0 || pos + gLen > arEnd) break;
+                          if (gLen === 16) arId = hexToBase62(bytesToHex(bytes.subarray(pos, pos + gLen)));
+                          pos += gLen;
+                      } else if (arField === 2 && arWire === 2) {
+                          const nLen = Number(readVarint(arEnd));
+                          if (!Number.isFinite(nLen) || nLen < 0 || pos + nLen > arEnd) break;
+                          arName = protoTextDecoder.decode(bytes.subarray(pos, pos + nLen));
+                          pos += nLen;
+                      } else if (!skipWire(arWire, arEnd)) {
+                          break;
+                      }
+                  }
+                  pos = arEnd;
+                  if (arId || arName) {
+                      artists.push({ id: arId, name: arName, uri: arId ? `spotify:artist:${arId}` : null });
+                  }
+              } else if (field === 5 && wire === 0) {
+                  const vBig = readVarint(len);
+                  if (vBig === null) break;
+                  trackNumber = decodeSint(vBig);
+              } else if (field === 6 && wire === 0) {
+                  const vBig = readVarint(len);
+                  if (vBig === null) break;
+                  discNumber = decodeSint(vBig) || 1;
+              } else if (field === 7 && wire === 0) {
+                  const vBig = readVarint(len);
+                  if (vBig === null) break;
+                  durationMs = decodeSint(vBig);
+              } else if (field === 8 && wire === 0) {
+                  const vBig = readVarint(len);
+                  if (vBig === null) break;
+                  const p = decodeSint(vBig);
+                  if (Number.isFinite(p) && p >= 0 && p <= 100) popularity = p;
+              } else if (field === 9 && wire === 0) {
+                  const vBig = readVarint(len);
+                  if (vBig === null) break;
+                  explicit = vBig !== 0n;
+              } else if (field === 10 && wire === 2) {
+                  const eLen = Number(readVarint(len));
+                  if (!Number.isFinite(eLen) || eLen < 0 || pos + eLen > len) break;
+                  const extEnd = pos + eLen;
+                  let extType = null, extVal = null;
+                  while (pos < extEnd) {
+                      const eTagBig = readVarint(extEnd);
+                      if (!eTagBig) break;
+                      const eTag = Number(eTagBig);
+                      const eField = eTag >>> 3;
+                      const eWire = eTag & 7;
+                      if ((eField === 1 || eField === 2) && eWire === 2) {
+                          const sLen = Number(readVarint(extEnd));
+                          if (!Number.isFinite(sLen) || sLen < 0 || pos + sLen > extEnd) break;
+                          const s = protoTextDecoder.decode(bytes.subarray(pos, pos + sLen));
+                          pos += sLen;
+                          if (eField === 1) extType = s;
+                          else extVal = s;
+                      } else if (!skipWire(eWire, extEnd)) {
+                          break;
+                      }
+                  }
+                  pos = extEnd;
+                  if (!isrc && extType === "isrc" && extVal) isrc = extVal;
+              } else if (field === 18 && wire === 0) {
+                  const vBig = readVarint(len);
+                  if (vBig === null) break;
+                  hasLyrics = vBig !== 0n;
+              } else if (!skipWire(wire, len)) {
+                  break;
               }
           }
-      } catch (e) {}
+      } catch {}
 
       const ALBUM_TYPE_MAP = { 1: "album", 2: "single", 3: "compilation", 4: "ep" };
       const albumType = ALBUM_TYPE_MAP[albumTypeEnum] || "album";
+      const finalId = id || fallbackTrackId;
+      const finalPopularity = (popularity !== null) ? popularity : ((pos >= len && (id || name)) ? 0 : null);
 
-      return { isrc, releaseDate, datePrecision, albumType };
+      return {
+          id: finalId,
+          uri: finalId ? `spotify:track:${finalId}` : null,
+          name,
+          isrc,
+          releaseDate,
+          datePrecision,
+          albumType,
+          popularity: finalPopularity,
+          explicit,
+          trackNumber,
+          discNumber,
+          duration_ms: durationMs,
+          has_lyrics: hasLyrics,
+          album: {
+              id: albumId,
+              uri: albumId ? `spotify:album:${albumId}` : null,
+              name: albumName,
+              label: albumLabel,
+              album_type: albumType,
+              release_date: releaseDate,
+              release_date_precision: datePrecision,
+              images: albumImages
+          },
+          artists,
+          external_ids: isrc ? { isrc } : {}
+      };
   }
 
-  async function fetchCoreMetadataBatch(uris) {
+  const pendingCoreMetadataFetches = new Map();
+
+  async function fetchCoreMetadataBatch(uris, options = {}) {
       const client = getMetadataClient();
       if (!client) throw new Error("Metadata client not available");
-      
-      const validUris = uris.filter(uri => uri && uri.startsWith("spotify:track:"));
+
+      const { requireFull = false, isCancelled = () => false, onProgress = null } = options || {};
+      const validUris = [...new Set((uris || []).filter(uri => uri && uri.startsWith("spotify:track:")))];
       if (validUris.length === 0) return new Map();
 
       const trackIds = validUris.map(u => u.split(':')[2]);
       const cachedMetaMap = await idb.getMany('trackMetadata', trackIds, CACHE_EXPIRE_METADATA);
-      
+      if (isCancelled()) return new Map();
+
       const results = new Map();
       const urisToFetch = [];
+      const awaitedInFlight = [];
 
       validUris.forEach(uri => {
           const id = uri.split(':')[2];
           const meta = cachedMetaMap.get(id);
-          if (meta && meta.album && meta.album.album_type) {
+          const hasPop = meta && meta.popularity !== undefined && meta.popularity !== null;
+          const hasFull = !requireFull || (meta?.name && Array.isArray(meta?.artists) && meta.artists.length > 0 && meta?.album?.id && Array.isArray(meta?.album?.images));
+          if (meta && meta.album?.album_type && hasPop && hasFull) {
+              setExtraColMem('popularity', id, meta.popularity);
               results.set(uri, {
+                  id,
+                  uri,
+                  name: meta.name || null,
                   isrc: meta.external_ids?.isrc || null,
                   releaseDate: meta.album.release_date || null,
                   datePrecision: meta.album.release_date_precision || null,
-                  albumType: meta.album.album_type
+                  albumType: meta.album.album_type,
+                  popularity: meta.popularity,
+                  explicit: Boolean(meta.explicit),
+                  trackNumber: meta.trackNumber || 0,
+                  discNumber: meta.discNumber || 1,
+                  duration_ms: meta.duration_ms ?? null,
+                  album: meta.album,
+                  artists: meta.artists || [],
+                  external_ids: meta.external_ids || {}
               });
+          } else if (pendingCoreMetadataFetches.has(uri)) {
+              awaitedInFlight.push({ uri, promise: pendingCoreMetadataFetches.get(uri) });
           } else {
               urisToFetch.push(uri);
           }
       });
 
-      if (urisToFetch.length > 0) {
+      const runNetworkBatches = async (targetUris) => {
           const BATCH_SIZE = 1000;
-          for (let i = 0; i < urisToFetch.length; i += BATCH_SIZE) {
-              const batch = urisToFetch.slice(i, i + BATCH_SIZE);
-              try {
-                  const response = await client.fetch({
-                      extensionQuery: [{ extensionKind: 10, entityUri: batch }],
-                  });
+          let processed = 0;
+          for (let i = 0; i < targetUris.length; i += BATCH_SIZE) {
+              if (isCancelled()) break;
+              const batch = targetUris.slice(i, i + BATCH_SIZE);
+              const batchPromise = (async () => {
+                  const batchMap = new Map();
+                  try {
+                      const response = await fetchMetadataWithTimeout(client, {
+                          extensionQuery: [{ extensionKind: 10, entityUri: batch }],
+                      });
 
-                  if (response.extension && response.extension[0] && response.extension[0].entityExtension) {
-                      const entriesToSave = [];
-                      for (const item of response.extension[0].entityExtension) {
-                          if (item.extensionData && item.extensionData.value) {
-                              const bytes = Object.values(item.extensionData.value);
-                              const extracted = extractCoreMetadataFromExtKind10(bytes);
-                              results.set(item.entityUri, extracted);
-                              
+                      const ext = response?.extension?.find(e => e.extensionKind === 10) || response?.extension?.[0];
+                      if (ext?.entityExtension) {
+                          const entriesToSave = [];
+                          for (const item of ext.entityExtension) {
+                              const status = item?.header?.statusCode;
+                              if ((status !== undefined && status !== 200) || item?.header?.isEmpty || !item?.extensionData?.value || !item?.entityUri) continue;
                               const id = item.entityUri.split(':')[2];
-                              const existingMeta = cachedMetaMap.get(id) || { id, external_ids: {}, album: {} };
-                              if (!existingMeta.external_ids) existingMeta.external_ids = {};
-                              if (!existingMeta.album) existingMeta.album = {};
-                              
-                              if (extracted.isrc) existingMeta.external_ids.isrc = extracted.isrc;
-                              if (extracted.releaseDate) existingMeta.album.release_date = extracted.releaseDate;
-                              if (extracted.datePrecision) existingMeta.album.release_date_precision = extracted.datePrecision;
-                              if (extracted.albumType) {
-                                  existingMeta.album.album_type = extracted.albumType;
-                                  existingMeta.albumType = extracted.albumType;
-                              }
-                              
-                              cachedMetaMap.set(id, existingMeta);
-                              entriesToSave.push({ key: id, val: existingMeta });
+                              const extracted = extractCoreMetadataFromExtKind10(item.extensionData.value, id);
+                              batchMap.set(item.entityUri, extracted);
+
+                              const existingMeta = cachedMetaMap.get(id);
+                              const mergedMeta = mergeTrackCacheData(existingMeta, extracted, Boolean(extracted.albumType));
+                              cachedMetaMap.set(id, mergedMeta);
+                              if (mergedMeta.popularity !== undefined && mergedMeta.popularity !== null) setExtraColMem('popularity', id, mergedMeta.popularity);
+                              entriesToSave.push({ key: id, val: mergedMeta });
+                          }
+                          if (idb.setMany && entriesToSave.length > 0) {
+                              await idb.setMany('trackMetadata', entriesToSave);
                           }
                       }
-                      if (idb.setMany && entriesToSave.length > 0) {
-                          await idb.setMany('trackMetadata', entriesToSave);
+                  } catch (e) {
+                      console.warn("[Sort-Play] fetchCoreMetadataBatch network fetch failed for a batch", e);
+                  }
+                  return batchMap;
+              })();
+
+              for (const u of batch) pendingCoreMetadataFetches.set(u, batchPromise);
+              try {
+                  const batchMap = await batchPromise;
+                  batchMap.forEach((v, k) => results.set(k, v));
+              } finally {
+                  for (const u of batch) {
+                      if (pendingCoreMetadataFetches.get(u) === batchPromise) pendingCoreMetadataFetches.delete(u);
+                  }
+              }
+
+              processed += batch.length;
+              if (onProgress) onProgress(Math.min(100, Math.round((processed / targetUris.length) * 100)));
+          }
+      };
+
+      const tasks = [];
+      if (urisToFetch.length > 0) tasks.push(runNetworkBatches(urisToFetch));
+      if (awaitedInFlight.length > 0) {
+          tasks.push((async () => {
+              const uniquePromises = [...new Set(awaitedInFlight.map(a => a.promise))];
+              await Promise.allSettled(uniquePromises);
+              const unresolved = [];
+              for (const { uri, promise } of awaitedInFlight) {
+                  try {
+                      const bm = await promise;
+                      const val = bm?.get(uri);
+                      if (val) { results.set(uri, val); continue; }
+                  } catch {}
+                  unresolved.push(uri);
+              }
+              if (unresolved.length > 0 && !isCancelled()) {
+                  await runNetworkBatches(unresolved);
+              }
+          })());
+      }
+
+      if (tasks.length > 0) {
+          await Promise.all(tasks);
+      }
+      if (onProgress && !isCancelled()) onProgress(100);
+      return results;
+  }
+
+  function extractAlbumMetadataFromExtKind9(rawBytes, fallbackAlbumId = null) {
+      const bytes = toUint8Array(rawBytes);
+      const len = bytes.length;
+      let pos = 0;
+      const readVarint = (limit = len) => {
+          let val = 0n, shift = 0n;
+          while (pos < limit) {
+              const b = bytes[pos++];
+              val |= BigInt(b & 0x7f) << shift;
+              if (!(b & 0x80)) return val;
+              shift += 7n;
+              if (shift > 63n) return null;
+          }
+          return null;
+      };
+      const decodeSint = (vBig) => Number((vBig >> 1n) ^ -(vBig & 1n));
+      const skipWire = (wire, limit = len) => {
+          if (wire === 0) {
+              if (readVarint(limit) === null) return false;
+          } else if (wire === 1) {
+              if (pos + 8 > limit) return false;
+              pos += 8;
+          } else if (wire === 2) {
+              const lBig = readVarint(limit);
+              if (lBig === null) return false;
+              const l = Number(lBig);
+              if (!Number.isFinite(l) || l < 0 || pos + l > limit) return false;
+              pos += l;
+          } else if (wire === 5) {
+              if (pos + 4 > limit) return false;
+              pos += 4;
+          } else {
+              return false;
+          }
+          return true;
+      };
+
+      let id = null;
+      let name = null;
+      let albumTypeEnum = 1;
+      let releaseDate = null;
+      let datePrecision = null;
+      let popularity = null;
+      const trackUris = [];
+      const images = [];
+
+      try {
+          while (pos < len) {
+              const tagBig = readVarint(len);
+              if (!tagBig) break;
+              const tag = Number(tagBig);
+              const field = tag >>> 3;
+              const wire = tag & 7;
+
+              if (field === 1 && wire === 2) {
+                  const fLen = Number(readVarint(len));
+                  if (!Number.isFinite(fLen) || fLen < 0 || pos + fLen > len) break;
+                  if (fLen === 16) id = hexToBase62(bytesToHex(bytes.subarray(pos, pos + fLen)));
+                  pos += fLen;
+              } else if (field === 2 && wire === 2) {
+                  const fLen = Number(readVarint(len));
+                  if (!Number.isFinite(fLen) || fLen < 0 || pos + fLen > len) break;
+                  name = protoTextDecoder.decode(bytes.subarray(pos, pos + fLen));
+                  pos += fLen;
+              } else if (field === 4 && wire === 0) {
+                  const vBig = readVarint(len);
+                  if (vBig === null) break;
+                  albumTypeEnum = Number(vBig);
+              } else if (field === 6 && wire === 2) {
+                  const dLen = Number(readVarint(len));
+                  if (!Number.isFinite(dLen) || dLen < 0 || pos + dLen > len) break;
+                  const parsed = parseDateProtobuf(bytes.subarray(pos, pos + dLen));
+                  pos += dLen;
+                  if (parsed?.date) {
+                      releaseDate = parsed.date;
+                      datePrecision = parsed.precision;
+                  }
+              } else if (field === 7 && wire === 0) {
+                  const vBig = readVarint(len);
+                  if (vBig === null) break;
+                  const p = decodeSint(vBig);
+                  if (Number.isFinite(p) && p >= 0 && p <= 100) popularity = p;
+              } else if (field === 11 && wire === 2) {
+                  const dLen = Number(readVarint(len));
+                  if (!Number.isFinite(dLen) || dLen < 0 || pos + dLen > len) break;
+                  const discEnd = pos + dLen;
+                  while (pos < discEnd) {
+                      const dTagBig = readVarint(discEnd);
+                      if (!dTagBig) break;
+                      const dTag = Number(dTagBig);
+                      const dField = dTag >>> 3;
+                      const dWire = dTag & 7;
+                      if (dField === 3 && dWire === 2) {
+                          const tLen = Number(readVarint(discEnd));
+                          if (!Number.isFinite(tLen) || tLen < 0 || pos + tLen > discEnd) break;
+                          const trkEnd = pos + tLen;
+                          while (pos < trkEnd) {
+                              const tTagBig = readVarint(trkEnd);
+                              if (!tTagBig) break;
+                              const tTag = Number(tTagBig);
+                              const tField = tTag >>> 3;
+                              const tWire = tTag & 7;
+                              if (tField === 1 && tWire === 2) {
+                                  const gLen = Number(readVarint(trkEnd));
+                                  if (!Number.isFinite(gLen) || gLen < 0 || pos + gLen > trkEnd) break;
+                                  if (gLen === 16) trackUris.push(`spotify:track:${hexToBase62(bytesToHex(bytes.subarray(pos, pos + gLen)))}`);
+                                  pos += gLen;
+                              } else if (!skipWire(tWire, trkEnd)) {
+                                  break;
+                              }
+                          }
+                          pos = trkEnd;
+                      } else if (!skipWire(dWire, discEnd)) {
+                          break;
                       }
                   }
-              } catch (e) {
-                  console.warn("[Sort-Play] fetchCoreMetadataBatch network fetch failed for a batch", e);
+                  pos = discEnd;
+              } else if (field === 17 && wire === 2) {
+                  const cLen = Number(readVarint(len));
+                  if (!Number.isFinite(cLen) || cLen < 0 || pos + cLen > len) break;
+                  const groupEnd = pos + cLen;
+                  while (pos < groupEnd) {
+                      const gTagBig = readVarint(groupEnd);
+                      if (!gTagBig) break;
+                      const gTag = Number(gTagBig);
+                      const gField = gTag >>> 3;
+                      const gWire = gTag & 7;
+                      if (gField === 1 && gWire === 2) {
+                          const iLen = Number(readVarint(groupEnd));
+                          if (!Number.isFinite(iLen) || iLen < 0 || pos + iLen > groupEnd) break;
+                          const imgEnd = pos + iLen;
+                          let fileHex = null, width = 0, height = 0;
+                          while (pos < imgEnd) {
+                              const imTagBig = readVarint(imgEnd);
+                              if (!imTagBig) break;
+                              const imTag = Number(imTagBig);
+                              const imField = imTag >>> 3;
+                              const imWire = imTag & 7;
+                              if (imField === 1 && imWire === 2) {
+                                  const fLen = Number(readVarint(imgEnd));
+                                  if (!Number.isFinite(fLen) || fLen < 0 || pos + fLen > imgEnd) break;
+                                  fileHex = bytesToHex(bytes.subarray(pos, pos + fLen));
+                                  pos += fLen;
+                              } else if ((imField === 3 || imField === 4) && imWire === 0) {
+                                  const vBig = readVarint(imgEnd);
+                                  if (vBig === null) break;
+                                  const dim = decodeSint(vBig);
+                                  if (imField === 3) width = dim;
+                                  else height = dim;
+                              } else if (!skipWire(imWire, imgEnd)) {
+                                  break;
+                              }
+                          }
+                          pos = imgEnd;
+                          if (fileHex) images.push({ url: `https://i.scdn.co/image/${fileHex}`, width, height });
+                      } else if (!skipWire(gWire, groupEnd)) {
+                          break;
+                      }
+                  }
+                  pos = groupEnd;
+              } else if (!skipWire(wire, len)) {
+                  break;
               }
+          }
+      } catch {}
+
+      images.sort((a, b) => (b.width || 0) - (a.width || 0));
+      const ALBUM_TYPE_MAP = { 1: "album", 2: "single", 3: "compilation", 4: "ep" };
+      return {
+          id: id || fallbackAlbumId,
+          name,
+          albumType: ALBUM_TYPE_MAP[albumTypeEnum] || "album",
+          releaseDate,
+          datePrecision,
+          popularity,
+          trackUris,
+          images
+      };
+  }
+
+  async function fetchAlbumMetadataBatch(albumUris) {
+      const client = getMetadataClient();
+      const results = new Map();
+      if (!client) return results;
+
+      const validUris = [...new Set((albumUris || []).filter(u => typeof u === "string" && u.startsWith("spotify:album:")))];
+      if (validUris.length === 0) return results;
+
+      const BATCH_SIZE = 500;
+      for (let i = 0; i < validUris.length; i += BATCH_SIZE) {
+          const batch = validUris.slice(i, i + BATCH_SIZE);
+          try {
+              const response = await fetchMetadataWithTimeout(client, {
+                  extensionQuery: [{ extensionKind: 9, entityUri: batch }]
+              });
+              const ext = response?.extension?.find(e => e.extensionKind === 9) || response?.extension?.[0];
+              if (ext?.entityExtension) {
+                  for (const item of ext.entityExtension) {
+                      const status = item?.header?.statusCode;
+                      if ((status !== undefined && status !== 200) || item?.header?.isEmpty || !item?.extensionData?.value || !item?.entityUri) continue;
+                      const albumId = item.entityUri.split(':')[2];
+                      results.set(albumId, extractAlbumMetadataFromExtKind9(item.extensionData.value, albumId));
+                  }
+              }
+          } catch (e) {
+              console.warn("[Sort-Play] fetchAlbumMetadataBatch failed for a batch", e);
           }
       }
       return results;
+  }
+
+  async function fetchAlbumTrackUrisBatch(albumIds) {
+      const uniqueIds = [...new Set((albumIds || []).filter(Boolean))];
+      const albumTrackUrisMap = new Map();
+      if (uniqueIds.length === 0) return albumTrackUrisMap;
+
+      const missingIds = [];
+      try {
+          const ext9Map = await fetchAlbumMetadataBatch(uniqueIds.map(id => `spotify:album:${id}`));
+          for (const albumId of uniqueIds) {
+              const meta = ext9Map.get(albumId);
+              if (meta?.trackUris?.length > 0) albumTrackUrisMap.set(albumId, meta.trackUris);
+              else missingIds.push(albumId);
+          }
+      } catch {
+          missingIds.push(...uniqueIds);
+      }
+
+      const CONCURRENCY = 25;
+      for (let i = 0; i < missingIds.length; i += CONCURRENCY) {
+          const batch = missingIds.slice(i, i + CONCURRENCY);
+          await Promise.all(batch.map(async (albumId) => {
+              let uris = [];
+              try {
+                  const hexId = spotifyHex(albumId);
+                  const res = await fetchWithSpotifyAuth(
+                      `https://spclient.wg.spotify.com/metadata/4/album/${hexId}?market=from_token&alt=json`,
+                      { headers: { Accept: "application/json" } },
+                      10000
+                  );
+                  if (res && res.ok) {
+                      const body = await res.json();
+                      if (body.disc) {
+                          for (const disc of body.disc) {
+                              if (disc.track) {
+                                  for (const track of disc.track) {
+                                      if (track.gid) uris.push(`spotify:track:${hexToBase62(track.gid)}`);
+                                  }
+                              }
+                          }
+                      }
+                  }
+              } catch {}
+              if (uris.length === 0) {
+                  try {
+                      const fallbackTracks = await getAlbumTracks(albumId);
+                      if (fallbackTracks) uris = fallbackTracks.map(t => t.uri);
+                  } catch {}
+              }
+              if (uris.length > 0) albumTrackUrisMap.set(albumId, uris);
+          }));
+      }
+      return albumTrackUrisMap;
   }
   
   async function fetchReleaseDatesBatchNew(uris) {
@@ -5690,98 +6309,188 @@
     }
   };
   
-  async function fetchInternalTrackMetadata(trackId) {
-      const maxRetries = 3;
-      let attempt = 0;
-
-      while (attempt < maxRetries) {
-          try {
-              if (internalTokenRefreshPromise) {
-                  await internalTokenRefreshPromise;
-              }
-
-              const hexId = spotifyHex(trackId);
-              
-              const currentToken = Spicetify.Platform.Session.accessToken;
-              
-              const url = `https://spclient.wg.spotify.com/metadata/4/track/${hexId}?market=from_token&alt=json`;
-              
-              const response = await fetch(url, {
-                  headers: {
-                      "Authorization": `Bearer ${currentToken}`,
-                      "Accept": "application/json"
-                  }
-              });
-              
-              if (response.status === 401) {
-                  if (!internalTokenRefreshPromise) {
-                      console.warn(`[Sort-Play] Token 401. Starting Refresh...`);
-                      
-                      internalTokenRefreshPromise = (async () => {
-                          try {
-                              const tokenData = await Spicetify.CosmosAsync.get('sp://auth/v2/token');
-                              const newToken = tokenData.accessToken;
-
-                              Spicetify.Platform.Session.accessToken = newToken;
-                              
-                              await new Promise(r => setTimeout(r, 500));
-                              return newToken;
-                          } catch (e) {
-                              console.error("[Sort-Play] Token refresh failed", e);
-                              throw e;
-                          } finally {
-                              internalTokenRefreshPromise = null;
-                          }
-                      })();
-                  }
-
-                  try {
-                      await internalTokenRefreshPromise;
-                  } catch (e) {
-                      return null;
-                  }
-                  
-                  attempt++;
-                  continue; 
-              }
-
-              if (!response.ok) return null;
-              const body = await response.json();
-              if (!body) return null;
-              
-              return {
-                  name: body.name,
-                  id: trackId,
-                  uri: `spotify:track:${trackId}`,
-                  popularity: body.popularity,
-                  duration_ms: body.duration,
-                  trackNumber: body.number || body.track_number || 0,
-                  discNumber: body.disc_number || 1,
-                  explicit: body.explicit,
-                  album: {
-                      name: body.album?.name,
-                      id: body.album?.gid ? hexToBase62(body.album.gid) : null,
-                      uri: body.album?.gid ? `spotify:album:${hexToBase62(body.album.gid)}` : null,
-                      release_date: body.album?.date ? `${body.album.date.year}-${String(body.album.date.month || 1).padStart(2,'0')}-${String(body.album.date.day || 1).padStart(2,'0')}` : null,
-                      release_date_precision: body.album?.date ? (body.album.date.day ? 'day' : (body.album.date.month ? 'month' : 'year')) : null,
-                      images: body.album?.cover_group?.image?.map(img => ({ url: `https://i.scdn.co/image/${img.file_id}` })) || []
-                  },
-                  artists: body.artist?.map(a => {
-                      const artistId = a.gid ? hexToBase62(a.gid) : null;
-                      return { 
-                          name: a.name, 
-                          id: artistId,
-                          uri: artistId ? `spotify:artist:${artistId}` : null 
-                      };
-                  }) || [],
-                  external_ids: body.external_id ? { isrc: body.external_id.find(i => i.type === 'isrc')?.id } : {}
-              };
-          } catch (e) {
-              console.error("[Sort-Play] Internal Metadata Fetch Error:", e);
-              return null;
-          }
+  async function getSpotifyAccessToken(forceRefresh = false) {
+      const now = Date.now();
+      if (!forceRefresh && cachedSpotifyAccessToken && now < cachedSpotifyAccessTokenExp - 30000) {
+          return cachedSpotifyAccessToken;
       }
-      return null;
+      if (internalTokenRefreshPromise) {
+          try {
+              const awaited = await internalTokenRefreshPromise;
+              if (awaited) return awaited;
+          } catch {}
+      }
+
+      internalTokenRefreshPromise = (async () => {
+          const withTimeout = (promise, ms) => Promise.race([
+              promise,
+              new Promise((_, rej) => setTimeout(() => rej(new Error("Token fetch timeout")), ms))
+          ]);
+          const storeToken = (token, expMs) => {
+              if (!token || typeof token !== "string") return null;
+              cachedSpotifyAccessToken = token;
+              cachedSpotifyAccessTokenExp = (typeof expMs === "number" && expMs > Date.now()) ? expMs : (Date.now() + 5 * 60 * 1000);
+              return token;
+          };
+
+          const tryAuthApi = async () => {
+              const auth = Spicetify.Platform?.AuthorizationAPI;
+              if (!auth) return null;
+              try {
+                  const st = auth.getState ? await withTimeout(auth.getState(), 4000) : auth._state;
+                  const t = st?.token;
+                  if (t?.accessToken && (!t.accessTokenExpirationTimestampMs || t.accessTokenExpirationTimestampMs > Date.now() + 15000)) {
+                      return storeToken(t.accessToken, t.accessTokenExpirationTimestampMs);
+                  }
+              } catch {}
+              try {
+                  if (auth._tokenProvider?.getToken) {
+                      const t = await withTimeout(auth._tokenProvider.getToken(), 4000);
+                      if (t?.accessToken) return storeToken(t.accessToken, t.accessTokenExpirationTimestampMs);
+                  }
+              } catch {}
+              return null;
+          };
+
+          const tryCosmosAuth = async () => {
+              try {
+                  const tokenData = await withTimeout(Spicetify.CosmosAsync.get('sp://auth/v2/token'), 5000);
+                  if (tokenData?.accessToken) {
+                      return storeToken(tokenData.accessToken, tokenData.expiresAtTime);
+                  }
+              } catch {}
+              return null;
+          };
+
+          try {
+              if (forceRefresh) {
+                  cachedSpotifyAccessToken = null;
+                  cachedSpotifyAccessTokenExp = 0;
+                  const cosmosTok = await tryCosmosAuth();
+                  if (cosmosTok) return cosmosTok;
+                  const authTok = await tryAuthApi();
+                  if (authTok) return authTok;
+              } else {
+                  const authTok = await tryAuthApi();
+                  if (authTok) return authTok;
+                  const lastTok = Spicetify.Platform?.Transport?.getLastToken?.();
+                  if (typeof lastTok === "string" && lastTok.length > 20) {
+                      return storeToken(lastTok, Date.now() + 2 * 60 * 1000);
+                  }
+                  const cosmosTok = await tryCosmosAuth();
+                  if (cosmosTok) return cosmosTok;
+              }
+              const sessionTok = Spicetify.Platform?.Session?.accessToken;
+              if (typeof sessionTok === "string" && sessionTok.length > 20) {
+                  return storeToken(sessionTok, Date.now() + 2 * 60 * 1000);
+              }
+              return null;
+          } finally {
+              internalTokenRefreshPromise = null;
+          }
+      })();
+
+      return await internalTokenRefreshPromise;
+  }
+
+  async function fetchWithSpotifyAuth(url, options = {}, timeoutMs = 12000, maxRetries = 2) {
+      let lastRes = null;
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+          const token = await getSpotifyAccessToken(attempt > 0);
+          if (!token) return null;
+
+          const headers = { ...(options.headers || {}), Authorization: `Bearer ${token}` };
+          const timeoutSig = typeof AbortSignal?.timeout === "function" ? AbortSignal.timeout(timeoutMs) : undefined;
+          const signal = (options.signal && timeoutSig && typeof AbortSignal?.any === "function")
+              ? AbortSignal.any([options.signal, timeoutSig])
+              : (options.signal || timeoutSig);
+
+          const res = await fetch(url, { ...options, headers, signal });
+          lastRes = res;
+          if (res.status === 401 && attempt < maxRetries) {
+              cachedSpotifyAccessToken = null;
+              cachedSpotifyAccessTokenExp = 0;
+              await new Promise(r => setTimeout(r, 200));
+              continue;
+          }
+          return res;
+      }
+      return lastRes;
+  }
+
+  async function fetchInternalTrackMetadataHttp(trackId, statusOut = null) {
+      try {
+          const hexId = spotifyHex(trackId);
+          const url = `https://spclient.wg.spotify.com/metadata/4/track/${hexId}?market=from_token&alt=json`;
+          const response = await fetchWithSpotifyAuth(url, { headers: { Accept: "application/json" } }, 10000);
+          if (statusOut) statusOut.status = response?.status ?? 0;
+          if (!response || !response.ok) return null;
+          const body = await response.json();
+          if (!body) return null;
+
+          return {
+              name: body.name,
+              id: trackId,
+              uri: `spotify:track:${trackId}`,
+              popularity: body.popularity,
+              duration_ms: body.duration,
+              trackNumber: body.number || body.track_number || 0,
+              discNumber: body.disc_number || 1,
+              explicit: body.explicit,
+              album: {
+                  name: body.album?.name,
+                  id: body.album?.gid ? hexToBase62(body.album.gid) : null,
+                  uri: body.album?.gid ? `spotify:album:${hexToBase62(body.album.gid)}` : null,
+                  album_type: body.album?.type ? String(body.album.type).toLowerCase() : undefined,
+                  release_date: body.album?.date ? `${body.album.date.year}-${String(body.album.date.month || 1).padStart(2, '0')}-${String(body.album.date.day || 1).padStart(2, '0')}` : null,
+                  release_date_precision: body.album?.date ? (body.album.date.day ? 'day' : (body.album.date.month ? 'month' : 'year')) : null,
+                  images: body.album?.cover_group?.image?.map(img => ({ url: `https://i.scdn.co/image/${img.file_id}` })) || []
+              },
+              artists: body.artist?.map(a => {
+                  const artistId = a.gid ? hexToBase62(a.gid) : null;
+                  return {
+                      name: a.name,
+                      id: artistId,
+                      uri: artistId ? `spotify:artist:${artistId}` : null
+                  };
+              }) || [],
+              external_ids: body.external_id ? { isrc: body.external_id.find(i => i.type === 'isrc')?.id } : {}
+          };
+      } catch (e) {
+          console.error("[Sort-Play] Internal Metadata Fetch Error:", e);
+          return null;
+      }
+  }
+
+  async function fetchInternalTrackMetadata(trackId) {
+      if (!trackId) return null;
+      const uri = `spotify:track:${trackId}`;
+      try {
+          const metaMap = await fetchCoreMetadataBatch([uri], { requireFull: true });
+          const meta = metaMap.get(uri);
+          if (meta && (meta.name || meta.popularity !== null)) return meta;
+      } catch {}
+      return await fetchInternalTrackMetadataHttp(trackId);
+  }
+
+  async function fetchInternalTrackMetadataBatch(trackIds) {
+      const ids = (trackIds || []).filter(Boolean);
+      if (ids.length === 0) return [];
+      const uniqueIds = [...new Set(ids)];
+      const resolvedMap = new Map();
+      try {
+          const metaMap = await fetchCoreMetadataBatch(uniqueIds.map(id => `spotify:track:${id}`), { requireFull: true });
+          for (const id of uniqueIds) {
+              const meta = metaMap.get(`spotify:track:${id}`);
+              if (meta && (meta.name || meta.popularity !== null)) resolvedMap.set(id, meta);
+          }
+      } catch {}
+      const missingIds = uniqueIds.filter(id => !resolvedMap.has(id));
+      if (missingIds.length > 0) {
+          const httpResults = await Promise.all(missingIds.map(id => fetchInternalTrackMetadataHttp(id).catch(() => null)));
+          httpResults.forEach((m, idx) => { if (m) resolvedMap.set(missingIds[idx], m); });
+      }
+      return ids.map(id => resolvedMap.get(id) || null);
   }
 
   async function searchTracks(query, limit = 5) {
@@ -5864,7 +6573,7 @@
       STORAGE_KEY_INCLUDE_LYRICS, STORAGE_KEY_AI_MODEL, STORAGE_KEY_SHOW_LIKE_BUTTON, STORAGE_KEY_LIKE_BUTTON_CONFIG,
       STORAGE_KEY_LASTFM_AUTOCORRECT, STORAGE_KEY_LFM_COMMENTS_COLLAPSED, STORAGE_KEY_CUSTOM_FILTER_PAGE_SIZE,
       STORAGE_KEY_ACTIVE_RANGE_FILTER, STORAGE_KEY_FILTER_TITLE, STORAGE_KEY_FILTER_ALBUM, STORAGE_KEY_FILTER_ARTIST,
-      STORAGE_KEY_MATCH_WHOLE_WORD, STORAGE_KEY_CF_FETCH_POPULARITY, STORAGE_KEY_CF_FETCH_LASTFM, STORAGE_KEY_COLUMN_LAYOUT,
+      STORAGE_KEY_MATCH_WHOLE_WORD, STORAGE_KEY_CF_FETCH_LASTFM, STORAGE_KEY_COLUMN_LAYOUT,
       STORAGE_KEY_CF_RELEASE_DATE_FORMAT, STORAGE_KEY_CF_MY_SCROBBLES_MODE, STORAGE_KEY_CF_KEY_MODE,
       STORAGE_KEY_AUTO_HIDE_DISCOGRAPHY_NOTIFICATION, STORAGE_KEY_RANGE_EXCLUDE_UNLISTENED, STORAGE_KEY_LOCAL_FILES_HANDLING,
       STORAGE_KEY_FOLLOWED_RELEASES_CONFIG, STORAGE_KEY_PRESERVE_DATE_ADDED, STORAGE_KEY_BACKUP_UNAVAILABLE_ON_REMOVE,
@@ -6052,6 +6761,8 @@
             }
         };
         req.onerror = () => resolve(null);
+        tx.onerror = () => resolve(null);
+        tx.onabort = () => resolve(null);
     }),
     getMany: (store, keys, expiryMs = null) => new Promise(resolve => {
         if (!idb.db || !keys || keys.length === 0) return resolve(new Map());
@@ -6089,6 +6800,7 @@
         }
         tx.oncomplete = () => resolve(results);
         tx.onerror = () => resolve(results);
+        tx.onabort = () => resolve(results);
     }),
     set: (store, key, val) => {
         const item = { val, ts: Date.now() };
@@ -6098,6 +6810,8 @@
             const tx = idb.db.transaction([store], "readwrite");
             tx.objectStore(store).put(item, key);
             tx.oncomplete = () => resolve();
+            tx.onerror = () => resolve();
+            tx.onabort = () => resolve();
         });
     },
     setMany: (store, entries) => {
@@ -6115,6 +6829,7 @@
             });
             tx.oncomplete = () => resolve();
             tx.onerror = () => resolve();
+            tx.onabort = () => resolve();
         });
     },
     del: (store, key) => {
@@ -6124,6 +6839,8 @@
             const tx = idb.db.transaction([store], "readwrite");
             tx.objectStore(store).delete(key);
             tx.oncomplete = () => resolve();
+            tx.onerror = () => resolve();
+            tx.onabort = () => resolve();
         });
     },
     delMany: (store, keys) => {
@@ -6135,6 +6852,7 @@
             keys.forEach(k => os.delete(k));
             tx.oncomplete = () => resolve();
             tx.onerror = () => resolve();
+            tx.onabort = () => resolve();
         });
     },
     clear: (store) => {
@@ -6144,6 +6862,8 @@
             const tx = idb.db.transaction([store], "readwrite");
             tx.objectStore(store).clear();
             tx.oncomplete = () => resolve();
+            tx.onerror = () => resolve();
+            tx.onabort = () => resolve();
         });
     },
     getAll: (store) => new Promise(resolve => {
@@ -6161,6 +6881,7 @@
             resolve(result);
         };
         tx.onerror = () => resolve({});
+        tx.onabort = () => resolve({});
     })
   };
   
@@ -7042,7 +7763,6 @@
     }
     rangeExcludeUnlistened = localStorage.getItem(STORAGE_KEY_RANGE_EXCLUDE_UNLISTENED) === "true";
     localFilesHandling = localStorage.getItem(STORAGE_KEY_LOCAL_FILES_HANDLING) || 'convert_keep';
-    cfFetchPopularity = localStorage.getItem(STORAGE_KEY_CF_FETCH_POPULARITY) === "true";
     cfFetchLastFm = localStorage.getItem(STORAGE_KEY_CF_FETCH_LASTFM) === "true";
     cfReleaseDateFormat = localStorage.getItem(STORAGE_KEY_CF_RELEASE_DATE_FORMAT) || 'YYYY-MM-DD';
     cfMyScrobblesDisplayMode = localStorage.getItem(STORAGE_KEY_CF_MY_SCROBBLES_MODE) || 'number';
@@ -7187,7 +7907,6 @@
     localStorage.setItem(STORAGE_KEY_RANGE_EXCLUDE_UNLISTENED, rangeExcludeUnlistened);
     localStorage.setItem(STORAGE_KEY_LOCAL_FILES_HANDLING, localFilesHandling);
     localStorage.setItem(STORAGE_KEY_NP_CONFIG, JSON.stringify(nowPlayingConfig));
-    localStorage.setItem(STORAGE_KEY_CF_FETCH_POPULARITY, cfFetchPopularity);
     localStorage.setItem(STORAGE_KEY_CF_FETCH_LASTFM, cfFetchLastFm);
     localStorage.setItem(STORAGE_KEY_CF_RELEASE_DATE_FORMAT, cfReleaseDateFormat);
     localStorage.setItem(STORAGE_KEY_CF_MY_SCROBBLES_MODE, cfMyScrobblesDisplayMode);
@@ -7351,7 +8070,6 @@
           [STORAGE_KEY_FOLLOWED_RELEASES_CONFIG]: JSON.stringify(DEFAULT_FR_CONFIG),
           [STORAGE_KEY_LOCAL_FILES_HANDLING]: "convert_keep",
           [STORAGE_KEY_GENRE_FILTER_SOURCES]: '{"spotify_track":true,"lastfm_track":false,"lastfm_artist":false,"deezer":false,"everynoise_artist":true}',
-          [STORAGE_KEY_CF_FETCH_POPULARITY]: "false",
           [STORAGE_KEY_CF_FETCH_LASTFM]: "false",
           [STORAGE_KEY_CF_RELEASE_DATE_FORMAT]: "YYYY-MM-DD",
           [STORAGE_KEY_CF_MY_SCROBBLES_MODE]: "number",
@@ -7866,6 +8584,7 @@
 
   const AI_DATA_CACHE_VERSION = '1';
   const AI_DATA_CACHE_KEY_PREFIX = `sort-play-playlist-cache-v${AI_DATA_CACHE_VERSION}-`;
+  const BPM_KEY_CACHE_PREFIX = 'sp-bpmkey-v1-';
   
   function getCacheKey(trackId, includeSongStats, includeLyrics, selectedAiModel) {
     return `${AI_DATA_CACHE_KEY_PREFIX}${trackId}-stats${includeSongStats}-lyrics${includeLyrics}-model${selectedAiModel}`;
@@ -22971,55 +23690,58 @@
 
 
   const nativeConceptTextDecoder = new TextDecoder();
+  const SPOTIFY_TRACK_GENRE_MIN_SCORE = 0.05;
 
   function parseNativeTrackConceptsBuffer(rawBytes) {
       if (!rawBytes) return [];
-      const bytes = rawBytes instanceof Uint8Array
-          ? rawBytes
-          : (rawBytes instanceof ArrayBuffer
-              ? new Uint8Array(rawBytes)
-              : (typeof rawBytes.length === "number"
-                  ? new Uint8Array(rawBytes)
-                  : new Uint8Array(Object.values(rawBytes))));
-
-      if (bytes.byteLength === 0) return [];
-      const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+      const bytes = toUint8Array(rawBytes);
+      const len = bytes.byteLength;
+      if (len === 0) return [];
+      const view = new DataView(bytes.buffer, bytes.byteOffset, len);
       const results = [];
       let pos = 0;
 
-      const readVarint = () => {
-          let val = 0, shift = 0;
-          while (pos < bytes.byteLength) {
+      const readVarint = (limit = len) => {
+          let val = 0n, shift = 0n;
+          while (pos < limit) {
               const b = bytes[pos++];
-              val = (val + ((b & 0x7f) << shift)) >>> 0;
-              if (!(b & 0x80) || shift > 35) break;
-              shift += 7;
+              val |= BigInt(b & 0x7f) << shift;
+              if (!(b & 0x80)) return val;
+              shift += 7n;
+              if (shift > 63n) return null;
           }
-          return val;
+          return null;
       };
 
-      while (pos < bytes.byteLength) {
-          const tag = readVarint();
-          if (tag === 0) break;
+      while (pos < len) {
+          const tagBig = readVarint(len);
+          if (!tagBig) break;
+          const tag = Number(tagBig);
           const field = tag >>> 3;
           const wire = tag & 7;
 
           if (field === 1 && wire === 2) {
-              const len = readVarint();
-              if (len < 0 || pos + len > bytes.byteLength) break;
-              const end = pos + len;
+              const msgLenBig = readVarint(len);
+              if (msgLenBig === null) break;
+              const msgLen = Number(msgLenBig);
+              if (!Number.isFinite(msgLen) || msgLen < 0 || pos + msgLen > len) break;
+              const end = pos + msgLen;
               let conceptName = "";
               let score = 0.5;
+              const categories = [];
 
               while (pos < end) {
-                  const subTag = readVarint();
-                  if (subTag === 0) break;
+                  const subTagBig = readVarint(end);
+                  if (!subTagBig) break;
+                  const subTag = Number(subTagBig);
                   const subField = subTag >>> 3;
                   const subWire = subTag & 7;
 
                   if (subField === 1 && subWire === 2) {
-                      const sLen = readVarint();
-                      if (pos + sLen <= end) {
+                      const sLenBig = readVarint(end);
+                      if (sLenBig === null) break;
+                      const sLen = Number(sLenBig);
+                      if (sLen >= 0 && pos + sLen <= end) {
                           conceptName = nativeConceptTextDecoder.decode(bytes.subarray(pos, pos + sLen)).toLowerCase().trim();
                           pos += sLen;
                       } else {
@@ -23041,18 +23763,41 @@
                       } else {
                           break;
                       }
+                  } else if (subField === 3 && subWire === 2) {
+                      const cLenBig = readVarint(end);
+                      if (cLenBig === null) break;
+                      const cLen = Number(cLenBig);
+                      if (cLen >= 0 && pos + cLen <= end) {
+                          const catEnd = pos + cLen;
+                          while (pos < catEnd) {
+                              const cidBig = readVarint(catEnd);
+                              if (cidBig === null) break;
+                              categories.push(Number(cidBig));
+                          }
+                          pos = catEnd;
+                      } else {
+                          break;
+                      }
+                  } else if (subField === 3 && subWire === 0) {
+                      const cidBig = readVarint(end);
+                      if (cidBig === null) break;
+                      categories.push(Number(cidBig));
                   } else if (subWire === 0) {
-                      readVarint();
+                      if (readVarint(end) === null) break;
                   } else if (subWire === 1) {
+                      if (pos + 8 > end) break;
                       pos += 8;
                   } else if (subWire === 2) {
-                      const skipLen = readVarint();
-                      if (pos + skipLen <= end) {
+                      const skipLenBig = readVarint(end);
+                      if (skipLenBig === null) break;
+                      const skipLen = Number(skipLenBig);
+                      if (skipLen >= 0 && pos + skipLen <= end) {
                           pos += skipLen;
                       } else {
                           break;
                       }
                   } else if (subWire === 5) {
+                      if (pos + 4 > end) break;
                       pos += 4;
                   } else {
                       break;
@@ -23066,20 +23811,24 @@
               conceptName = conceptName.replace(/_/g, ' ').trim();
 
               if (conceptName && conceptName !== "track") {
-                  results.push({ name: conceptName, score: Math.max(0.01, Math.min(1.0, score)) });
+                  results.push({ name: conceptName, score: Math.max(0.01, Math.min(1.0, score)), categories });
               }
           } else if (wire === 0) {
-              readVarint();
+              if (readVarint(len) === null) break;
           } else if (wire === 1) {
+              if (pos + 8 > len) break;
               pos += 8;
           } else if (wire === 2) {
-              const skipLen = readVarint();
-              if (pos + skipLen <= bytes.byteLength) {
+              const skipLenBig = readVarint(len);
+              if (skipLenBig === null) break;
+              const skipLen = Number(skipLenBig);
+              if (skipLen >= 0 && pos + skipLen <= len) {
                   pos += skipLen;
               } else {
                   break;
               }
           } else if (wire === 5) {
+              if (pos + 4 > len) break;
               pos += 4;
           } else {
               break;
@@ -23089,18 +23838,31 @@
       if (results.length === 0) return [];
       const uniqueMap = new Map();
       results.forEach(r => {
-          if (!uniqueMap.has(r.name) || r.score > uniqueMap.get(r.name)) {
-              uniqueMap.set(r.name, r.score);
+          const prev = uniqueMap.get(r.name);
+          if (!prev) {
+              uniqueMap.set(r.name, { name: r.name, score: r.score, categories: r.categories });
+          } else {
+              if (r.score > prev.score) prev.score = r.score;
+              if (r.categories?.length) {
+                  for (const cid of r.categories) {
+                      if (!prev.categories.includes(cid)) prev.categories.push(cid);
+                  }
+              }
           }
       });
 
-      return Array.from(uniqueMap.entries())
-          .map(([name, score]) => ({ name, score }))
-          .sort((a, b) => b.score - a.score);
+      return Array.from(uniqueMap.values()).sort((a, b) => b.score - a.score);
   }
 
   const nativeSpotifyTrackGenreCache = new Map();
   const pendingNativeTrackGenreFetches = new Map();
+
+  const setNativeTrackGenreCache = (uri, val) => {
+      nativeSpotifyTrackGenreCache.set(uri, val);
+      if (nativeSpotifyTrackGenreCache.size > 5000) {
+          nativeSpotifyTrackGenreCache.delete(nativeSpotifyTrackGenreCache.keys().next().value);
+      }
+  };
 
   async function fetchNativeSpotifyTrackGenres(trackUri) {
       if (!trackUri || !trackUri.startsWith("spotify:track:")) return [];
@@ -23116,17 +23878,18 @@
               const client = getMetadataClient();
               if (!client) return [];
 
-              const response = await client.fetch({ extensionQuery: [
+              const response = await fetchMetadataWithTimeout(client, { extensionQuery: [
                   { extensionKind: 6, entityUri: [trackUri] }
-              ]});
+              ]}, 15000);
 
               const ext = response?.extension?.find(e => e.extensionKind === 6) || response?.extension?.[0];
               const item = ext?.entityExtension?.find(e => e.entityUri === trackUri) || ext?.entityExtension?.[0];
-              const parsed = parseNativeTrackConceptsBuffer(item?.extensionData?.value);
-              nativeSpotifyTrackGenreCache.set(trackUri, parsed);
-              if (nativeSpotifyTrackGenreCache.size > 500) {
-                  nativeSpotifyTrackGenreCache.delete(nativeSpotifyTrackGenreCache.keys().next().value);
-              }
+              const status = item?.header?.statusCode;
+              if (status !== undefined && status !== 200 && status !== 404) return [];
+              const parsed = (status === 404 || item?.header?.isEmpty || !item?.extensionData?.value)
+                  ? []
+                  : parseNativeTrackConceptsBuffer(item.extensionData.value);
+              setNativeTrackGenreCache(trackUri, parsed);
               return parsed;
           } catch (e) {
               console.warn("[Sort-Play] Failed to fetch Native Spotify Track Genres:", e);
@@ -23146,18 +23909,28 @@
       trackUris.forEach(uri => finalMap.set(uri, []));
 
       try {
-          const client = getMetadataClient();
-          if (!client) return finalMap;
-
           const validUris = [...new Set(trackUris.filter(uri => uri && uri.startsWith("spotify:track:")))];
           if (validUris.length === 0) return finalMap;
 
-          const BATCH_SIZE = 500;
-          for (let i = 0; i < validUris.length; i += BATCH_SIZE) {
-              const batch = validUris.slice(i, i + BATCH_SIZE);
+          const missingUris = [];
+          for (const uri of validUris) {
+              if (nativeSpotifyTrackGenreCache.has(uri)) {
+                  finalMap.set(uri, nativeSpotifyTrackGenreCache.get(uri));
+              } else {
+                  missingUris.push(uri);
+              }
+          }
+          if (missingUris.length === 0) return finalMap;
+
+          const client = getMetadataClient();
+          if (!client) return finalMap;
+
+          const BATCH_SIZE = 1000;
+          for (let i = 0; i < missingUris.length; i += BATCH_SIZE) {
+              const batch = missingUris.slice(i, i + BATCH_SIZE);
 
               try {
-                  const response = await client.fetch({ extensionQuery: [
+                  const response = await fetchMetadataWithTimeout(client, { extensionQuery: [
                       { extensionKind: 6, entityUri: batch }
                   ]});
 
@@ -23165,8 +23938,13 @@
                   if (ext?.entityExtension) {
                       ext.entityExtension.forEach(item => {
                           if (!item?.entityUri) return;
-                          const parsed = parseNativeTrackConceptsBuffer(item?.extensionData?.value);
+                          const status = item?.header?.statusCode;
+                          if (status !== undefined && status !== 200 && status !== 404) return;
+                          const parsed = (status === 404 || item?.header?.isEmpty || !item?.extensionData?.value)
+                              ? []
+                              : parseNativeTrackConceptsBuffer(item.extensionData.value);
                           finalMap.set(item.entityUri, parsed);
+                          setNativeTrackGenreCache(item.entityUri, parsed);
                       });
                   }
               } catch (batchError) {
@@ -23218,7 +23996,7 @@
                           const nativeGenres = await fetchNativeSpotifyTrackGenres(track.uri);
                           const validNative = nativeGenres.filter(g => {
                               const name = g.name.toLowerCase();
-                              return !/^\d+$/.test(name) && !isCountryOnly(name) && isWhitelistedGenre(name, genreMap) && (g.score * 100) >= 5;
+                              return !/^\d+$/.test(name) && !isCountryOnly(name) && !isSpotifyTrackExcludedConcept(name) && isWhitelistedGenre(name, genreMap) && g.score >= SPOTIFY_TRACK_GENRE_MIN_SCORE;
                           });
                           
                           if (validNative.length > 0) {
@@ -24564,12 +25342,7 @@
                         const meta = await fetchInternalTrackMetadata(trackId);
                         if (meta) {
                             val = meta.popularity;
-                            const formattedMeta = formatTrackCacheData(meta);
-                            if (cachedMeta) {
-                                if (cachedMeta.external_ids) formattedMeta.external_ids = { ...cachedMeta.external_ids, ...formattedMeta.external_ids };
-                                if (cachedMeta.album) formattedMeta.album = { ...cachedMeta.album, ...formattedMeta.album };
-                                if (cachedMeta.albumType) formattedMeta.albumType = cachedMeta.albumType;
-                            }
+                            const formattedMeta = mergeTrackCacheData(cachedMeta, meta, Boolean(meta.albumType || meta.album?.album_type));
                             await idb.set('trackMetadata', trackId, formattedMeta);
                         }
                     }
@@ -25079,7 +25852,7 @@
                 sourceName = res.data?.albumUnion?.name || "Unknown Album";
                 artistName = res.data?.albumUnion?.artists?.items?.[0]?.profile?.name || "Unknown Artist";
             } else if (Spicetify.URI.isPlaylistV1OrV2(uri)) {
-                const meta = await Spicetify.Platform.PlaylistAPI.getMetadata(uri);
+                const meta = await getFastPlaylistMetadata(uri);
                 sourceName = meta?.name || "Unknown Playlist";
             }
             break;
@@ -25526,13 +26299,7 @@ shadowRoot.innerHTML = `
         for (let i = 0; i < trackIds.length; i += batchSize) {
             const batch = trackIds.slice(i, i + batchSize);
             try {
-                let responseTracks = [];
-
-                const fetchBatchInternal = async () => {
-                    return await Promise.all(batch.map(id => fetchInternalTrackMetadata(id)));
-                };
-
-                responseTracks = await fetchBatchInternal();
+                const responseTracks = await fetchInternalTrackMetadataBatch(batch);
 
                 if (responseTracks) {
                     const availableTracks = await Promise.all(responseTracks.map(async track => {
@@ -26296,6 +27063,9 @@ shadowRoot.innerHTML = `
 
   async function getPaletteAnalysis(imageUrl) {
       if (!colorThiefLib) {
+          try { await loadColorThief(); } catch {}
+      }
+      if (!colorThiefLib) {
           throw new Error("ColorThief library not loaded.");
       }
 
@@ -26324,6 +27094,92 @@ shadowRoot.innerHTML = `
       }
   }
 
+  async function fetchAlbumColorsBatch(albumIds, options = {}) {
+      const { onProgress = null, isCancelled = () => false } = options || {};
+      const uniqueIds = [...new Set((albumIds || []).filter(Boolean).map(id => id.startsWith("spotify:album:") ? id.split(":")[2] : id))];
+      const results = new Map();
+      if (uniqueIds.length === 0) return results;
+
+      const cachedMap = await idb.getMany('palettes', uniqueIds, CACHE_EXPIRE_PALETTE);
+      if (isCancelled()) return results;
+
+      const missingIds = [];
+      for (const id of uniqueIds) {
+          const cached = cachedMap.get(id);
+          if (cached && cached.dominantHsl) {
+              results.set(id, cached);
+          } else {
+              missingIds.push(id);
+          }
+      }
+
+      if (missingIds.length === 0) {
+          if (onProgress) onProgress(100);
+          return results;
+      }
+
+      if (!colorThiefLib) {
+          try { await loadColorThief(); } catch {}
+      }
+      if (!colorThiefLib) return results;
+
+      const workItems = [];
+      const META_BATCH_SIZE = 500;
+      for (let i = 0; i < missingIds.length; i += META_BATCH_SIZE) {
+          if (isCancelled()) break;
+          const chunk = missingIds.slice(i, i + META_BATCH_SIZE);
+          try {
+              const metaMap = await fetchAlbumMetadataBatch(chunk.map(id => `spotify:album:${id}`));
+              for (const id of chunk) {
+                  const imgs = metaMap.get(id)?.images;
+                  const url = imgs?.length > 0 ? imgs[imgs.length - 1]?.url : null;
+                  if (url) workItems.push({ id, url });
+              }
+          } catch (e) {
+              console.warn("[Sort-Play] fetchAlbumColorsBatch metadata batch failed", e);
+          }
+          if (onProgress) onProgress(Math.min(10, Math.round((Math.min(i + META_BATCH_SIZE, missingIds.length) / missingIds.length) * 10)));
+      }
+
+      if (workItems.length === 0 || isCancelled()) {
+          if (onProgress && !isCancelled()) onProgress(100);
+          return results;
+      }
+
+      const CONCURRENCY = 30;
+      const FLUSH_SIZE = 60;
+      let idx = 0;
+      let completed = 0;
+      let pendingSaves = [];
+      const flushSaves = async () => {
+          if (!idb.setMany || pendingSaves.length === 0) return;
+          const batch = pendingSaves;
+          pendingSaves = [];
+          try { await idb.setMany('palettes', batch); } catch {}
+      };
+
+      const worker = async () => {
+          while (idx < workItems.length && !isCancelled()) {
+              const item = workItems[idx++];
+              try {
+                  const analysis = await getPaletteAnalysis(item.url);
+                  if (analysis?.dominantHsl) {
+                      results.set(item.id, analysis);
+                      pendingSaves.push({ key: item.id, val: analysis });
+                      if (pendingSaves.length >= FLUSH_SIZE) await flushSaves();
+                  }
+              } catch {}
+              completed++;
+              if (onProgress) onProgress(10 + Math.round((completed / workItems.length) * 90));
+          }
+      };
+
+      await Promise.all(Array(Math.min(CONCURRENCY, workItems.length)).fill(null).map(() => worker()));
+      await flushSaves();
+      if (onProgress && !isCancelled()) onProgress(100);
+      return results;
+  }
+
   async function getAlbumColorAnalysis(albumId) {
       const cachedAnalysis = await getCachedPaletteAnalysis(albumId);
       if (cachedAnalysis) {
@@ -26333,46 +27189,35 @@ shadowRoot.innerHTML = `
       try {
           let albumDetails;
           try {
-              const hexId = spotifyHex(albumId);
-              let res = null;
-              let attempt = 0;
-              while (attempt < 3) {
-                  if (internalTokenRefreshPromise) await internalTokenRefreshPromise;
-                  const token = Spicetify.Platform.Session.accessToken;
-                  res = await fetch(`https://spclient.wg.spotify.com/metadata/4/album/${hexId}?market=from_token&alt=json`, {
-                      headers: { "Authorization": `Bearer ${token}` }
-                  });
-                  if (res.status === 401) {
-                      if (!internalTokenRefreshPromise) {
-                          internalTokenRefreshPromise = (async () => {
-                              try {
-                                  const tData = await Spicetify.CosmosAsync.get('sp://auth/v2/token');
-                                  Spicetify.Platform.Session.accessToken = tData.accessToken;
-                                  await new Promise(r => setTimeout(r, 500));
-                                  return tData.accessToken;
-                              } catch(e) { throw e; } finally { internalTokenRefreshPromise = null; }
-                          })();
+              const albMap = await fetchAlbumMetadataBatch([`spotify:album:${albumId}`]);
+              const albMeta = albMap.get(albumId);
+              if (albMeta?.images?.length > 0) {
+                  albumDetails = { images: albMeta.images };
+              }
+          } catch {}
+
+          if (!albumDetails) {
+              try {
+                  const hexId = spotifyHex(albumId);
+                  const res = await fetchWithSpotifyAuth(
+                      `https://spclient.wg.spotify.com/metadata/4/album/${hexId}?market=from_token&alt=json`,
+                      { headers: { Accept: "application/json" } },
+                      10000
+                  );
+                  if (res && res.ok) {
+                      const body = await res.json();
+                      if (body.cover_group && body.cover_group.image) {
+                          const images = body.cover_group.image.map(img => ({
+                              url: `https://i.scdn.co/image/${img.file_id}`,
+                              width: img.width || 0,
+                              height: img.height || 0
+                          }));
+                          images.sort((a, b) => b.width - a.width);
+                          albumDetails = { images: images };
                       }
-                      try { await internalTokenRefreshPromise; } catch(e) { break; }
-                      attempt++;
-                      continue;
                   }
-                  break;
-              }
-              
-              if (res && res.ok) {
-                  const body = await res.json();
-                  if (body.cover_group && body.cover_group.image) {
-                      const images = body.cover_group.image.map(img => ({
-                          url: `https://i.scdn.co/image/${img.file_id}`,
-                          width: img.width || 0,
-                          height: img.height || 0
-                      }));
-                      images.sort((a, b) => b.width - a.width);
-                      albumDetails = { images: images };
-                  }
-              }
-          } catch(e) {}
+              } catch {}
+          }
 
           if (!albumDetails) {
               const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getAlbum, {
@@ -26404,7 +27249,9 @@ shadowRoot.innerHTML = `
 
   async function getTrackDetailsWithPaletteAnalysis(track) {
       if (Spicetify.URI.isLocal(track.uri)) return { ...track, averageColor: null };
-      const albumId = track.albumId || track.track?.album?.id;
+      const albumId = track.albumId || track.track?.album?.id
+          || (track.albumUri?.startsWith("spotify:album:") ? track.albumUri.split(":")[2] : null)
+          || (track.album?.uri?.startsWith("spotify:album:") ? track.album.uri.split(":")[2] : null);
       if (!albumId) {
           console.warn(`Could not determine album ID for track ${track.songTitle}`);
           return { ...track, averageColor: null };
@@ -26424,6 +27271,7 @@ shadowRoot.innerHTML = `
     if (!forceRefetch) {
         const cached = await idb.get('trueReleaseDates', trackId, CACHE_EXPIRE_RELEASE_DATE);
         if (cached && typeof cached === 'object' && cached.date !== undefined) {
+            setExtraColMem('trueReleaseDates', trackId, cached);
             return { 
                 ...track, 
                 trueReleaseDate: cached.date,
@@ -26599,7 +27447,7 @@ shadowRoot.innerHTML = `
             const MAX_META_CONCURRENCY = 50;
             for (let i = 0; i < itemIds.length; i += MAX_META_CONCURRENCY) {
                 const batch = itemIds.slice(i, i + MAX_META_CONCURRENCY);
-                const metaBatch = await Promise.all(batch.map(id => fetchInternalTrackMetadata(id).catch(() => null)));
+                const metaBatch = await Promise.all(batch.map(id => fetchInternalTrackMetadataHttp(id).catch(() => null)));
                 metaBatch.forEach(m => { 
                     if (m) {
                         if (!m.album) m.album = {};
@@ -26700,7 +27548,9 @@ shadowRoot.innerHTML = `
         bestAlbumId = albumId;
     }
 
-    await idb.set('trueReleaseDates', trackId, { date: bestDate, precision: bestPrecision, trackNumber: bestTrackNumber, discNumber: bestDiscNumber, albumName: bestAlbumName, albumId: bestAlbumId });
+    const trdCacheVal = { date: bestDate, precision: bestPrecision, trackNumber: bestTrackNumber, discNumber: bestDiscNumber, albumName: bestAlbumName, albumId: bestAlbumId };
+    await idb.set('trueReleaseDates', trackId, trdCacheVal);
+    if (bestDate) setExtraColMem('trueReleaseDates', trackId, trdCacheVal);
 
     return { ...track, trueReleaseDate: bestDate, trueReleaseDatePrecision: bestPrecision, trueTrackNumber: bestTrackNumber, trueDiscNumber: bestDiscNumber, trueAlbumName: bestAlbumName, trueAlbumId: bestAlbumId, _exactAlbumIdFound: true };
   }
@@ -27757,24 +28607,15 @@ shadowRoot.innerHTML = `
         tracks = convertedTracks;
         mainButton.innerText = "Loading...";
 
-        const trackIdsToCheck = tracks.map(t => Spicetify.URI.isLocal(t.uri) ? null : t.uri.split(":")[2]).filter(Boolean);
         const lfmKeysToCheck = [...new Set(tracks.map(t => getLfmInfo(t)?.key).filter(Boolean))];
 
-        const cachedMeta = await idb.getMany('trackMetadata', trackIdsToCheck, CACHE_EXPIRE_METADATA);
         const cachedPersScrobbles = await idb.getMany('personalScrobbles', lfmKeysToCheck, CACHE_EXPIRE_PERSONAL_SCROBBLES);
         const cachedGlobScrobbles = await idb.getMany('scrobbles', lfmKeysToCheck, CACHE_EXPIRE_GLOBAL_SCROBBLES);
 
-        let missingPopCount = 0;
         let missingPersCount = 0;
         let missingGlobCount = 0;
 
         tracks.forEach(t => {
-            const id = Spicetify.URI.isLocal(t.uri) ? null : t.uri.split(":")[2];
-            if (id) {
-                const meta = cachedMeta.get(id);
-                if (!meta || meta.popularity === undefined || meta.popularity === null) missingPopCount++;
-            }
-            
             const lfmInfo = getLfmInfo(t);
             if (lfmInfo) {
                 const pers = cachedPersScrobbles.get(lfmInfo.key);
@@ -27789,20 +28630,21 @@ shadowRoot.innerHTML = `
         });
 
         const hasLfmUser = !!loadLastFmUsername();
-        const fetchPop = cfFetchPopularity || missingPopCount <= 1000;
+        const fetchPop = true;
         const fetchPers = hasLfmUser && (cfFetchLastFm || missingPersCount <= 2000);
         const fetchGlob = fetchPers || cfFetchLastFm || missingGlobCount <= 2000;
 
-        const wType = !isArtistPage ? 10 : 0;
+        const wCore = 20;
+        const wType = !isArtistPage ? 5 : 0;
         const wPlays = 20;
-        const wPop = fetchPop ? 15 : 0;
-        const wDates = 15;
+        const wPop = 10;
+        const wDates = 10;
         const wAudio = 15;
         const wPers = fetchPers ? 15 : 0;
         const wGlob = fetchGlob ? 10 : 0;
-        const totalWeight = wType + wPlays + wPop + wDates + wAudio + wPers + wGlob || 1;
+        const totalWeight = wCore + wType + wPlays + wPop + wDates + wAudio + wPers + wGlob || 1;
         let currentWeights = {
-            type: 0, plays: 0, pop: 0, dates: 0, audio: 0, pers: 0, glob: 0
+            core: 0, type: 0, plays: 0, pop: 0, dates: 0, audio: 0, pers: 0, glob: 0
         };
 
         const updateFetchProgress = (key, weight, p) => {
@@ -27815,21 +28657,25 @@ shadowRoot.innerHTML = `
             if (globalPct > 0 && globalPct < 100) mainButton.innerText = `${globalPct}%`;
         };
 
-        let refreshedTracksPromise = Promise.resolve(tracks);
-        if (!isArtistPage) {
-            refreshedTracksPromise = refreshTrackAlbumInfo(tracks, (p) => updateFetchProgress('type', wType, p))
-                .then(res => { updateFetchProgress('type', wType, 100); return res; });
-        } else {
-            updateFetchProgress('type', wType, 100);
-        }
+        const spotifyTrackUris = tracks.filter(t => t.uri && t.uri.startsWith("spotify:track:")).map(t => t.uri);
+        const coreMetaPromise = spotifyTrackUris.length > 0
+            ? fetchCoreMetadataBatch(spotifyTrackUris, { onProgress: (p) => updateFetchProgress('core', wCore, p) })
+                .catch(() => new Map())
+                .finally(() => updateFetchProgress('core', wCore, 100))
+            : (updateFetchProgress('core', wCore, 100), Promise.resolve(new Map()));
+
+        const refreshedTracksPromise = !isArtistPage
+            ? coreMetaPromise.then(() => refreshTrackAlbumInfo(tracks, (p) => updateFetchProgress('type', wType, p)))
+                .then(res => { updateFetchProgress('type', wType, 100); return res; })
+            : (updateFetchProgress('type', wType, 100), Promise.resolve(tracks));
 
         const playsPromise = enrichTracksWithPlayCounts(tracks, (p) => updateFetchProgress('plays', wPlays, p))
             .then(res => { updateFetchProgress('plays', wPlays, 100); return res; });
 
-        const popPromise = fetchPop ? fetchPopularityForMultipleTracks(tracks, (p) => updateFetchProgress('pop', wPop, p))
-            .then(res => { updateFetchProgress('pop', wPop, 100); return res; }) : Promise.resolve(tracks);
+        const popPromise = coreMetaPromise.then(() => fetchPopularityForMultipleTracks(tracks, (p) => updateFetchProgress('pop', wPop, p)))
+            .then(res => { updateFetchProgress('pop', wPop, 100); return res; });
 
-        const datesPromise = processReleaseDatesConcurrently(tracks, (p) => updateFetchProgress('dates', wDates, p), getTrackDetailsWithReleaseDateForFilter)
+        const datesPromise = coreMetaPromise.then(() => processReleaseDatesConcurrently(tracks, (p) => updateFetchProgress('dates', wDates, p), getTrackDetailsWithReleaseDateForFilter))
             .then(res => { updateFetchProgress('dates', wDates, 100); return res; });
 
         const statsTrackIds = tracks.map(t => Spicetify.URI.isLocal(t.uri) ? null : t.uri.split(":")[2]).filter(Boolean);
@@ -32012,7 +32858,7 @@ shadowRoot.innerHTML = `
     }
 
     const hasLfmUser = !!loadLastFmUsername();
-    const { fetchPop = cfFetchPopularity, fetchPers = hasLfmUser && cfFetchLastFm, fetchGlob = cfFetchLastFm } = fetchOptions;
+    const { fetchPop = true, fetchPers = hasLfmUser && cfFetchLastFm, fetchGlob = cfFetchLastFm } = fetchOptions;
     const abortController = new AbortController();
     
     const { sourceName } = await fetchSourceNameAndArtist(currentUri);
@@ -34508,7 +35354,6 @@ shadowRoot.innerHTML = `
 
     modalContainer.querySelector('#cfSettingsBtn').addEventListener('click', () => {
         showCustomFilterSettingsModal(async (results) => {
-            cfFetchPopularity = results.popularity;
             cfFetchLastFm = results.lastfm;
             saveSettings();
             showNotification("Settings saved. Close and reopen the Custom Filter to apply changes.", "warning");
@@ -41733,8 +42578,8 @@ shadowRoot.innerHTML = `
       const descriptionHtml = `
           <div style="background-color: rgba(241, 94, 108, 0.1); border: 1px solid rgba(241, 94, 108, 0.3); border-radius: 8px; padding: 12px; margin-bottom: 5px;">
               <p style="margin: 0; color: #ffbaba; font-size: 13px; line-height: 1.4;">
-                  <strong>Note:</strong> Enabling these will slow down how fast the Custom Filter modal opens for large playlists. Keep them disabled for faster loading.<br><br>
-                  <em>If a playlist has 2000 or fewer uncached tracks for a metric (1000 for popularity), it will automatically be fetched upfront regardless of these settings to provide a better experience.</em>
+                  <strong>Note:</strong> Enabling this will slow down how fast the Custom Filter modal opens for large playlists. Keep it disabled for faster loading.<br><br>
+                  <em>If a playlist has 2000 or fewer uncached tracks, Last.fm data will automatically be fetched upfront regardless of this setting to provide a better experience.</em>
               </p>
           </div>
       `;
@@ -41744,7 +42589,6 @@ shadowRoot.innerHTML = `
           descriptionHtml: descriptionHtml,
           saveButtonText: "Done",
           toggleOptions: [
-              { id: "popularity", label: "Fetch Popularity Upfront", checked: cfFetchPopularity },
               { id: "lastfm", label: "Fetch Last.fm Data Upfront", checked: cfFetchLastFm }
           ],
           onSave: (results, saveBtn, closeModal) => {
@@ -44163,7 +45007,7 @@ shadowRoot.innerHTML = `
           return resultMap;
         }
 
-        const BATCH_SIZE = 500;
+        const BATCH_SIZE = 1000;
         let processed = 0;
 
         for (let i = 0; i < uniqueUris.length; i += BATCH_SIZE) {
@@ -44180,7 +45024,7 @@ shadowRoot.innerHTML = `
             const finalNative = [];
             const trackScores = {};
             validNative.forEach(g => {
-              if ((g.score * 100) > 5) {
+              if (g.score >= SPOTIFY_TRACK_GENRE_MIN_SCORE) {
                 finalNative.push(g.name);
                 trackScores[g.name] = g.score;
               }
@@ -45953,7 +46797,7 @@ shadowRoot.innerHTML = `
     }
   }
 
-  const fetchPlaylistContents = async (uri) => (await getRawPlaylistContents(uri)).items;
+  const fetchPlaylistContents = async (uri) => (await getRawPlaylistContentsMinimal(uri, 'tracks')).items;
 
   const parsePlaylistAPITrack = (track) => ({
     uri: track.uri,
@@ -45990,12 +46834,14 @@ shadowRoot.innerHTML = `
     }
   });
 
-  const getPlaylistTracksSpicetify = async (playlistId) => {
+  const getPlaylistTracksSpicetify = async (playlistId, options = null) => {
     const playlistUri = `spotify:playlist:${playlistId}`;
+    const isCancelled = options?.isCancelled || null;
     const retries = 5;
     let delay = 1000;
 
     for (let attempt = 1; attempt <= retries; attempt++) {
+        if (isCancelled?.()) return [];
         try {
             if (!Spicetify || !URI) {
                 throw new Error('Spicetify is not properly initialized');
@@ -46006,6 +46852,7 @@ shadowRoot.innerHTML = `
             }
 
             const playlistContents = await fetchPlaylistContents(playlistUri);
+            if (isCancelled?.()) return [];
             
             if (!playlistContents || !Array.isArray(playlistContents)) {
                 throw new Error('Failed to fetch playlist contents');
@@ -46037,6 +46884,7 @@ shadowRoot.innerHTML = `
 
             return parsedTracks;
         } catch (error) {
+            if (isCancelled?.()) return [];
             console.error(
                 `Error fetching playlist tracks (Attempt ${attempt}/${retries}):`,
                 error
@@ -46092,7 +46940,7 @@ shadowRoot.innerHTML = `
           const batch = uris.slice(i, i + BATCH_SIZE);
           const promises = batch.map(async (uri) => {
               try {
-                  const meta = await Spicetify.Platform.PlaylistAPI.getMetadata(uri);
+                  const meta = await getFastPlaylistMetadata(uri);
                   if (meta && meta.owner && (meta.owner.username === username || meta.owner.uri.includes(username))) {
                       return {
                           uri: uri,
@@ -46334,13 +47182,14 @@ shadowRoot.innerHTML = `
       }
   }
 
-  async function getPlaylistTracks(playlistId) {
+  async function getPlaylistTracks(playlistId, options = null) {
     try {
         if (!playlistId || typeof playlistId !== 'string') {
             throw new Error('Invalid playlist format');
         }
 
-        const tracks = await getPlaylistTracksSpicetify(playlistId);
+        const tracks = await getPlaylistTracksSpicetify(playlistId, options);
+        if (options?.isCancelled?.()) return [];
         
         if (!Array.isArray(tracks)) {
             throw new Error('Failed to process playlist tracks');
@@ -46352,6 +47201,7 @@ shadowRoot.innerHTML = `
             throw new Error('No tracks found in playlist');
         }
     } catch (error) {
+        if (options?.isCancelled?.() || options?.silent) return [];
         console.error('Error in getPlaylistTracks:', error);
         showNotification(
             `Failed to fetch playlist tracks: ${error.message}. Please try again.`,
@@ -47160,38 +48010,15 @@ shadowRoot.innerHTML = `
             
             if (!uploadToken) throw new Error("Upload failed: No token returned");
 
-            let regRes = null;
-            let attempt = 0;
-            while (attempt < 3) {
-                if (internalTokenRefreshPromise) await internalTokenRefreshPromise;
-                const sessionToken = Spicetify.Platform.Session.accessToken;
-                
-                regRes = await fetch(`https://spclient.wg.spotify.com/playlist/v2/playlist/${playlistId}/register-image`, {
+            const regRes = await fetchWithSpotifyAuth(
+                `https://spclient.wg.spotify.com/playlist/v2/playlist/${playlistId}/register-image`,
+                {
                     method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${sessionToken}`,
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ uploadToken })
-                });
-
-                if (regRes.status === 401) {
-                    if (!internalTokenRefreshPromise) {
-                        internalTokenRefreshPromise = (async () => {
-                            try {
-                                const tData = await Spicetify.CosmosAsync.get('sp://auth/v2/token');
-                                Spicetify.Platform.Session.accessToken = tData.accessToken;
-                                await new Promise(r => setTimeout(r, 500));
-                                return tData.accessToken;
-                            } catch(e) { throw e; } finally { internalTokenRefreshPromise = null; }
-                        })();
-                    }
-                    try { await internalTokenRefreshPromise; } catch(e) { break; }
-                    attempt++;
-                    continue;
-                }
-                break;
-            }
+                },
+                15000
+            );
 
             if (!regRes || !regRes.ok) throw new Error(`Registration failed: ${regRes?.status}`);
 
@@ -47347,6 +48174,7 @@ shadowRoot.innerHTML = `
               
               if (releaseDate !== null) {
                 entriesToSave.push({ key: tId, val: { date: releaseDate, trackNumber: tNum, discNumber: dNum } });
+                setExtraColMem('releaseDates', tId, releaseDate);
               }
 
               albumTracks.push({
@@ -47410,6 +48238,7 @@ shadowRoot.innerHTML = `
     const cachedCount = await idb.get('playCounts', trackId, CACHE_EXPIRE_PLAYCOUNTS);
     
     if (cachedCount !== null && cachedCount !== undefined && cachedCount !== "N/A") {
+        setExtraColMem('playCounts', trackId, cachedCount);
         return {
             ...track,
             playCount: cachedCount,
@@ -47433,7 +48262,7 @@ shadowRoot.innerHTML = `
             const pc = resMap.get(`spotify:track:${trackId}`);
             if (pc !== undefined) {
                 playCount = pc;
-                await idb.set('playCounts', trackId, playCount);
+                await setCachedPlayCount(trackId, playCount);
             }
         } catch (e) {
             console.warn("[Sort-Play] New playcount fetch failed for single track", e);
@@ -47451,7 +48280,7 @@ shadowRoot.innerHTML = `
             trackNumber = foundTrack.trackNumber;
             track.discNumber = foundTrack.discNumber || track.discNumber || 1;
             if (playCount !== "N/A") {
-                await idb.set('playCounts', trackId, playCount);
+                await setCachedPlayCount(trackId, playCount);
             }
           }
       }
@@ -47463,7 +48292,7 @@ shadowRoot.innerHTML = `
                   const pc = parseInt(res.data.trackUnion.playcount, 10);
                   if (!isNaN(pc)) {
                       playCount = pc;
-                      await idb.set('playCounts', trackId, playCount);
+                      await setCachedPlayCount(trackId, playCount);
                   }
               }
           } catch (e) {
@@ -47516,6 +48345,7 @@ shadowRoot.innerHTML = `
         const cachedVal = cachedPlayCounts.get(track._tempId);
         if (cachedVal !== undefined && cachedVal !== null && cachedVal !== "N/A") {
             playCountMap.set(track._tempId, cachedVal);
+            setExtraColMem('playCounts', track._tempId, cachedVal);
         } else {
             missingUris.push(`spotify:track:${track._tempId}`);
             missingTracks.push(track);
@@ -47539,6 +48369,7 @@ shadowRoot.innerHTML = `
                 for (const [uri, count] of batchResults.entries()) {
                     const tId = uri.split(":")[2];
                     playCountMap.set(tId, count);
+                    setExtraColMem('playCounts', tId, count);
                     entriesToSave.push({ key: tId, val: count });
                 }
                 
@@ -47598,6 +48429,7 @@ shadowRoot.innerHTML = `
                                 const tId = t.uri.split(":")[2];
                                 if (t.playcount !== undefined && t.playcount !== "N/A") {
                                     playCountMap.set(tId, t.playcount);
+                                    setExtraColMem('playCounts', tId, t.playcount);
                                     idb.set('playCounts', tId, t.playcount); 
                                 }
                             });
@@ -47636,6 +48468,7 @@ shadowRoot.innerHTML = `
                             const pc = parseInt(res.data.trackUnion.playcount, 10);
                             if (!isNaN(pc)) {
                                 playCountMap.set(track._tempId, pc);
+                                setExtraColMem('playCounts', track._tempId, pc);
                                 entriesToSave.push({ key: track._tempId, val: pc });
                             }
                         }
@@ -47788,6 +48621,7 @@ shadowRoot.innerHTML = `
         if (cached && typeof cached === 'object' && cached.trackNumber !== undefined) {
             const finalTrackNum = (track.trackNumber > 0) ? track.trackNumber : cached.trackNumber;
             const finalDiscNum = track.discNumber || cached.discNumber || 1;
+            if (trackId && cached.date !== undefined && cached.date !== null) setExtraColMem('releaseDates', trackId, cached.date);
             results[index] = { ...track, releaseDate: cached.date, trackNumber: finalTrackNum, discNumber: finalDiscNum };
         } else {
             missingUris.push({ track, index, trackId });
@@ -47814,11 +48648,12 @@ shadowRoot.innerHTML = `
                     const meta = fetchedMetaMap.get(track.uri);
                     
                     if (meta && meta.releaseDate) {
-                        const finalTrackNum = (track.trackNumber > 0) ? track.trackNumber : 0;
-                        const finalDiscNum = track.discNumber || 1;
+                        const finalTrackNum = (track.trackNumber > 0) ? track.trackNumber : (meta.trackNumber || 0);
+                        const finalDiscNum = track.discNumber || meta.discNumber || 1;
                         results[index] = { ...track, releaseDate: meta.releaseDate, trackNumber: finalTrackNum, discNumber: finalDiscNum };
                         if (trackId) {
                             entriesToSave.push({ key: trackId, val: { date: meta.releaseDate, trackNumber: finalTrackNum, discNumber: finalDiscNum } });
+                            setExtraColMem('releaseDates', trackId, meta.releaseDate);
                         }
                     } else {
                         results[index] = await fetchFunction(track);
@@ -47864,26 +48699,63 @@ shadowRoot.innerHTML = `
     if (isCancelled()) return tracks;
     
     const missingIds = uniqueTrackIds.filter(id => {
-        if (skipNetworkForIds.has(id)) return false;
         const meta = cachedMetadata.get(id);
-        return !meta || meta.popularity === undefined || meta.popularity === null;
+        if (meta && meta.popularity !== undefined && meta.popularity !== null) {
+            setExtraColMem('popularity', id, meta.popularity);
+            return false;
+        }
+        return true;
     });
 
     let tracksProcessed = 0;
     let failedCount = 0;
+    const fallbackIds = [];
+
+    if (missingIds.length > 0 && !isCancelled()) {
+        try {
+            const coreMap = await fetchCoreMetadataBatch(
+                missingIds.map(id => `spotify:track:${id}`),
+                {
+                    isCancelled,
+                    onProgress: (pct) => {
+                        if (updateProgress) updateProgress(Math.round((pct * 0.9) / totalProgressSteps));
+                    }
+                }
+            );
+            for (const id of missingIds) {
+                const uri = `spotify:track:${id}`;
+                const meta = coreMap.get(uri);
+                if (meta && meta.popularity !== undefined && meta.popularity !== null) {
+                    const existing = cachedMetadata.get(id);
+                    const merged = mergeTrackCacheData(existing, meta, Boolean(meta.albumType));
+                    cachedMetadata.set(id, merged);
+                    tracksProcessed++;
+                } else if (!skipNetworkForIds.has(id)) {
+                    fallbackIds.push(id);
+                }
+            }
+        } catch (e) {
+            console.warn("[Sort-Play] Batch extKind 10 popularity fetch failed, falling back to HTTP", e);
+            for (const id of missingIds) {
+                if (!skipNetworkForIds.has(id)) fallbackIds.push(id);
+            }
+        }
+    }
 
     const processInternalItem = async (id) => {
         let data = null;
-        let maxRetries = 3;
+        const maxRetries = 3;
         let delay = 800;
 
         for (let attempt = 0; attempt <= maxRetries; attempt++) {
             if (isCancelled()) return null;
-            data = await fetchInternalTrackMetadata(id);
+            const statusOut = { status: 0 };
+            data = await fetchInternalTrackMetadataHttp(id, statusOut);
             if (isCancelled()) return null;
-            
+            if (statusOut.status === 404) break;
+
             if (data && (data.popularity === null || data.popularity === undefined) && attempt < maxRetries) {
-                data = null; 
+                data = null;
             }
 
             if (data) break;
@@ -47897,69 +48769,61 @@ shadowRoot.innerHTML = `
         }
 
         if (data) {
-            const cacheData = formatTrackCacheData(data);
             const existing = cachedMetadata.get(id);
-            if (existing) {
-                if (existing.external_ids) {
-                    cacheData.external_ids = { ...existing.external_ids, ...cacheData.external_ids };
-                }
-                if (existing.album) {
-                    cacheData.album = { ...existing.album, ...cacheData.album };
-                    if (existing.album.album_type) {
-                        cacheData.album.album_type = existing.album.album_type;
-                    }
-                }
-                if (existing.albumType) {
-                    cacheData.albumType = existing.albumType;
-                }
-            }
-            cachedMetadata.set(data.id, cacheData);
-            return { key: data.id, val: cacheData };
+            const merged = mergeTrackCacheData(existing, data, !existing?.album?.album_type);
+            cachedMetadata.set(data.id, merged);
+            if (merged.popularity !== undefined && merged.popularity !== null) setExtraColMem('popularity', data.id, merged.popularity);
+            return { key: data.id, val: merged };
         } else {
             failedCount++;
             return null;
         }
     };
 
-    const CONCURRENCY_LIMIT = 30;
-    let currentIndex = 0;
-    const entriesToSave = [];
+    if (fallbackIds.length > 0 && !isCancelled()) {
+        const CONCURRENCY_LIMIT = 30;
+        const totalToProcess = (tracksProcessed + fallbackIds.length) || 1;
+        let currentIndex = 0;
+        const entriesToSave = [];
 
-    const worker = async () => {
-        while (currentIndex < missingIds.length && !isCancelled()) {
-            const id = missingIds[currentIndex++];
-            const result = await processInternalItem(id);
-            
-            if (result) {
-                entriesToSave.push(result);
-            }
+        const worker = async () => {
+            while (currentIndex < fallbackIds.length && !isCancelled()) {
+                const id = fallbackIds[currentIndex++];
+                const result = await processInternalItem(id);
 
-            tracksProcessed++;
-            
-            if (tracksProcessed % 10 === 0 || tracksProcessed === missingIds.length) {
-                const intermediateProgress = Math.round(
-                    ((tracksProcessed / missingIds.length) * 100) / totalProgressSteps
-                );
-                if (updateProgress) updateProgress(intermediateProgress);
-            }
+                if (result) {
+                    entriesToSave.push(result);
+                }
 
-            if (entriesToSave.length >= 50) {
-                const toSave = entriesToSave.splice(0, entriesToSave.length);
-                if (idb.setMany) {
-                    await idb.setMany('trackMetadata', toSave);
+                tracksProcessed++;
+
+                if (tracksProcessed % 10 === 0 || tracksProcessed >= totalToProcess) {
+                    const intermediateProgress = Math.min(100, Math.round(
+                        ((tracksProcessed / totalToProcess) * 100) / totalProgressSteps
+                    ));
+                    if (updateProgress) updateProgress(intermediateProgress);
+                }
+
+                if (entriesToSave.length >= 50) {
+                    const toSave = entriesToSave.splice(0, entriesToSave.length);
+                    if (idb.setMany) {
+                        await idb.setMany('trackMetadata', toSave);
+                    }
                 }
             }
+        };
+
+        const workers = Array(Math.min(CONCURRENCY_LIMIT, fallbackIds.length))
+            .fill(null)
+            .map(() => worker());
+
+        await Promise.all(workers);
+
+        if (entriesToSave.length > 0 && idb.setMany) {
+            await idb.setMany('trackMetadata', entriesToSave);
         }
-    };
-
-    const workers = Array(Math.min(CONCURRENCY_LIMIT, missingIds.length))
-        .fill(null)
-        .map(() => worker());
-
-    await Promise.all(workers);
-
-    if (entriesToSave.length > 0 && idb.setMany) {
-        await idb.setMany('trackMetadata', entriesToSave);
+    } else if (updateProgress && !isCancelled()) {
+        updateProgress(Math.round(100 / totalProgressSteps));
     }
 
     if (failedCount > 0) {
@@ -48017,9 +48881,10 @@ shadowRoot.innerHTML = `
         const fetchedMetaMap = await fetchCoreMetadataBatch([track.uri]);
         const meta = fetchedMetaMap.get(track.uri);
         if (meta && meta.releaseDate) {
-            const finalTrackNum = (track.trackNumber > 0) ? track.trackNumber : 0;
-            await setCachedReleaseDate(trackId, meta.releaseDate, finalTrackNum);
-            return { ...track, releaseDate: meta.releaseDate, trackNumber: finalTrackNum };
+            const finalTrackNum = (track.trackNumber > 0) ? track.trackNumber : (meta.trackNumber || 0);
+            const finalDiscNum = track.discNumber || meta.discNumber || 1;
+            await setCachedReleaseDate(trackId, meta.releaseDate, finalTrackNum, finalDiscNum);
+            return { ...track, releaseDate: meta.releaseDate, trackNumber: finalTrackNum, discNumber: finalDiscNum };
         }
     } catch (e) {
         console.warn("[Sort-Play] Fast single release date fetch failed, falling back", e);
@@ -48435,6 +49300,7 @@ shadowRoot.innerHTML = `
     const cachedData = await idb.get('lastScrobbledDates', lfmInfo.key, CACHE_EXPIRE_PERSONAL_SCROBBLES);
     
     if (cachedData !== null && cachedData !== undefined && !isLocal) {
+        setExtraColMem('lastScrobbled', lfmInfo.key, cachedData);
         return { ...track, lastScrobbled: cachedData };
     }
 
@@ -48497,7 +49363,10 @@ shadowRoot.innerHTML = `
             return { ...track, lastScrobbled: -1, error: "Last.fm profile is private. Make your listening history public.", errorLabel: "Private" };
         }
         if (data.error === 6) { 
-          if (!isLocal) await idb.set('lastScrobbledDates', lfmInfo.key, -1);
+          if (!isLocal) {
+            await idb.set('lastScrobbledDates', lfmInfo.key, -1);
+            setExtraColMem('lastScrobbled', lfmInfo.key, -1);
+          }
           return { ...track, lastScrobbled: -1, error: "Track not found on Last.fm", errorLabel: "N/A" };
         }
         throw new Error(`Last.fm API error: ${data.message}`);
@@ -48521,6 +49390,7 @@ shadowRoot.innerHTML = `
       
       if (!isLocal && !isNowPlaying) {
           await idb.set('lastScrobbledDates', lfmInfo.key, lastScrobbled);
+          setExtraColMem('lastScrobbled', lfmInfo.key, lastScrobbled);
       }
 
       return { ...track, lastScrobbled: lastScrobbled };
@@ -50471,7 +51341,7 @@ shadowRoot.innerHTML = `
         if (typeof Spicetify.Platform.PlaylistAPI.clear === 'function') {
             await Spicetify.Platform.PlaylistAPI.clear(playlistUri);
         } else {
-            let content = await getRawPlaylistContents(playlistUri);
+            let content = await getRawPlaylistContentsMinimal(playlistUri, 'uid');
             if (content && content.items && content.items.length > 0) {
                 const toRemove = content.items.map(i => ({ uri: i.uri, uid: i.uid }));
                 await removeTracksFromPlaylist(playlistUri, toRemove, maxRetries, initialDelay);
@@ -50511,7 +51381,7 @@ shadowRoot.innerHTML = `
                 
                 try {
                     await new Promise(r => setTimeout(r, 2000));
-                    const content = await getRawPlaylistContents(playlistUri);
+                    const content = await getRawPlaylistContentsMinimal(playlistUri, 'uid');
                     if (content && content.items) {
                         const currentTrackUris = content.items.map(item => item.uri);
                         const expectedLastUris = currentTrackUris.slice(-batch.length);
@@ -51729,6 +52599,7 @@ shadowRoot.innerHTML = `
               if (useSpotify && rec.uri) {
                   const ng = nativeGenresMap.get(rec.uri) || [];
                   for (const g of ng) {
+                      if (typeof g?.score === 'number' && g.score < SPOTIFY_TRACK_GENRE_MIN_SCORE) continue;
                       const raw = (g?.name || '').toLowerCase().trim();
                       if (!raw || /^\d+$/.test(raw) || isCountryOnly(raw) || isSpotifyTrackExcludedConcept(raw)) continue;
                       if (!isWhitelistedGenre(raw, genreMap)) continue;
@@ -55232,24 +56103,76 @@ shadowRoot.innerHTML = `
           const trackIdsToEnrich = itemsToEnrich.map(c => c.track.id || c.track.uri.split(':')[2]);
           stats = await getBatchTrackStats(trackIdsToEnrich, (p) => updateProgress(`Stats ${Math.floor(p)}%`));
           
-          updateProgress("Plays...");
-          const urisToFetch = itemsToEnrich.map(c => c.track.uri);
-          
-          for (let i = 0; i < urisToFetch.length; i += 500) {
-              const batch = urisToFetch.slice(i, i + 500);
-              const res = await fetchPlayCountsBatchNew(batch);
-              res.forEach((v, k) => playCounts.set(k, v));
-              updateProgress(`Plays ${Math.floor((i / urisToFetch.length) * 100)}%`);
-              await new Promise(r => setTimeout(r, 100));
-          }
+          updateProgress("Plays & Genres...");
+          const urisToFetch = itemsToEnrich.map(c => c.track.uri).filter(u => u && u.startsWith("spotify:track:"));
+          const mdataClient = getMetadataClient();
+          const BUNDLE_BATCH = 1000;
 
-          updateProgress("Genres...");
-          for (let i = 0; i < urisToFetch.length; i += 500) {
-              const batch = urisToFetch.slice(i, i + 500);
-              const res = await fetchNativeSpotifyTrackGenresBatch(batch);
-              res.forEach((v, k) => nativeGenres.set(k, v));
-              updateProgress(`Genres ${Math.floor((i / urisToFetch.length) * 100)}%`);
-              await new Promise(r => setTimeout(r, 100));
+          if (mdataClient && urisToFetch.length > 0) {
+              for (let i = 0; i < urisToFetch.length; i += BUNDLE_BATCH) {
+                  const batch = urisToFetch.slice(i, i + BUNDLE_BATCH);
+                  const genreBatch = batch.filter(u => {
+                      if (nativeSpotifyTrackGenreCache.has(u)) {
+                          nativeGenres.set(u, nativeSpotifyTrackGenreCache.get(u));
+                          return false;
+                      }
+                      return true;
+                  });
+                  try {
+                      const extensionQuery = [{ extensionKind: 185, entityUri: batch }];
+                      if (genreBatch.length > 0) extensionQuery.push({ extensionKind: 6, entityUri: genreBatch });
+                      const resp = await fetchMetadataWithTimeout(mdataClient, { extensionQuery });
+
+                      const ext185 = resp?.extension?.find(e => e.extensionKind === 185);
+                      if (ext185?.entityExtension) {
+                          for (const item of ext185.entityExtension) {
+                              const status = item?.header?.statusCode;
+                              if ((status !== undefined && status !== 200) || item?.header?.isEmpty || !item?.extensionData?.value) continue;
+                              const parsed = parseVarint(item.extensionData.value);
+                              if (parsed !== null && Number.isFinite(parsed) && parsed >= 0) {
+                                  playCounts.set(item.entityUri, parsed);
+                              }
+                          }
+                      }
+
+                      const ext6 = resp?.extension?.find(e => e.extensionKind === 6);
+                      if (ext6?.entityExtension) {
+                          for (const item of ext6.entityExtension) {
+                              if (!item?.entityUri) continue;
+                              const status = item?.header?.statusCode;
+                              if (status !== undefined && status !== 200 && status !== 404) continue;
+                              const parsed = (status === 404 || item?.header?.isEmpty || !item?.extensionData?.value)
+                                  ? []
+                                  : parseNativeTrackConceptsBuffer(item.extensionData.value);
+                              nativeGenres.set(item.entityUri, parsed);
+                              setNativeTrackGenreCache(item.entityUri, parsed);
+                          }
+                      }
+                  } catch {
+                      const [pcRes, ngRes] = await Promise.all([
+                          fetchPlayCountsBatchNew(batch).catch(() => new Map()),
+                          genreBatch.length > 0 ? fetchNativeSpotifyTrackGenresBatch(genreBatch).catch(() => new Map()) : Promise.resolve(new Map())
+                      ]);
+                      pcRes.forEach((v, k) => playCounts.set(k, v));
+                      ngRes.forEach((v, k) => nativeGenres.set(k, v));
+                  }
+                  updateProgress(`Enriching ${Math.min(100, Math.floor(((i + batch.length) / urisToFetch.length) * 100))}%`);
+              }
+          } else {
+              updateProgress("Plays...");
+              for (let i = 0; i < urisToFetch.length; i += 500) {
+                  const batch = urisToFetch.slice(i, i + 500);
+                  const res = await fetchPlayCountsBatchNew(batch).catch(() => new Map());
+                  res.forEach((v, k) => playCounts.set(k, v));
+                  updateProgress(`Plays ${Math.floor((i / urisToFetch.length) * 100)}%`);
+              }
+              updateProgress("Genres...");
+              for (let i = 0; i < urisToFetch.length; i += 1000) {
+                  const batch = urisToFetch.slice(i, i + 1000);
+                  const res = await fetchNativeSpotifyTrackGenresBatch(batch).catch(() => new Map());
+                  res.forEach((v, k) => nativeGenres.set(k, v));
+                  updateProgress(`Genres ${Math.floor((i / urisToFetch.length) * 100)}%`);
+              }
           }
       }
 
@@ -55279,7 +56202,7 @@ shadowRoot.innerHTML = `
               item.playCount = playCounts.get(uri) ?? prevCached?.playCount ?? 0;
               const rawNg = nativeGenres.get(uri);
               if (rawNg && rawNg.length > 0) {
-                  const ng = rawNg.filter(g => (g.score * 100) > 5 && !isCountryOnly(g.name));
+                  const ng = rawNg.filter(g => g.score >= SPOTIFY_TRACK_GENRE_MIN_SCORE && !isCountryOnly(g.name));
                   const toMap = ng.map(g => ({name: g.name, source: 'spotify_track'}));
                   const mapped = mapAndNormalizeGenres(toMap);
                   
@@ -56626,31 +57549,9 @@ shadowRoot.innerHTML = `
                 while (queue.length > 0 && !shouldStop) {
                     const uri = queue.shift();
                     try {
-                        if (internalTokenRefreshPromise) {
-                            await internalTokenRefreshPromise;
-                        }
-                        let token = Spicetify.Platform.Session.accessToken;
                         const url = `https://spclient.wg.spotify.com/inspiredby-mix/v2/seed_to_playlist/${uri}?response-format=json`;
-                        let res = await fetch(url, { headers: { "Authorization": `Bearer ${token}` } });
-                        
-                        if (res.status === 401) {
-                            if (!internalTokenRefreshPromise) {
-                                console.warn("[Sort-Play] Token 401 in fetchRadioTracks. Refreshing token...");
-                                internalTokenRefreshPromise = (async () => {
-                                    try {
-                                        const tokenData = await Spicetify.CosmosAsync.get('sp://auth/v2/token');
-                                        Spicetify.Platform.Session.accessToken = tokenData.accessToken;
-                                        await new Promise(r => setTimeout(r, 500));
-                                        return tokenData.accessToken;
-                                    } catch(e) { throw e; } finally { internalTokenRefreshPromise = null; }
-                                })();
-                            }
-                            await internalTokenRefreshPromise;
-                            token = Spicetify.Platform.Session.accessToken;
-                            res = await fetch(url, { headers: { "Authorization": `Bearer ${token}` } });
-                        }
-                        
-                        if (!res.ok) continue;
+                        const res = await fetchWithSpotifyAuth(url, {}, 10000);
+                        if (!res || !res.ok) continue;
                         const data = await res.json();
                         const radioUri = data?.mediaItems?.[0]?.uri;
                         if (!radioUri) continue;
@@ -57080,7 +57981,7 @@ shadowRoot.innerHTML = `
             ]);
 
             const assignGenres = (t) => {
-                const raw = (nativeGenresMap.get(t.uri) || []).filter(g => (g.score * 100) > 5 && !isCountryOnly(g.name));
+                const raw = (nativeGenresMap.get(t.uri) || []).filter(g => g.score >= SPOTIFY_TRACK_GENRE_MIN_SCORE && !isCountryOnly(g.name));
                 const mapped = mapAndNormalizeGenres(raw.map(g => ({ name: g.name, source: 'spotify_track' })));
                 t.genres = mapped.map(m => ({
                     name: normalizeGenre(m.name),
@@ -57573,7 +58474,7 @@ shadowRoot.innerHTML = `
                 item.features = stats;
                 item.track.popularity = corpusPopMap.get(item.track.uri) ?? item.track.popularity ?? 50;
 
-                const rawGenres = (corpusNativeGenres.get(item.track.uri) || []).filter(g => (g.score * 100) > 5 && !isCountryOnly(g.name));
+                const rawGenres = (corpusNativeGenres.get(item.track.uri) || []).filter(g => g.score >= SPOTIFY_TRACK_GENRE_MIN_SCORE && !isCountryOnly(g.name));
                 const mappedGenres = mapAndNormalizeGenres(rawGenres.map(g => ({ name: g.name, source: 'spotify_track' })));
                 item.genres = mappedGenres.map(m => ({
                     name: normalizeGenre(m.name),
@@ -57941,41 +58842,7 @@ shadowRoot.innerHTML = `
             });
 
             const albumIdsArray = Array.from(albumsToCheck).filter(id => !excludedAlbumIds.has(id));
-            const albumTrackUrisMap = new Map();
-            const CONCURRENCY = 40;
-
-            for (let i = 0; i < albumIdsArray.length; i += CONCURRENCY) {
-                const batch = albumIdsArray.slice(i, i + CONCURRENCY);
-                await Promise.all(batch.map(async (albumId) => {
-                    let uris = [];
-                    try {
-                        const hexId = spotifyHex(albumId);
-                        let token = Spicetify.Platform.Session.accessToken;
-                        let res = await fetch(`https://spclient.wg.spotify.com/metadata/4/album/${hexId}?market=from_token&alt=json`, {
-                            headers: { "Authorization": `Bearer ${token}`, "Accept": "application/json" }
-                        });
-                        if (res.ok) {
-                            const body = await res.json();
-                            if (body.disc) {
-                                for (const disc of body.disc) {
-                                    if (disc.track) {
-                                        for (const track of disc.track) {
-                                            if (track.gid) uris.push(`spotify:track:${hexToBase62(track.gid)}`);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    } catch (err) {}
-                    if (uris.length === 0) {
-                        try {
-                            const fallbackTracks = await getAlbumTracks(albumId);
-                            if (fallbackTracks) uris = fallbackTracks.map(t => t.uri);
-                        } catch(e) {}
-                    }
-                    if (uris.length > 0) albumTrackUrisMap.set(albumId, uris);
-                }));
-            }
+            const albumTrackUrisMap = await fetchAlbumTrackUrisBatch(albumIdsArray);
 
             for (const [albumId, uris] of albumTrackUrisMap.entries()) {
                 let likedCount = 0;
@@ -58018,7 +58885,7 @@ shadowRoot.innerHTML = `
 
             const evaluatedCandidates = cleanCandidatePool.map(t => {
                 const stats = candidateStats[t.id];
-                const rawGenres = (candidateGenresMap.get(t.uri) || []).filter(g => (g.score * 100) > 5 && !isCountryOnly(g.name));
+                const rawGenres = (candidateGenresMap.get(t.uri) || []).filter(g => g.score >= SPOTIFY_TRACK_GENRE_MIN_SCORE && !isCountryOnly(g.name));
                 const mappedGenres = mapAndNormalizeGenres(rawGenres.map(g => ({ name: g.name, source: 'spotify_track' })));
                 const genres = mappedGenres.map(m => ({
                     name: normalizeGenre(m.name),
@@ -58307,7 +59174,7 @@ shadowRoot.innerHTML = `
                 item.features = stats;
                 item.track.popularity = corpusPopMap.get(item.track.uri) ?? item.track.popularity ?? 50;
 
-                const rawGenres = (corpusNativeGenres.get(item.track.uri) || []).filter(g => (g.score * 100) > 5 && !isCountryOnly(g.name));
+                const rawGenres = (corpusNativeGenres.get(item.track.uri) || []).filter(g => g.score >= SPOTIFY_TRACK_GENRE_MIN_SCORE && !isCountryOnly(g.name));
                 const mappedGenres = mapAndNormalizeGenres(rawGenres.map(g => ({ name: g.name, source: 'spotify_track' })));
                 item.genres = mappedGenres.map(m => ({
                     name: normalizeGenre(m.name),
@@ -58651,41 +59518,7 @@ shadowRoot.innerHTML = `
             });
 
             const albumIdsArray = Array.from(albumsToCheck).filter(id => !excludedAlbumIds.has(id));
-            const albumTrackUrisMap = new Map();
-            const CONCURRENCY = 40;
-
-            for (let i = 0; i < albumIdsArray.length; i += CONCURRENCY) {
-                const batch = albumIdsArray.slice(i, i + CONCURRENCY);
-                await Promise.all(batch.map(async (albumId) => {
-                    let uris = [];
-                    try {
-                        const hexId = spotifyHex(albumId);
-                        let token = Spicetify.Platform.Session.accessToken;
-                        let res = await fetch(`https://spclient.wg.spotify.com/metadata/4/album/${hexId}?market=from_token&alt=json`, {
-                            headers: { "Authorization": `Bearer ${token}`, "Accept": "application/json" }
-                        });
-                        if (res.ok) {
-                            const body = await res.json();
-                            if (body.disc) {
-                                for (const disc of body.disc) {
-                                    if (disc.track) {
-                                        for (const track of disc.track) {
-                                            if (track.gid) uris.push(`spotify:track:${hexToBase62(track.gid)}`);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    } catch (err) {}
-                    if (uris.length === 0) {
-                        try {
-                            const fallbackTracks = await getAlbumTracks(albumId);
-                            if (fallbackTracks) uris = fallbackTracks.map(t => t.uri);
-                        } catch(e) {}
-                    }
-                    if (uris.length > 0) albumTrackUrisMap.set(albumId, uris);
-                }));
-            }
+            const albumTrackUrisMap = await fetchAlbumTrackUrisBatch(albumIdsArray);
 
             for (const [albumId, uris] of albumTrackUrisMap.entries()) {
                 let likedCount = 0;
@@ -58728,7 +59561,7 @@ shadowRoot.innerHTML = `
 
             const evaluatedCandidates = cleanCandidatePool.map(t => {
                 const stats = candidateStats[t.id];
-                const rawGenres = (candidateGenresMap.get(t.uri) || []).filter(g => (g.score * 100) > 5 && !isCountryOnly(g.name));
+                const rawGenres = (candidateGenresMap.get(t.uri) || []).filter(g => g.score >= SPOTIFY_TRACK_GENRE_MIN_SCORE && !isCountryOnly(g.name));
                 const mappedGenres = mapAndNormalizeGenres(rawGenres.map(g => ({ name: g.name, source: 'spotify_track' })));
                 const genres = mappedGenres.map(m => ({
                     name: normalizeGenre(m.name),
@@ -59495,13 +60328,7 @@ shadowRoot.innerHTML = `
         const trackIds = batchToTest.map(t => t.uri.split(':')[2]);
         
         try {
-            let responseTracks = [];
-
-            const fetchBatchInternal = async () => {
-                return await Promise.all(trackIds.map(id => fetchInternalTrackMetadata(id)));
-            };
-
-            responseTracks = await fetchBatchInternal();
+            const responseTracks = await fetchInternalTrackMetadataBatch(trackIds);
 
             if (responseTracks) {
                 const availabilityChecks = await Promise.all(responseTracks.map(t => isTrackAvailable(t)));
@@ -60481,7 +61308,7 @@ shadowRoot.innerHTML = `
 
         candidatesWithMeta.forEach(t => {
             t.features = allAudioStats[t.id] || null;
-            const rawGenres = (nativeGenresMap.get(t.uri) || []).filter(g => (g.score * 100) > 5 && !isCountryOnly(g.name));
+            const rawGenres = (nativeGenresMap.get(t.uri) || []).filter(g => g.score >= SPOTIFY_TRACK_GENRE_MIN_SCORE && !isCountryOnly(g.name));
             const mappedGenres = mapAndNormalizeGenres(rawGenres.map(g => ({ name: g.name, source: 'spotify_track' })));
             t.genres = mappedGenres.map(m => ({
                 name: normalizeGenre(m.name),
@@ -61130,19 +61957,34 @@ shadowRoot.innerHTML = `
       let isAlbumPage = false;
       let currentPlaylistDetails = null;
       let sourcePlaylistCoverUrl = null;
+      let user = null;
+      let tracksPromise = null;
+      let isPlaylistFetchCancelled = false;
 
       if (URI.isPlaylistV1OrV2(currentUriAtStart)) {
         const playlistId = currentUriAtStart.split(":")[2];
-        tracks = await getPlaylistTracks(playlistId);
-        try {
-            const meta = await Spicetify.Platform.PlaylistAPI.getMetadata(currentUriAtStart);
-            currentPlaylistDetails = { name: meta.name, owner: { id: meta.owner.uri.split(':')[2], display_name: meta.owner.name }, images: meta.images };
+        const [meta, currentUser] = await Promise.all([
+            getFastPlaylistMetadata(currentUriAtStart).catch((e) => {
+                console.warn("Could not fetch current playlist details for ownership check/dialog", e);
+                return null;
+            }),
+            Spicetify.Platform.UserAPI.getUser()
+        ]);
+        user = currentUser;
+        if (meta) {
+            const ownerId = meta.owner?.uri ? meta.owner.uri.split(':')[2] : (meta.owner?.username || null);
+            currentPlaylistDetails = { name: meta.name, owner: { id: ownerId, display_name: meta.owner?.displayName || meta.owner?.name }, images: meta.images };
             if (currentPlaylistDetails?.images?.length > 0) {
                 sourcePlaylistCoverUrl = currentPlaylistDetails.images[0].url;
             }
-        } catch (e) {
-            console.warn("Could not fetch current playlist details for ownership check/dialog", e);
+            if (typeof meta.totalLength === 'number' && meta.totalLength === 0) {
+                showNotification('No tracks found to sort');
+                if (!isHeadless && !progressCallback) resetButtons();
+                return;
+            }
         }
+        tracksPromise = getPlaylistTracks(playlistId, { isCancelled: () => isPlaylistFetchCancelled });
+        tracksPromise.catch(() => {});
       } else if (isArtistPage) {
         tracks = await getArtistTracks(currentUriAtStart, isHeadless, updateProgressText);
       } else if (isLikedSongsPage(currentUriAtStart)) {
@@ -61168,14 +62010,12 @@ shadowRoot.innerHTML = `
         throw new Error('Invalid page for sorting');
       }
 
-      if (!tracks || tracks.length === 0) {
+      if (!tracksPromise && (!tracks || tracks.length === 0)) {
           showNotification('No tracks found to sort');
           if (!isHeadless && !progressCallback) resetButtons();
           return;
       }
 
-      let originalTracksForRemoval = [...tracks];
-      let unconvertedLocalCount = 0;
       const directSortsToConvertLocalTracks = [
         'tasteMatch', 'playCount', 'popularity', 'artistMonthlyListeners', 'releaseDate', 'trueReleaseDate', 'artistReleaseDate', 'averageColor', 
         'energyWave', 'tempo', 'energy', 'danceability', 'valence', 
@@ -61183,7 +62023,7 @@ shadowRoot.innerHTML = `
         'excludeByPlaylist'
       ];
 
-      const user = await Spicetify.Platform.UserAPI.getUser();
+      if (!user) user = await Spicetify.Platform.UserAPI.getUser();
       let canModifyCurrentPlaylist = sortCurrentPlaylistEnabled &&
                                        createPlaylistAfterSort && 
                                        isDirectSortType(sortType) &&
@@ -61212,10 +62052,21 @@ shadowRoot.innerHTML = `
         });
 
         if (userChoice === 'cancel') {
+            isPlaylistFetchCancelled = true;
             showNotification("Sorting cancelled.");
             if (!isHeadless && !progressCallback) resetButtons();
             return;
-        } else if (userChoice === 'neutral') {
+        }
+        if (tracksPromise) {
+            tracks = await tracksPromise;
+            tracksPromise = null;
+        }
+        if (!tracks || tracks.length === 0) {
+            showNotification('No tracks found to sort');
+            if (!isHeadless && !progressCallback) resetButtons();
+            return;
+        }
+        if (userChoice === 'neutral') {
             canModifyCurrentPlaylist = false;
         } else if (userChoice === 'confirm') {
             await new Promise(resolve => setTimeout(resolve, 100));
@@ -61393,6 +62244,19 @@ shadowRoot.innerHTML = `
         }
       }
 
+      if (tracksPromise) {
+          tracks = await tracksPromise;
+          tracksPromise = null;
+      }
+      if (!tracks || tracks.length === 0) {
+          showNotification('No tracks found to sort');
+          if (!isHeadless && !progressCallback) resetButtons();
+          return;
+      }
+
+      let originalTracksForRemoval = [...tracks];
+      let unconvertedLocalCount = 0;
+
       if (directSortsToConvertLocalTracks.includes(sortType)) {
         const { convertedTracks, unconvertedCount } = await convertLocalTracksToSpotify(
             tracks,
@@ -61496,42 +62360,33 @@ shadowRoot.innerHTML = `
               (progress) => { updateProgressText(`${Math.floor(progress * 0.85)}%`); }
             );
           } else if (sortType === "averageColor") {
-              const albumIds = [...new Set(tracksWithPopularity.map(t => Spicetify.URI.isLocal(t.uri) ? null : (t.albumId || t.track?.album?.id)).filter(Boolean))];
-              const bulkPalettes = await idb.getMany('palettes', albumIds);
+              const resolveTrackAlbumId = (t) => t.albumId || t.track?.album?.id
+                  || (t.albumUri?.startsWith("spotify:album:") ? t.albumUri.split(":")[2] : null)
+                  || (t.album?.uri?.startsWith("spotify:album:") ? t.album.uri.split(":")[2] : null);
+              const uniqueAlbumIds = [...new Set(tracksWithPopularity.map(t => Spicetify.URI.isLocal(t.uri) ? null : resolveTrackAlbumId(t)).filter(Boolean))];
+              const paletteMap = await fetchAlbumColorsBatch(uniqueAlbumIds, {
+                  onProgress: (p) => updateProgressText(`${Math.min(90, Math.floor(p * 0.90))}%`)
+              });
 
-              const cachedTracks = [];
-              const uncachedTracks = [];
-              
-              for (const track of tracksWithPopularity) {
-                  if (Spicetify.URI.isLocal(track.uri)) {
-                      cachedTracks.push({ ...track, averageColor: null });
-                      continue;
-                  }
-                  const albumId = track.albumId || track.track?.album?.id;
-                  if (albumId && bulkPalettes.has(albumId)) {
-                      cachedTracks.push({ ...track, averageColor: bulkPalettes.get(albumId) });
-                  } else {
-                      uncachedTracks.push(track);
-                  }
-              }
-
-              let tracksWithColor = [...cachedTracks];
-              const totalColorTracks = tracksWithPopularity.length;
-
-              if (uncachedTracks.length > 0) {
-                  const uncachedResults = await processBatchesWithDelay(
-                      uncachedTracks, 15, 1500,
-                      (progress) => {
-                          const cachedPortion = (cachedTracks.length / totalColorTracks) * 100;
-                          const uncachedPortion = (uncachedTracks.length / totalColorTracks) * progress;
-                          updateProgressText(`${60 + Math.floor((cachedPortion + uncachedPortion) * 0.40)}%`);
-                      },
-                      getTrackDetailsWithPaletteAnalysis
+              const fallbackAlbumIds = uniqueAlbumIds.filter(id => !paletteMap.has(id));
+              if (fallbackAlbumIds.length > 0) {
+                  const fallbackResults = await processBatchesWithDelay(
+                      fallbackAlbumIds, 15, 1500,
+                      (progress) => updateProgressText(`${90 + Math.floor(progress * 0.10)}%`),
+                      async (aid) => ({ aid, analysis: await getAlbumColorAnalysis(aid) })
                   );
-                  tracksWithColor.push(...uncachedResults);
+                  for (const item of fallbackResults) {
+                      if (item?.aid) paletteMap.set(item.aid, item.analysis ?? null);
+                  }
+              } else {
+                  updateProgressText("100%");
               }
 
-              tracksForDeduplication = tracksWithColor;
+              tracksForDeduplication = tracksWithPopularity.map(track => {
+                  if (Spicetify.URI.isLocal(track.uri)) return { ...track, averageColor: null };
+                  const albumId = resolveTrackAlbumId(track);
+                  return { ...track, averageColor: albumId ? (paletteMap.get(albumId) ?? null) : null };
+              });
           } else {
             tracksForDeduplication = tracksWithPopularity;
           }
@@ -61612,6 +62467,7 @@ shadowRoot.innerHTML = `
                 sortedTracks = shuffleArray(uniqueTracks);
             }
           } else if (sortType === "averageColor") {
+              const getAlbumKey = (t) => t.albumId || t.track?.album?.id || t.albumUri || t.album?.uri || "";
               sortedTracks = uniqueTracks
                   .filter(track => track.averageColor && track.averageColor.dominantHsl)
                   .sort((a, b) => {
@@ -61624,14 +62480,18 @@ shadowRoot.innerHTML = `
                           if (!analysisA.isMonochrome && analysisB.isMonochrome) return 1;
 
                           if (analysisA.isMonochrome) {
-                              return (analysisB.dominantHsl.l - analysisA.dominantHsl.l);
+                              if (analysisB.dominantHsl.l !== analysisA.dominantHsl.l) {
+                                  return analysisB.dominantHsl.l - analysisA.dominantHsl.l;
+                              }
                           } else {
                               const colorA = analysisA.dominantHsl;
                               const colorB = analysisB.dominantHsl;
                               if (colorA.h !== colorB.h) {
                                   return (colorA.h - colorB.h) * sortOrder;
                               }
-                              return colorB.l - colorA.l;
+                              if (colorB.l !== colorA.l) {
+                                  return colorB.l - colorA.l;
+                              }
                           }
                       } else {
                           const colorA = analysisA.dominantHsl;
@@ -61642,8 +62502,14 @@ shadowRoot.innerHTML = `
                           if (colorA.l !== colorB.l) {
                               return (colorA.l - colorB.l) * sortOrder;
                           }
-                          return (colorA.s - colorB.s) * sortOrder;
+                          if (colorA.s !== colorB.s) {
+                              return (colorA.s - colorB.s) * sortOrder;
+                          }
                       }
+
+                      const albumA = getAlbumKey(a);
+                      const albumB = getAlbumKey(b);
+                      return albumA !== albumB ? albumA.localeCompare(albumB) : 0;
                   });
         } else if (sortType === "filterOnePerArtist") {
             const artistBestTrack = new Map();
@@ -63121,11 +63987,25 @@ shadowRoot.innerHTML = `
       }
     }
     const cachedMetaMap = missingPopIds.length > 0 ? await idb.getMany('trackMetadata', missingPopIds) : null;
+    const stillMissingUris = [];
+    if (missingPopIds.length > 0) {
+      for (const id of new Set(missingPopIds)) {
+        const meta = cachedMetaMap?.get(id);
+        if (!meta || meta.popularity === undefined || meta.popularity === null) {
+          stillMissingUris.push(`spotify:track:${id}`);
+        }
+      }
+    }
+    const fetchedCoreMap = stillMissingUris.length > 0
+      ? await fetchCoreMetadataBatch(stillMissingUris).catch(() => new Map())
+      : null;
 
     const profiled = tracks.map(t => {
-      if (cachedMetaMap && !(t.popularity > 0) && t.uri && t.uri.startsWith("spotify:track:")) {
-        const meta = cachedMetaMap.get(t.trackId || t.id || t.uri.split(":")[2]);
-        if (meta && meta.popularity > 0) t = { ...t, popularity: meta.popularity };
+      if (!(t.popularity > 0) && t.uri && t.uri.startsWith("spotify:track:")) {
+        const id = t.trackId || t.id || t.uri.split(":")[2];
+        const meta = cachedMetaMap?.get(id);
+        const pop = (meta && meta.popularity > 0) ? meta.popularity : fetchedCoreMap?.get(`spotify:track:${id}`)?.popularity;
+        if (pop > 0) t = { ...t, popularity: pop };
       }
       return { track: t, profile: extractTrackAudioProfile(t) };
     });
@@ -64324,28 +65204,23 @@ shadowRoot.innerHTML = `
                     const uri = `spotify:track:${id}`;
                     const meta = fetchedMetaMap.get(uri);
                     if (meta && meta.isrc) {
-                        let existing = cachedMetadata.get(id) || { id, external_ids: {} };
+                        const existing = cachedMetadata.get(id) || { id, external_ids: {} };
                         if (!existing.external_ids) existing.external_ids = {};
                         existing.external_ids.isrc = meta.isrc;
+                        if (meta.popularity !== undefined && meta.popularity !== null) existing.popularity = meta.popularity;
                         cachedMetadata.set(id, existing);
-                        
-                        const idbCached = await idb.get('trackMetadata', id);
-                        if (idbCached) {
-                            if (!idbCached.external_ids) idbCached.external_ids = {};
-                            idbCached.external_ids.isrc = meta.isrc;
-                            idb.set('trackMetadata', id, idbCached);
-                        }
                     }
                 }
             } catch (e) {
                 console.warn("[Sort-Play] Fast ISRC fetch failed during deduplication", e);
                 const fallbackBatch = batchIds.slice(0, 50);
                 await Promise.all(fallbackBatch.map(async id => {
-                    const data = await fetchInternalTrackMetadata(id);
+                    const data = await fetchInternalTrackMetadataHttp(id);
                     if (data) {
-                        const cacheData = formatTrackCacheData(data);
-                        cachedMetadata.set(data.id, cacheData);
-                        idb.set('trackMetadata', data.id, cacheData);
+                        const existing = cachedMetadata.get(id);
+                        const merged = mergeTrackCacheData(existing, data, !existing?.album?.album_type);
+                        cachedMetadata.set(data.id, merged);
+                        idb.set('trackMetadata', data.id, merged);
                     }
                 }));
             }
@@ -65160,6 +66035,10 @@ shadowRoot.innerHTML = `
         }
 
         if (hasValidCache) {
+            if (track._lfmKey) {
+                setExtraColMem(isPersonal ? 'personalScrobbles' : 'scrobbles', track._lfmKey, val);
+                if (isPersonal && typeof cachedGlobal === 'number') setExtraColMem('scrobbles', track._lfmKey, cachedGlobal);
+            }
             const entry = { ...track, [sortType]: val };
             if (isPersonal && typeof cachedGlobal === 'number') {
                 entry.scrobbles = cachedGlobal;
@@ -65252,18 +66131,16 @@ shadowRoot.innerHTML = `
 
                          const mainVal = isPersonal ? res.personalScrobbles : res.scrobbles;
                          if (mainVal !== null && mainVal !== undefined) {
-                             entriesToSave.push({
-                                 key: lfmInfo.key,
-                                 val: isPersonal ? { count: mainVal, pendingUpdate: false } : clampGlobal(mainVal)
-                             });
+                             const savedMain = isPersonal ? { count: mainVal, pendingUpdate: false } : clampGlobal(mainVal);
+                             entriesToSave.push({ key: lfmInfo.key, val: savedMain });
+                             setExtraColMem(isPersonal ? 'personalScrobbles' : 'scrobbles', lfmInfo.key, isPersonal ? mainVal : savedMain);
                          }
                          
                          const altVal = isPersonal ? res.scrobbles : res.personalScrobbles;
                          if (altVal !== null && altVal !== undefined) {
-                             altEntriesToSave.push({
-                                 key: lfmInfo.key,
-                                 val: isPersonal ? clampGlobal(altVal) : { count: altVal, pendingUpdate: false }
-                             });
+                             const savedAlt = isPersonal ? clampGlobal(altVal) : { count: altVal, pendingUpdate: false };
+                             altEntriesToSave.push({ key: lfmInfo.key, val: savedAlt });
+                             setExtraColMem(isPersonal ? 'scrobbles' : 'personalScrobbles', lfmInfo.key, isPersonal ? savedAlt : altVal);
                          }
                      }
                  }
@@ -65746,12 +66623,204 @@ shadowRoot.innerHTML = `
     mainButton.style.filter = "brightness(1)";
   }
 
+  function formatAudioAttributesV2(bpm, keyStr, majorMinor, camelotVal, danceability = null, energy = null) {
+    const keyStringToInt = {
+      "C": 0, "C#": 1, "Db": 1, "DB": 1,
+      "D": 2, "D#": 3, "Eb": 3, "EB": 3,
+      "E": 4,
+      "F": 5, "F#": 6, "Gb": 6, "GB": 6,
+      "G": 7, "G#": 8, "Ab": 8, "AB": 8,
+      "A": 9, "A#": 10, "Bb": 10, "BB": 10,
+      "B": 11
+    };
+    const pitchClasses = ["C", "C♯/D♭", "D", "D♯/E♭", "E", "F", "F♯/G♭", "G", "G♯/A♭", "A", "A♯/B♭", "B"];
+
+    let keyRaw = -1;
+    let mode = -1;
+    if (typeof keyStr === 'string' && keyStr.length > 0) {
+      const kIdx = parseInt(keyStr, 10);
+      if (!isNaN(kIdx) && String(kIdx) === keyStr && kIdx >= 0 && kIdx <= 11) {
+        keyRaw = kIdx;
+      } else {
+        const upperKey = keyStr.toUpperCase();
+        if (keyStringToInt[keyStr] !== undefined) keyRaw = keyStringToInt[keyStr];
+        else if (keyStringToInt[upperKey] !== undefined) keyRaw = keyStringToInt[upperKey];
+      }
+    }
+    if (majorMinor !== undefined && majorMinor !== null) {
+      mode = majorMinor === 2 ? 1 : 0;
+    }
+
+    let keyString = "Undefined";
+    if (keyRaw !== -1) {
+      keyString = pitchClasses[keyRaw];
+      if (mode === 0) keyString += "m";
+    }
+
+    return {
+      tempo: bpm ? Math.round(bpm) : null,
+      key_raw: keyRaw,
+      mode,
+      key: keyString,
+      camelot: camelotVal || null,
+      energy: (energy !== null && energy !== undefined) ? Math.round(100 * energy) : null,
+      danceability: (danceability !== null && danceability !== undefined) ? Math.round(100 * danceability) : null,
+      valence: null, acousticness: null,
+      instrumentalness: null, speechiness: null,
+      liveness: null, loudness: null
+    };
+  }
+
+  function parseAudioAttributesV2Buffer(rawBytes) {
+    const bytes = toUint8Array(rawBytes);
+    const len = bytes.byteLength;
+    if (len === 0) return null;
+    const view = new DataView(bytes.buffer, bytes.byteOffset, len);
+    let pos = 0;
+
+    const readVarint = (limit = len) => {
+      let val = 0n, shift = 0n;
+      while (pos < limit) {
+        const b = bytes[pos++];
+        val |= BigInt(b & 0x7f) << shift;
+        if (!(b & 0x80)) return val;
+        shift += 7n;
+        if (shift > 63n) return null;
+      }
+      return null;
+    };
+    const skipWire = (wire, limit = len) => {
+      if (wire === 0) return readVarint(limit) !== null;
+      if (wire === 1) { if (pos + 8 > limit) return false; pos += 8; return true; }
+      if (wire === 2) {
+        const lBig = readVarint(limit);
+        if (lBig === null) return false;
+        const l = Number(lBig);
+        if (!Number.isFinite(l) || l < 0 || pos + l > limit) return false;
+        pos += l;
+        return true;
+      }
+      if (wire === 5) { if (pos + 4 > limit) return false; pos += 4; return true; }
+      return false;
+    };
+
+    let bpm = null, keyStr = null, majorMinor = undefined, camelotVal = null, danceability = null, energy = null;
+    try {
+      while (pos < len) {
+        const tagBig = readVarint(len);
+        if (!tagBig) break;
+        const tag = Number(tagBig);
+        const field = tag >>> 3;
+        const wire = tag & 7;
+
+        if (field === 1 && wire === 1 && pos + 8 <= len) {
+          bpm = view.getFloat64(pos, true);
+          pos += 8;
+        } else if (field === 2 && wire === 2) {
+          const kLen = Number(readVarint(len));
+          if (!Number.isFinite(kLen) || kLen < 0 || pos + kLen > len) break;
+          const keyEnd = pos + kLen;
+          while (pos < keyEnd) {
+            const kTagBig = readVarint(keyEnd);
+            if (!kTagBig) break;
+            const kTag = Number(kTagBig);
+            const kField = kTag >>> 3;
+            const kWire = kTag & 7;
+            if (kField === 1 && kWire === 2) {
+              const sLen = Number(readVarint(keyEnd));
+              if (!Number.isFinite(sLen) || sLen < 0 || pos + sLen > keyEnd) break;
+              keyStr = protoTextDecoder.decode(bytes.subarray(pos, pos + sLen));
+              pos += sLen;
+            } else if (kField === 2 && kWire === 0) {
+              const mmBig = readVarint(keyEnd);
+              if (mmBig === null) break;
+              majorMinor = Number(mmBig);
+            } else if (kField === 3 && kWire === 2) {
+              const cLen = Number(readVarint(keyEnd));
+              if (!Number.isFinite(cLen) || cLen < 0 || pos + cLen > keyEnd) break;
+              const camEnd = pos + cLen;
+              while (pos < camEnd) {
+                const cTagBig = readVarint(camEnd);
+                if (!cTagBig) break;
+                const cTag = Number(cTagBig);
+                const cField = cTag >>> 3;
+                const cWire = cTag & 7;
+                if (cField === 1 && cWire === 2) {
+                  const csLen = Number(readVarint(camEnd));
+                  if (!Number.isFinite(csLen) || csLen < 0 || pos + csLen > camEnd) break;
+                  camelotVal = protoTextDecoder.decode(bytes.subarray(pos, pos + csLen));
+                  pos += csLen;
+                } else if (!skipWire(cWire, camEnd)) {
+                  break;
+                }
+              }
+              pos = camEnd;
+            } else if (!skipWire(kWire, keyEnd)) {
+              break;
+            }
+          }
+          pos = keyEnd;
+        } else if (field === 3 && wire === 1 && pos + 8 <= len) {
+          danceability = view.getFloat64(pos, true);
+          pos += 8;
+        } else if (field === 4 && wire === 1 && pos + 8 <= len) {
+          energy = view.getFloat64(pos, true);
+          pos += 8;
+        } else if (!skipWire(wire, len)) {
+          break;
+        }
+      }
+    } catch {}
+
+    if (bpm === null && keyStr === null && camelotVal === null) return null;
+    return formatAudioAttributesV2(bpm, keyStr, majorMinor, camelotVal, danceability, energy);
+  }
+
   async function fetchInternalAudioFeaturesBatch(trackIds) {
     if (!trackIds || trackIds.length === 0) return {};
-    
+
+    const uniqueIds = [...new Set(trackIds.filter(Boolean))];
+    const results = {};
+    const missingIds = [];
+
+    const client = getMetadataClient();
+    if (client) {
+        const ESP_BATCH_SIZE = 500;
+        for (let i = 0; i < uniqueIds.length; i += ESP_BATCH_SIZE) {
+            const batchIds = uniqueIds.slice(i, i + ESP_BATCH_SIZE);
+            const resolved = new Set();
+            try {
+                const response = await fetchMetadataWithTimeout(client, {
+                    extensionQuery: [{ extensionKind: 222, entityUri: batchIds.map(id => `spotify:track:${id}`) }]
+                });
+                const ext = response?.extension?.find(e => e.extensionKind === 222) || response?.extension?.[0];
+                if (ext?.entityExtension) {
+                    for (const item of ext.entityExtension) {
+                        const status = item?.header?.statusCode;
+                        if ((status !== undefined && status !== 200) || item?.header?.isEmpty || !item?.extensionData?.value || !item?.entityUri) continue;
+                        const parsed = parseAudioAttributesV2Buffer(item.extensionData.value);
+                        if (parsed) {
+                            const tid = item.entityUri.split(':')[2];
+                            results[tid] = parsed;
+                            resolved.add(tid);
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn("[Sort-Play] Esperanto extKind 222 audio attributes batch failed, falling back to HTTP", e);
+            }
+            for (const id of batchIds) {
+                if (!resolved.has(id)) missingIds.push(id);
+            }
+        }
+    } else {
+        missingIds.push(...uniqueIds);
+    }
+
+    if (missingIds.length === 0) return results;
+
     try {
         const protobuf = await loadProtobuf();
-        
         const { ProductStateAPI, PlatformData } = Spicetify.Platform;
         const productState = await ProductStateAPI.getValues();
         const country = productState.country || "US";
@@ -65764,29 +66833,10 @@ shadowRoot.innerHTML = `
         crypto.getRandomValues(taskId);
 
         const BATCH_SIZE = 100;
-        const results = {};
-
-        const keyStringToInt = {
-            "C": 0, "C#": 1, "Db": 1, "DB": 1, 
-            "D": 2, "D#": 3, "Eb": 3, "EB": 3,
-            "E": 4, 
-            "F": 5, "F#": 6, "Gb": 6, "GB": 6, 
-            "G": 7, "G#": 8, "Ab": 8, "AB": 8,
-            "A": 9, "A#": 10, "Bb": 10, "BB": 10, 
-            "B": 11
-        };
-
-        const pitchClasses = ["C", "C♯/D♭", "D", "D♯/E♭", "E", "F", "F♯/G♭", "G", "G♯/A♭", "A", "A♯/B♭", "B"];
-
-        for (let i = 0; i < trackIds.length; i += BATCH_SIZE) {
-            const batch = trackIds.slice(i, i + BATCH_SIZE);
-            
+        for (let i = 0; i < missingIds.length; i += BATCH_SIZE) {
+            const batch = missingIds.slice(i, i + BATCH_SIZE);
             const payload = {
-                header: {
-                    country: country,
-                    catalogue: catalogue,
-                    task_id: taskId
-                },
+                header: { country, catalogue, task_id: taskId },
                 request: batch.map(id => ({
                     entity_uri: `spotify:track:${id}`,
                     query: { extension_kind: 222 }
@@ -65794,122 +66844,38 @@ shadowRoot.innerHTML = `
             };
 
             const buffer = rootRequest.encode(payload).finish();
-            
-            let attempt = 0;
-            let success = false;
-            let decoded = null;
-
-            while (attempt < 3 && !success) {
-                if (internalTokenRefreshPromise) {
-                    await internalTokenRefreshPromise;
-                }
-                const token = Spicetify.Platform.Session.accessToken;
-
-                const res = await fetch("https://spclient.wg.spotify.com/extended-metadata/v0/extended-metadata", {
+            const res = await fetchWithSpotifyAuth(
+                "https://spclient.wg.spotify.com/extended-metadata/v0/extended-metadata",
+                {
                     method: "POST",
                     body: buffer,
                     headers: {
                         "Content-Type": "application/protobuf",
-                        "Authorization": `Bearer ${token}`,
                         "Spotify-App-Version": Spicetify.Platform.version,
                         "App-Platform": PlatformData.app_platform
                     }
-                });
+                },
+                12000
+            );
+            if (!res || !res.ok) continue;
 
-                if (res.status === 401) {
-                    if (!internalTokenRefreshPromise) {
-                        console.warn(`[Sort-Play] Token 401 in AudioFeaturesBatch. Starting Refresh...`);
-                        internalTokenRefreshPromise = (async () => {
-                            try {
-                                const tokenData = await Spicetify.CosmosAsync.get('sp://auth/v2/token');
-                                const newToken = tokenData.accessToken;
-                                Spicetify.Platform.Session.accessToken = newToken;
-                                await new Promise(r => setTimeout(r, 500));
-                                return newToken;
-                            } catch (e) {
-                                console.error("[Sort-Play] Token refresh failed", e);
-                                throw e;
-                            } finally {
-                                internalTokenRefreshPromise = null;
-                            }
-                        })();
-                    }
-                    try {
-                        await internalTokenRefreshPromise;
-                    } catch (e) {
-                        break;
-                    }
-                    attempt++;
-                    continue;
-                }
-
-                if (!res.ok) break;
-
-                const resBuffer = new Uint8Array(await res.arrayBuffer());
-                decoded = rootResponse.decode(resBuffer);
-                success = true;
-            }
-
-            if (!success || !decoded) continue;
-
-            const data = rootResponse.toObject(decoded, {
-                longs: String,
-                enums: String,
-                bytes: String,
-            });
+            const resBuffer = new Uint8Array(await res.arrayBuffer());
+            const decoded = rootResponse.decode(resBuffer);
+            const data = rootResponse.toObject(decoded, { longs: String, enums: String, bytes: String });
 
             if (data.response) {
                 data.response.forEach(resp => {
                     if (resp.attributes && resp.attributes.attributes) {
                         const attr = resp.attributes.attributes;
                         const trackId = resp.track.split(":")[2];
-                        
-                        let keyRaw = -1;
-                        let mode = -1;
-                        let camelotVal = null;
-                        
-                        if (attr.key) {
-                            if (typeof attr.key.key === 'string') {
-                                const kStr = attr.key.key;
-                                const kIdx = parseInt(kStr);
-                                
-                                if (!isNaN(kIdx) && String(kIdx) === kStr && kIdx >= 0 && kIdx <= 11) {
-                                    keyRaw = kIdx;
-                                } else {
-                                    const upperKey = kStr.toUpperCase();
-                                    if (keyStringToInt[kStr] !== undefined) {
-                                        keyRaw = keyStringToInt[kStr];
-                                    } else if (keyStringToInt[upperKey] !== undefined) {
-                                        keyRaw = keyStringToInt[upperKey];
-                                    }
-                                }
-                            }
-                            if (attr.key.majorMinor !== undefined) {
-                                mode = attr.key.majorMinor === 2 ? 1 : 0;
-                            }
-                            if (attr.key.camelot && attr.key.camelot.key) {
-                                camelotVal = attr.key.camelot.key;
-                            }
-                        }
-
-                        let keyString = "Undefined";
-                        if (keyRaw !== -1) {
-                            keyString = pitchClasses[keyRaw];
-                            if (mode === 0) keyString += "m";
-                        }
-
-                        results[trackId] = {
-                            tempo: attr.bpm ? Math.round(attr.bpm) : null,
-                            key_raw: keyRaw,
-                            mode: mode,
-                            key: keyString,
-                            camelot: camelotVal,
-                            energy: (attr.energy !== null && attr.energy !== undefined) ? Math.round(100 * attr.energy) : null,
-                            danceability: (attr.danceability !== null && attr.danceability !== undefined) ? Math.round(100 * attr.danceability) : null,
-                            valence: null, acousticness: null, 
-                            instrumentalness: null, speechiness: null, 
-                            liveness: null, loudness: null
-                        };
+                        results[trackId] = formatAudioAttributesV2(
+                            attr.bpm,
+                            attr.key?.key,
+                            attr.key?.majorMinor,
+                            attr.key?.camelot?.key,
+                            attr.danceability,
+                            attr.energy
+                        );
                     }
                 });
             }
@@ -65917,8 +66883,181 @@ shadowRoot.innerHTML = `
         return results;
     } catch (e) {
         console.error("Internal Audio Features fetch failed:", e);
-        return {};
+        return results;
     }
+  }
+
+  async function fetchFastExtraColsEsperanto({ playCountIds = [], coreIds = [], tempoKeyIds = [], existingMetaMap = null } = {}) {
+      const pcIds = [...new Set((playCountIds || []).filter(Boolean))];
+      const cIds = [...new Set((coreIds || []).filter(Boolean))];
+      const tkIds = [...new Set((tempoKeyIds || []).filter(Boolean))];
+      const playCounts = new Map();
+      const coreMeta = new Map();
+      const tempoKey = new Map();
+      if (!pcIds.length && !cIds.length && !tkIds.length) return { playCounts, coreMeta, tempoKey, ok: true };
+
+      const client = getMetadataClient();
+      if (!client) return { playCounts, coreMeta, tempoKey, ok: false };
+
+      const extensionQuery = [];
+      if (pcIds.length) extensionQuery.push({ extensionKind: 185, entityUri: pcIds.map(id => `spotify:track:${id}`) });
+      if (cIds.length) extensionQuery.push({ extensionKind: 10, entityUri: cIds.map(id => `spotify:track:${id}`) });
+      if (tkIds.length) extensionQuery.push({ extensionKind: 222, entityUri: tkIds.map(id => `spotify:track:${id}`) });
+
+      let response;
+      try {
+          response = await fetchMetadataWithTimeout(client, { extensionQuery });
+      } catch (e) {
+          console.warn("[Sort-Play] Bundled Esperanto extra-column fetch failed", e);
+          return { playCounts, coreMeta, tempoKey, ok: false };
+      }
+
+      const exts = Array.isArray(response?.extension) ? response.extension : [];
+      const pcEntries = [];
+      const metaEntries = [];
+      const rdEntries = [];
+      const tkEntries = [];
+
+      const ext185 = pcIds.length ? exts.find(e => e.extensionKind === 185) : null;
+      if (ext185?.entityExtension) {
+          for (const item of ext185.entityExtension) {
+              const status = item?.header?.statusCode;
+              if ((status !== undefined && status !== 200) || item?.header?.isEmpty || !item?.extensionData?.value || !item?.entityUri) continue;
+              const parsed = parseVarint(item.extensionData.value);
+              if (parsed !== null && Number.isFinite(parsed) && parsed >= 0) {
+                  const tid = item.entityUri.split(':')[2];
+                  if (!tid) continue;
+                  playCounts.set(tid, parsed);
+                  setExtraColMem('playCounts', tid, parsed);
+                  pcEntries.push({ key: tid, val: parsed });
+              }
+          }
+      }
+
+      const ext10 = cIds.length ? exts.find(e => e.extensionKind === 10) : null;
+      if (ext10?.entityExtension) {
+          for (const item of ext10.entityExtension) {
+              const status = item?.header?.statusCode;
+              if ((status !== undefined && status !== 200) || item?.header?.isEmpty || !item?.extensionData?.value || !item?.entityUri) continue;
+              const tid = item.entityUri.split(':')[2];
+              if (!tid) continue;
+              const extracted = extractCoreMetadataFromExtKind10(item.extensionData.value, tid);
+              if (!extracted) continue;
+              coreMeta.set(tid, extracted);
+              const mergedMeta = mergeTrackCacheData(existingMetaMap?.get(tid), extracted, Boolean(extracted.albumType));
+              metaEntries.push({ key: tid, val: mergedMeta });
+              if (extracted.popularity !== undefined && extracted.popularity !== null) setExtraColMem('popularity', tid, extracted.popularity);
+              if (extracted.releaseDate) {
+                  setExtraColMem('releaseDates', tid, extracted.releaseDate);
+                  rdEntries.push({ key: tid, val: { date: extracted.releaseDate, trackNumber: extracted.trackNumber || 0, discNumber: extracted.discNumber || 1 } });
+              }
+          }
+      }
+
+      const ext222 = tkIds.length ? exts.find(e => e.extensionKind === 222) : null;
+      if (ext222?.entityExtension) {
+          for (const item of ext222.entityExtension) {
+              const status = item?.header?.statusCode;
+              if ((status !== undefined && status !== 200) || item?.header?.isEmpty || !item?.extensionData?.value || !item?.entityUri) continue;
+              const parsed = parseAudioAttributesV2Buffer(item.extensionData.value);
+              if (!parsed) continue;
+              const tid = item.entityUri.split(':')[2];
+              if (!tid) continue;
+              const tk = { tempo: parsed.tempo, key_raw: parsed.key_raw, mode: parsed.mode, key: parsed.key, camelot: parsed.camelot };
+              tempoKey.set(tid, tk);
+              setExtraColMem('tempoKey', tid, tk);
+              tkEntries.push({ key: `${BPM_KEY_CACHE_PREFIX}${tid}`, val: tk });
+          }
+      }
+
+      const writes = [];
+      if (idb.setMany) {
+          if (pcEntries.length) writes.push(idb.setMany('playCounts', pcEntries));
+          if (metaEntries.length) writes.push(idb.setMany('trackMetadata', metaEntries));
+          if (rdEntries.length) writes.push(idb.setMany('releaseDates', rdEntries));
+          if (tkEntries.length) writes.push(idb.setMany('aiData', tkEntries));
+      }
+      if (writes.length) Promise.all(writes).catch(() => {});
+
+      return { playCounts, coreMeta, tempoKey, ok: true };
+  }
+
+  async function fetchTempoKeyBatch(trackIds, isCancelled = () => false) {
+      const uniqueIds = [...new Set((trackIds || []).filter(Boolean))];
+      const results = {};
+      if (!uniqueIds.length) return results;
+
+      const missingFromMem = [];
+      for (const id of uniqueIds) {
+          const full = getExtraColMem('aiStats', id, CACHE_EXPIRE_AI_DATA);
+          if (full && !full._missing) {
+              results[id] = full;
+              continue;
+          }
+          const tk = getExtraColMem('tempoKey', id, CACHE_EXPIRE_AI_DATA);
+          if (tk && !tk._missing) {
+              results[id] = tk;
+              continue;
+          }
+          missingFromMem.push(id);
+      }
+      if (!missingFromMem.length || isCancelled()) return results;
+
+      const fullKeys = missingFromMem.map(id => getCacheKey(id, true, false, "stats-column"));
+      const tkKeys = missingFromMem.map(id => `${BPM_KEY_CACHE_PREFIX}${id}`);
+      const cachedMap = await idb.getMany('aiData', [...fullKeys, ...tkKeys], CACHE_EXPIRE_AI_DATA);
+      if (isCancelled()) return results;
+
+      const missingFromIdb = [];
+      for (let i = 0; i < missingFromMem.length; i++) {
+          const id = missingFromMem[i];
+          const fullRaw = cachedMap.get(fullKeys[i]);
+          const fullStats = fullRaw ? (fullRaw.stats || fullRaw) : null;
+          if (fullStats && ((fullStats.tempo && fullStats.tempo > 0) || (fullStats.key_raw !== undefined && fullStats.key_raw !== -1))) {
+              if (!fullStats._partialFallback && fullStats.energy !== undefined && fullStats.energy !== null) {
+                  setExtraColMem('aiStats', id, fullStats);
+              }
+              results[id] = fullStats;
+              continue;
+          }
+          const tkRaw = cachedMap.get(tkKeys[i]);
+          if (tkRaw && typeof tkRaw === 'object') {
+              setExtraColMem('tempoKey', id, tkRaw);
+              results[id] = tkRaw;
+              continue;
+          }
+          missingFromIdb.push(id);
+      }
+      if (!missingFromIdb.length || isCancelled()) return results;
+
+      const BATCH_SIZE = 500;
+      const fallbackIds = [];
+      for (let i = 0; i < missingFromIdb.length; i += BATCH_SIZE) {
+          if (isCancelled()) return results;
+          const batch = missingFromIdb.slice(i, i + BATCH_SIZE);
+          const { tempoKey, ok } = await fetchFastExtraColsEsperanto({ tempoKeyIds: batch });
+          if (ok) {
+              for (const [tid, tk] of tempoKey.entries()) results[tid] = tk;
+          } else {
+              fallbackIds.push(...batch);
+          }
+      }
+
+      if (fallbackIds.length > 0 && !isCancelled()) {
+          const fb = await fetchInternalAudioFeaturesBatch(fallbackIds);
+          const tkEntries = [];
+          for (const id of fallbackIds) {
+              const parsed = fb?.[id];
+              if (!parsed) continue;
+              const tk = { tempo: parsed.tempo, key_raw: parsed.key_raw, mode: parsed.mode, key: parsed.key, camelot: parsed.camelot };
+              results[id] = tk;
+              setExtraColMem('tempoKey', id, tk);
+              tkEntries.push({ key: `${BPM_KEY_CACHE_PREFIX}${id}`, val: tk });
+          }
+          if (tkEntries.length && idb.setMany) idb.setMany('aiData', tkEntries).catch(() => {});
+      }
+
+      return results;
   }
 
   async function getBatchTrackStats(trackIds, updateProgress = () => {}, isCancelled = () => false) {
@@ -65930,13 +67069,18 @@ shadowRoot.innerHTML = `
 
     const results = {};
     const missingIds = [];
+    const now = Date.now();
 
     trackIds.forEach((id, index) => {
         const key = cacheKeys[index];
         const cached = cachedDataMap.get(key);
         const stats = cached ? (cached.stats || cached) : null;
-        
-        if (stats && stats.energy !== undefined && stats.energy !== null && stats.key_raw !== undefined && stats.key_raw !== -1) {
+
+        const hasFull = stats && !stats._partialFallback && stats.energy !== undefined && stats.energy !== null && stats.key_raw !== undefined && stats.key_raw !== -1;
+        const hasRecentPartial = stats && stats._partialFallback && stats.key_raw !== undefined && stats.key_raw !== -1 && stats.tempo && (now - (stats._partialTs || 0) < CACHE_EXPIRE_METADATA);
+
+        if (hasFull || hasRecentPartial) {
+            setExtraColMem('aiStats', id, stats);
             results[id] = stats;
         } else {
             missingIds.push(id);
@@ -65955,59 +67099,18 @@ shadowRoot.innerHTML = `
     for (let i = 0; i < missingIds.length; i += BATCH_SIZE) {
         if (isCancelled()) break;
         const batchIds = missingIds.slice(i, i + BATCH_SIZE);
-        
-        const batchPromises = batchIds.map(async (id) => {
-            let attempt = 0;
-            while (attempt < 3) {
-                if (isCancelled()) return { id, features: null, success: false };
-                try {
-                    if (internalTokenRefreshPromise) {
-                        await internalTokenRefreshPromise;
-                    }
-                    const token = Spicetify.Platform.Session.accessToken;
-                    const url = `https://spclient.wg.spotify.com/audio-attributes/v1/audio-features/${id}`;
-                    const res = await fetch(url, {
-                        headers: {
-                            "Authorization": `Bearer ${token}`
-                        }
-                    });
-                    
-                    if (res.status === 401) {
-                        if (!internalTokenRefreshPromise) {
-                            console.warn(`[Sort-Play] Token 401 in BatchTrackStats. Starting Refresh...`);
-                            internalTokenRefreshPromise = (async () => {
-                                try {
-                                    const tokenData = await Spicetify.CosmosAsync.get('sp://auth/v2/token');
-                                    const newToken = tokenData.accessToken;
-                                    Spicetify.Platform.Session.accessToken = newToken;
-                                    await new Promise(r => setTimeout(r, 500));
-                                    return newToken;
-                                } catch (e) {
-                                    console.error("[Sort-Play] Token refresh failed", e);
-                                    throw e;
-                                } finally {
-                                    internalTokenRefreshPromise = null;
-                                }
-                            })();
-                        }
-                        try {
-                            await internalTokenRefreshPromise;
-                        } catch (e) {
-                            return { id, features: null, success: false };
-                        }
-                        attempt++;
-                        continue;
-                    }
 
-                    if (!res.ok) throw new Error("Fetch failed");
-                    const features = await res.json();
-                    
-                    if (features && features.id) {
-                        return { id, features, success: true };
-                    }
-                } catch (e) {}
-                break;
-            }
+        const batchPromises = batchIds.map(async (id) => {
+            if (isCancelled()) return { id, features: null, success: false };
+            try {
+                const url = `https://spclient.wg.spotify.com/audio-attributes/v1/audio-features/${id}`;
+                const res = await fetchWithSpotifyAuth(url, {}, 10000);
+                if (!res || !res.ok) return { id, features: null, success: false };
+                const features = await res.json();
+                if (features && features.id) {
+                    return { id, features, success: true };
+                }
+            } catch {}
             return { id, features: null, success: false };
         });
 
@@ -66035,17 +67138,18 @@ shadowRoot.innerHTML = `
                     releaseDate: null
                 };
                 results[res.id] = stats;
-                
+
                 if (stats.key_raw === -1 || !stats.tempo) {
                     idsNeedingInternal.push(res.id);
                 } else {
+                    setExtraColMem('aiStats', res.id, stats);
                     entriesToSave.push({ key: getCacheKey(res.id, true, false, "stats-column"), val: { stats } });
                 }
             } else {
                 idsNeedingInternal.push(res.id);
             }
         }
-        
+
         if (idb.setMany && entriesToSave.length > 0) await idb.setMany('aiData', entriesToSave);
         if (isCancelled()) break;
 
@@ -66053,6 +67157,7 @@ shadowRoot.innerHTML = `
             try {
                 const internalData = await fetchInternalAudioFeaturesBatch(idsNeedingInternal);
                 const internalEntriesToSave = [];
+                const partialNow = Date.now();
                 for (const id of idsNeedingInternal) {
                     if (internalData[id]) {
                         if (results[id]) {
@@ -66064,8 +67169,9 @@ shadowRoot.innerHTML = `
                             }
                             if (internalData[id].tempo) results[id].tempo = internalData[id].tempo;
                         } else {
-                            results[id] = internalData[id];
+                            results[id] = { ...internalData[id], _partialFallback: true, _partialTs: partialNow };
                         }
+                        setExtraColMem('aiStats', id, results[id]);
                         internalEntriesToSave.push({ key: getCacheKey(id, true, false, "stats-column"), val: { stats: results[id] } });
                     }
                 }
@@ -66077,9 +67183,9 @@ shadowRoot.innerHTML = `
 
         tracksProcessed += batchIds.length;
         if (updateProgress) updateProgress(Math.min(100, Math.floor((tracksProcessed / missingIds.length) * 100)));
-        
+
         if (i + BATCH_SIZE < missingIds.length && !isCancelled()) {
-            await new Promise(r => setTimeout(r, 50)); 
+            await new Promise(r => setTimeout(r, 50));
         }
     }
 
@@ -68238,6 +69344,87 @@ shadowRoot.innerHTML = `
       return await promise;
   }
 
+  async function getRawPlaylistContentsMinimal(uri, mode = 'tracks') {
+      const origDec = PlaylistAPI._getPlaylistDecorationPolicies;
+      if (typeof origDec !== 'function') {
+          return await getRawPlaylistContents(uri);
+      }
+      try {
+          let promise;
+          PlaylistAPI._getPlaylistDecorationPolicies = function(...args) {
+              const pol = origDec.apply(this, args);
+              if (mode === 'uid') {
+                  return {
+                      ...pol,
+                      playlist: { link: true, totalLength: true, extension: [] },
+                      track: { track: { link: true, isLocal: true, extension: [] }, rowId: true },
+                      episode: { episode: { link: true, extension: [] }, rowId: true },
+                      item: { uri: true, extensionPolicy: [], collectionState: false, rowId: true }
+                  };
+              }
+              return {
+                  ...pol,
+                  playlist: { link: true, totalLength: true, length: true, loaded: true, extension: [] },
+                  track: {
+                      track: {
+                          link: true, name: true, length: true, playable: true,
+                          isAvailableInMetadataCatalogue: true, locallyPlayable: true, playableLocalTrack: true,
+                          discNumber: true, trackNumber: true, isExplicit: true, isLocal: true, playableTrackLink: true,
+                          extension: []
+                      },
+                      rowId: true, addTime: true, localFile: true,
+                      album: { album: { link: true, name: true, covers: false, year: false } },
+                      artist: { link: true, name: true, isVariousArtists: false, portraits: false }
+                  },
+                  episode: { episode: { link: true, extension: [] } },
+                  item: { uri: true, extensionPolicy: [], collectionState: false, rowId: false, addTime: false }
+              };
+          };
+          try {
+              promise = spViewSortOriginals.getContents(uri);
+          } finally {
+              PlaylistAPI._getPlaylistDecorationPolicies = origDec;
+          }
+          const res = await promise;
+          if (res && Array.isArray(res.items)) return res;
+      } catch (e) {
+          console.warn("[Sort-Play] Minimal playlist fetch failed, falling back to full getContents", e);
+      }
+      return await getRawPlaylistContents(uri);
+  }
+
+  async function getFastPlaylistMetadata(uri) {
+      const origDec = PlaylistAPI._getPlaylistDecorationPolicies;
+      if (typeof origDec !== 'function') {
+          return await Spicetify.Platform.PlaylistAPI.getMetadata(uri);
+      }
+      try {
+          let promise;
+          PlaylistAPI._getPlaylistDecorationPolicies = function(...args) {
+              const pol = origDec.apply(this, args);
+              return {
+                  ...pol,
+                  playlist: {
+                      link: true, name: true, description: true, totalLength: true, length: true,
+                      unrangedLength: true, numberOfTracks: true, picture: true, ownedBySelf: true,
+                      owner: { username: true, link: true, name: true },
+                      extension: []
+                  }
+              };
+          };
+          try {
+              promise = Spicetify.Platform.PlaylistAPI.getMetadata(uri);
+          } finally {
+              PlaylistAPI._getPlaylistDecorationPolicies = origDec;
+          }
+          const meta = await promise;
+          if (meta) return meta;
+      } catch (e) {
+          console.warn("[Sort-Play] Fast playlist metadata failed, falling back", e);
+      }
+      return await Spicetify.Platform.PlaylistAPI.getMetadata(uri);
+  }
+
   function getCachedRawPlaylistItems(uri, requireReleaseExt = false) {
       const entry = playlistRawItemsCache.get(uri);
       if (!entry) return null;
@@ -68478,6 +69665,7 @@ shadowRoot.innerHTML = `
                   if (dateVal && tid) toCache.push({ key: tid, val: { date: dateVal, trackNumber: trackNum, discNumber: discNum } });
               }
               if (dateVal != null) {
+                  if (tid) setExtraColMem('releaseDates', tid, dateVal);
                   const ts = parseViewSortReleaseDateMs(dateVal);
                   if (!isNaN(ts)) valuesMap.set(item.uri, { ts, albumName: item.album?.name || '', discNumber: discNum, trackNumber: trackNum });
               } else {
@@ -68550,9 +69738,13 @@ shadowRoot.innerHTML = `
               const cachedTs = (!entry.isLocal && cachedMap.has(key)) ? cachedMap.get(key) : null;
               if (recentTs > 0 && (!cachedTs || recentTs > cachedTs)) {
                   valuesMap.set(entry.track.uri, recentTs);
-                  if (!entry.isLocal) toCache.push({ key, val: recentTs });
+                  if (!entry.isLocal) {
+                      toCache.push({ key, val: recentTs });
+                      setExtraColMem('lastScrobbled', key, recentTs);
+                  }
               } else if (typeof cachedTs === 'number' && cachedTs > 0) {
                   valuesMap.set(entry.track.uri, cachedTs);
+                  if (!entry.isLocal) setExtraColMem('lastScrobbled', key, cachedTs);
               } else if (cachedTs === null || cachedTs === undefined) {
                   if (!seenMissingKeys.has(key)) {
                       seenMissingKeys.add(key);
@@ -68584,6 +69776,14 @@ shadowRoot.innerHTML = `
                   const ts = entry.lfmInfo?.key ? keyResultMap.get(entry.lfmInfo.key) : null;
                   if (ts > 0 && !valuesMap.has(entry.track.uri)) valuesMap.set(entry.track.uri, ts);
               }
+          }
+      } else if (colType === 'tempo' || colType === 'key') {
+          const ids = eligibleItems.map(i => i.uri.split(':')[2]).filter(Boolean);
+          const statsObj = await fetchTempoKeyBatch(ids, isCancelled);
+          if (isCancelled()) return null;
+          for (const item of eligibleItems) {
+              const st = statsObj[item.uri.split(':')[2]];
+              if (st) valuesMap.set(item.uri, st);
           }
       } else {
           const ids = eligibleItems.map(i => i.uri.split(':')[2]).filter(Boolean);
@@ -68786,11 +69986,11 @@ shadowRoot.innerHTML = `
   function setExtraColMem(store, key, val) {
       const map = extraColMemCache[store];
       if (!map || !key) return;
-      if (map.size >= 10000) {
+      if (map.size >= 25000) {
           let pruned = 0;
           for (const k of map.keys()) {
               map.delete(k);
-              if (++pruned >= 2000) break;
+              if (++pruned >= 5000) break;
           }
       }
       map.set(key, { val, ts: Date.now() });
@@ -68799,6 +69999,447 @@ shadowRoot.innerHTML = `
   function clearExtraColMem(stores = null) {
       const targets = Array.isArray(stores) ? stores : Object.keys(extraColMemCache);
       for (const s of targets) extraColMemCache[s]?.clear();
+      playlistExtraColPrefetchState.completed.clear();
+      playlistExtraColPrefetchState.activeColSig = '';
+  }
+
+  const extraColInFlight = {
+      playCounts: new Map(),
+      core: new Map(),
+      tempoKey: new Map(),
+      aiStats: new Map()
+  };
+
+  function registerExtraColInFlight(bucket, ids, promise) {
+      const map = extraColInFlight[bucket];
+      if (!map || !ids?.length || !promise) return promise;
+      for (const id of ids) map.set(id, promise);
+      promise.finally(() => {
+          for (const id of ids) {
+              if (map.get(id) === promise) map.delete(id);
+          }
+      });
+      return promise;
+  }
+
+  const playlistExtraColPrefetchState = {
+      sessionId: 0,
+      activeUri: null,
+      activeColSig: '',
+      warmupTimer: null,
+      networkTimer: null,
+      recentNetworkStarts: [],
+      cooldownUntil: 0,
+      completed: new Map()
+  };
+
+  function cancelPlaylistExtraColPrefetch() {
+      playlistExtraColPrefetchState.sessionId++;
+      if (playlistExtraColPrefetchState.warmupTimer) {
+          clearTimeout(playlistExtraColPrefetchState.warmupTimer);
+          playlistExtraColPrefetchState.warmupTimer = null;
+      }
+      if (playlistExtraColPrefetchState.networkTimer) {
+          clearTimeout(playlistExtraColPrefetchState.networkTimer);
+          playlistExtraColPrefetchState.networkTimer = null;
+      }
+      playlistExtraColPrefetchState.activeUri = null;
+      playlistExtraColPrefetchState.activeColSig = '';
+  }
+
+  function repaintUnprocessedPlaylistRows() {
+      if (document.querySelector('.main-trackList-trackListRow:not(.sort-play-processing) .sp-extra-col-val:not([data-sp-processed="true"])')) {
+          updateTracklist();
+      }
+  }
+
+  async function runPlaylistExtraColWarmup(uri, colTypes, hasLfmUser, isStale) {
+      const needPC = colTypes.has('playCount');
+      const needPop = colTypes.has('popularity');
+      const needRD = colTypes.has('releaseDate');
+      const needTRD = colTypes.has('trueReleaseDate');
+      const needTK = colTypes.has('tempo') || colTypes.has('key');
+      const needFullAudio = colTypes.has('energy') || colTypes.has('danceability') || colTypes.has('valence') || colTypes.has('djInfo');
+      const needScrobbles = colTypes.has('scrobbles');
+      const needPersonal = hasLfmUser && colTypes.has('personalScrobbles');
+      const needLastScrobbled = hasLfmUser && colTypes.has('lastScrobbled');
+      const needAnyLfm = needScrobbles || needPersonal || needLastScrobbled;
+
+      let rawItems = getCachedRawPlaylistItems(uri);
+      if (!rawItems) {
+          const res = await getRawPlaylistContentsMinimal(uri, needAnyLfm ? 'tracks' : 'uid');
+          rawItems = Array.isArray(res?.items) ? res.items : [];
+      }
+      if (isStale() || !rawItems.length) return null;
+
+      const trackIds = [];
+      const seenIds = new Set();
+      const lfmEntries = [];
+      const seenLfmKeys = new Set();
+
+      for (const item of rawItems) {
+          const u = item?.uri;
+          if (typeof u !== 'string') continue;
+          if (u.startsWith('spotify:track:')) {
+              const id = u.split(':')[2];
+              if (id && !seenIds.has(id)) {
+                  seenIds.add(id);
+                  trackIds.push(id);
+              }
+          }
+          if (needAnyLfm && (u.startsWith('spotify:track:') || URI.isLocal(u))) {
+              const trackObj = buildViewSortTrackObj(item);
+              const lfmInfo = getLfmInfo(trackObj);
+              if (lfmInfo?.key && !seenLfmKeys.has(lfmInfo.key)) {
+                  seenLfmKeys.add(lfmInfo.key);
+                  lfmEntries.push({ key: lfmInfo.key, track: trackObj, isLocal: URI.isLocal(u) });
+              }
+          }
+      }
+      if (isStale()) return null;
+
+      const missMemPC = needPC ? trackIds.filter(id => { const v = getExtraColMem('playCounts', id, CACHE_EXPIRE_PLAYCOUNTS); return v === undefined || v === null; }) : [];
+      const missMemRD = needRD ? trackIds.filter(id => getExtraColMem('releaseDates', id, CACHE_EXPIRE_RELEASE_DATE) === undefined) : [];
+      const missMemPop = needPop ? trackIds.filter(id => getExtraColMem('popularity', id, CACHE_EXPIRE_METADATA) === undefined) : [];
+      const missMemTRD = needTRD ? trackIds.filter(id => getExtraColMem('trueReleaseDates', id, CACHE_EXPIRE_RELEASE_DATE) === undefined) : [];
+      const missMemFullAudio = needFullAudio ? trackIds.filter(id => getExtraColMem('aiStats', id, CACHE_EXPIRE_AI_DATA) === undefined) : [];
+      const missMemTK = needTK ? trackIds.filter(id => {
+          const full = getExtraColMem('aiStats', id, CACHE_EXPIRE_AI_DATA);
+          if (full && !full._missing) return false;
+          return getExtraColMem('tempoKey', id, CACHE_EXPIRE_AI_DATA) === undefined;
+      }) : [];
+      const missMemScrobbles = needScrobbles ? lfmEntries.filter(e => getExtraColMem('scrobbles', e.key, CACHE_EXPIRE_GLOBAL_SCROBBLES) === undefined) : [];
+      const missMemPersonal = needPersonal ? lfmEntries.filter(e => getExtraColMem('personalScrobbles', e.key, CACHE_EXPIRE_PERSONAL_SCROBBLES) === undefined) : [];
+      const missMemLast = needLastScrobbled ? lfmEntries.filter(e => !e.isLocal && getExtraColMem('lastScrobbled', e.key, CACHE_EXPIRE_PERSONAL_SCROBBLES) === undefined) : [];
+
+      const idbTasks = [];
+      let warmedCount = 0;
+
+      if (missMemPC.length) {
+          idbTasks.push(idb.getMany('playCounts', missMemPC, CACHE_EXPIRE_PLAYCOUNTS).then(map => {
+              if (isStale()) return;
+              for (const [id, val] of map.entries()) {
+                  if (val !== undefined && val !== null && val !== "N/A") { setExtraColMem('playCounts', id, val); warmedCount++; }
+              }
+          }));
+      }
+      if (missMemRD.length) {
+          idbTasks.push(idb.getMany('releaseDates', missMemRD, CACHE_EXPIRE_RELEASE_DATE).then(map => {
+              if (isStale()) return;
+              for (const [id, rd] of map.entries()) {
+                  const d = (rd && typeof rd === 'object' && rd.date !== undefined) ? rd.date : rd;
+                  if (d !== undefined && d !== null) { setExtraColMem('releaseDates', id, d); warmedCount++; }
+              }
+          }));
+      }
+      let existingMetaMap = null;
+      if (missMemPop.length) {
+          idbTasks.push(idb.getMany('trackMetadata', missMemPop, CACHE_EXPIRE_METADATA).then(map => {
+              if (isStale()) return;
+              existingMetaMap = map;
+              for (const [id, meta] of map.entries()) {
+                  if (meta && meta.popularity !== undefined && meta.popularity !== null) { setExtraColMem('popularity', id, meta.popularity); warmedCount++; }
+              }
+          }));
+      }
+      if (missMemTRD.length) {
+          idbTasks.push(idb.getMany('trueReleaseDates', missMemTRD, CACHE_EXPIRE_RELEASE_DATE).then(map => {
+              if (isStale()) return;
+              for (const [id, val] of map.entries()) {
+                  if (val !== undefined && val !== null) { setExtraColMem('trueReleaseDates', id, val); warmedCount++; }
+              }
+          }));
+      }
+      if (missMemFullAudio.length || missMemTK.length) {
+          const fullUnionIds = [...new Set([...missMemFullAudio, ...missMemTK])];
+          const fullKeys = fullUnionIds.map(id => getCacheKey(id, true, false, "stats-column"));
+          const tkKeys = missMemTK.map(id => `${BPM_KEY_CACHE_PREFIX}${id}`);
+          idbTasks.push(idb.getMany('aiData', [...fullKeys, ...tkKeys], CACHE_EXPIRE_AI_DATA).then(map => {
+              if (isStale()) return;
+              const now = Date.now();
+              for (let i = 0; i < fullUnionIds.length; i++) {
+                  const id = fullUnionIds[i];
+                  const raw = map.get(fullKeys[i]);
+                  const stats = raw ? (raw.stats || raw) : null;
+                  if (!stats) continue;
+                  const hasFull = !stats._partialFallback && stats.energy !== undefined && stats.energy !== null && stats.key_raw !== undefined && stats.key_raw !== -1;
+                  const hasRecentPartial = stats._partialFallback && stats.key_raw !== undefined && stats.key_raw !== -1 && stats.tempo && (now - (stats._partialTs || 0) < CACHE_EXPIRE_METADATA);
+                  if (hasFull || hasRecentPartial) {
+                      setExtraColMem('aiStats', id, stats);
+                      warmedCount++;
+                  }
+              }
+              for (let i = 0; i < missMemTK.length; i++) {
+                  const id = missMemTK[i];
+                  const full = getExtraColMem('aiStats', id, CACHE_EXPIRE_AI_DATA);
+                  if (full && !full._missing) continue;
+                  const tkRaw = map.get(tkKeys[i]);
+                  if (tkRaw && typeof tkRaw === 'object') {
+                      setExtraColMem('tempoKey', id, tkRaw);
+                      warmedCount++;
+                  }
+              }
+          }));
+      }
+      if (missMemScrobbles.length) {
+          idbTasks.push(idb.getMany('scrobbles', missMemScrobbles.map(e => e.key), CACHE_EXPIRE_GLOBAL_SCROBBLES).then(map => {
+              if (isStale()) return;
+              for (const [k, val] of map.entries()) {
+                  if (val !== undefined && val !== null) { setExtraColMem('scrobbles', k, val); warmedCount++; }
+              }
+          }));
+      }
+      if (missMemPersonal.length) {
+          idbTasks.push(idb.getMany('personalScrobbles', missMemPersonal.map(e => e.key), CACHE_EXPIRE_PERSONAL_SCROBBLES).then(map => {
+              if (isStale()) return;
+              for (const [k, d] of map.entries()) {
+                  if (d && !d.pendingUpdate && d.count !== undefined && d.count !== null) { setExtraColMem('personalScrobbles', k, d.count); warmedCount++; }
+              }
+          }));
+      }
+      if (missMemLast.length) {
+          idbTasks.push(idb.getMany('lastScrobbledDates', missMemLast.map(e => e.key), CACHE_EXPIRE_PERSONAL_SCROBBLES).then(map => {
+              if (isStale()) return;
+              for (const [k, val] of map.entries()) {
+                  if (val !== undefined && val !== null) { setExtraColMem('lastScrobbled', k, val); warmedCount++; }
+              }
+          }));
+      }
+
+      if (idbTasks.length) await Promise.all(idbTasks);
+      if (isStale()) return null;
+      if (warmedCount > 0) repaintUnprocessedPlaylistRows();
+
+      return { totalTracks: rawItems.length, trackIds, lfmEntries, existingMetaMap };
+  }
+
+  async function runPlaylistExtraColPrefetch(uri, colSig, colTypes, hasLfmUser, warmupData, isStale) {
+      const FAST_MAX = 10000;
+      const SLOW_MAX = 400;
+      const { totalTracks, trackIds, lfmEntries, existingMetaMap } = warmupData;
+
+      const needPC = colTypes.has('playCount');
+      const needPop = colTypes.has('popularity');
+      const needRD = colTypes.has('releaseDate');
+      const needTK = colTypes.has('tempo') || colTypes.has('key');
+      const needFullAudio = colTypes.has('energy') || colTypes.has('danceability') || colTypes.has('valence') || colTypes.has('djInfo');
+      const needScrobbles = colTypes.has('scrobbles');
+      const needPersonal = hasLfmUser && colTypes.has('personalScrobbles');
+      const needLastScrobbled = hasLfmUser && colTypes.has('lastScrobbled');
+
+      const fastAllowed = trackIds.length > 0 && trackIds.length <= FAST_MAX;
+      const slowAllowed = totalTracks > 0 && totalTracks <= SLOW_MAX;
+
+      const missPC = (fastAllowed && needPC) ? trackIds.filter(id => { const v = getExtraColMem('playCounts', id, CACHE_EXPIRE_PLAYCOUNTS); return v === undefined || v === null; }) : [];
+      const missCoreSet = new Set();
+      if (fastAllowed && needRD) {
+          for (const id of trackIds) if (getExtraColMem('releaseDates', id, CACHE_EXPIRE_RELEASE_DATE) === undefined) missCoreSet.add(id);
+      }
+      if (fastAllowed && needPop) {
+          for (const id of trackIds) if (getExtraColMem('popularity', id, CACHE_EXPIRE_METADATA) === undefined) missCoreSet.add(id);
+      }
+      const missCore = Array.from(missCoreSet);
+      const missTK = (fastAllowed && needTK) ? trackIds.filter(id => {
+          const full = getExtraColMem('aiStats', id, CACHE_EXPIRE_AI_DATA);
+          if (full && !full._missing) return false;
+          return getExtraColMem('tempoKey', id, CACHE_EXPIRE_AI_DATA) === undefined;
+      }) : [];
+
+      const missFullAudio = (slowAllowed && needFullAudio) ? trackIds.filter(id => getExtraColMem('aiStats', id, CACHE_EXPIRE_AI_DATA) === undefined) : [];
+      const missLfmTrackInfo = [];
+      if (slowAllowed && (needScrobbles || needPersonal)) {
+          for (const entry of lfmEntries) {
+              const needG = needScrobbles && getExtraColMem('scrobbles', entry.key, CACHE_EXPIRE_GLOBAL_SCROBBLES) === undefined;
+              const needP = needPersonal && getExtraColMem('personalScrobbles', entry.key, CACHE_EXPIRE_PERSONAL_SCROBBLES) === undefined;
+              if (needG || needP) missLfmTrackInfo.push({ ...entry, needG, needP });
+          }
+      }
+      const missLfmLast = (slowAllowed && needLastScrobbled) ? lfmEntries.filter(e => !e.isLocal && getExtraColMem('lastScrobbled', e.key, CACHE_EXPIRE_PERSONAL_SCROBBLES) === undefined) : [];
+
+      const hasNetworkWork = missPC.length || missCore.length || missTK.length || missFullAudio.length || missLfmTrackInfo.length || missLfmLast.length;
+      if (!hasNetworkWork) {
+          if (playlistExtraColPrefetchState.completed.size >= 100) playlistExtraColPrefetchState.completed.clear();
+          playlistExtraColPrefetchState.completed.set(uri, { colSig, ts: Date.now() });
+          return;
+      }
+
+      const now = Date.now();
+      if (now < playlistExtraColPrefetchState.cooldownUntil) return;
+      playlistExtraColPrefetchState.recentNetworkStarts = playlistExtraColPrefetchState.recentNetworkStarts.filter(ts => (now - ts) < 60 * 1000);
+      if (playlistExtraColPrefetchState.recentNetworkStarts.length >= 4) {
+          playlistExtraColPrefetchState.cooldownUntil = now + 2 * 60 * 1000;
+          return;
+      }
+      playlistExtraColPrefetchState.recentNetworkStarts.push(now);
+
+      const tasks = [];
+
+      if (missPC.length || missCore.length || missTK.length) {
+          tasks.push((async () => {
+              const CHUNK = 500;
+              const maxLen = Math.max(missPC.length, missCore.length, missTK.length);
+              const chunks = [];
+              for (let i = 0; i < maxLen; i += CHUNK) {
+                  chunks.push({
+                      pc: missPC.slice(i, i + CHUNK),
+                      core: missCore.slice(i, i + CHUNK),
+                      tk: missTK.slice(i, i + CHUNK)
+                  });
+              }
+              let idx = 0;
+              const worker = async () => {
+                  while (idx < chunks.length && !isStale()) {
+                      const chunk = chunks[idx++];
+                      const pcIds = chunk.pc.filter(id => !extraColInFlight.playCounts.has(id) && getExtraColMem('playCounts', id, CACHE_EXPIRE_PLAYCOUNTS) === undefined);
+                      const coreIds = chunk.core.filter(id => !extraColInFlight.core.has(id) && (
+                          (needRD && getExtraColMem('releaseDates', id, CACHE_EXPIRE_RELEASE_DATE) === undefined) ||
+                          (needPop && getExtraColMem('popularity', id, CACHE_EXPIRE_METADATA) === undefined)
+                      ));
+                      const tkIds = chunk.tk.filter(id => !extraColInFlight.tempoKey.has(id) && getExtraColMem('tempoKey', id, CACHE_EXPIRE_AI_DATA) === undefined);
+                      if (!pcIds.length && !coreIds.length && !tkIds.length) continue;
+
+                      const p = fetchFastExtraColsEsperanto({ playCountIds: pcIds, coreIds, tempoKeyIds: tkIds, existingMetaMap });
+                      if (pcIds.length) registerExtraColInFlight('playCounts', pcIds, p);
+                      if (coreIds.length) registerExtraColInFlight('core', coreIds, p);
+                      if (tkIds.length) registerExtraColInFlight('tempoKey', tkIds, p);
+                      const res = await p;
+                      if (isStale()) break;
+                      if (!res.ok) break;
+                      repaintUnprocessedPlaylistRows();
+                  }
+              };
+              await Promise.all(Array.from({ length: Math.min(3, chunks.length) }, () => worker()));
+          })());
+      }
+
+      if (missFullAudio.length) {
+          tasks.push((async () => {
+              const CHUNK = 50;
+              for (let i = 0; i < missFullAudio.length && !isStale(); i += CHUNK) {
+                  const batch = missFullAudio.slice(i, i + CHUNK).filter(id => !extraColInFlight.aiStats.has(id) && getExtraColMem('aiStats', id, CACHE_EXPIRE_AI_DATA) === undefined);
+                  if (!batch.length) continue;
+                  const p = getBatchTrackStats(batch, () => {}, isStale);
+                  registerExtraColInFlight('aiStats', batch, p);
+                  await p;
+                  if (isStale()) break;
+                  repaintUnprocessedPlaylistRows();
+              }
+          })());
+      }
+
+      if (missLfmTrackInfo.length) {
+          tasks.push((async () => {
+              if (L_F_M_Key_Pool.length === 0) await fetchLastFmKeys();
+              if (isStale()) return;
+              const validKeys = Math.max(1, L_F_M_Key_Pool.length - revokedLfmKeys.size);
+              const conc = Math.min(8, Math.max(3, validKeys));
+              const globalToSave = [];
+              const personalToSave = [];
+              const flushLfmIdb = () => {
+                  if (globalToSave.length && idb.setMany) idb.setMany('scrobbles', globalToSave.splice(0, globalToSave.length)).catch(() => {});
+                  if (personalToSave.length && idb.setMany) idb.setMany('personalScrobbles', personalToSave.splice(0, personalToSave.length)).catch(() => {});
+              };
+              let idx = 0;
+              const worker = async () => {
+                  while (idx < missLfmTrackInfo.length && !isStale()) {
+                      const entry = missLfmTrackInfo[idx++];
+                      const stillG = entry.needG && getExtraColMem('scrobbles', entry.key, CACHE_EXPIRE_GLOBAL_SCROBBLES) === undefined;
+                      const stillP = entry.needP && getExtraColMem('personalScrobbles', entry.key, CACHE_EXPIRE_PERSONAL_SCROBBLES) === undefined;
+                      if (!stillG && !stillP) continue;
+                      try {
+                          const r = stillP
+                              ? await getTrackDetailsWithPersonalScrobbles(entry.track, true, true, true)
+                              : await getTrackDetailsWithScrobbles(entry.track, true, true, true);
+                          if (typeof r?.scrobbles === 'number') {
+                              setExtraColMem('scrobbles', entry.key, r.scrobbles);
+                              if (!entry.isLocal) globalToSave.push({ key: entry.key, val: r.scrobbles });
+                          }
+                          if (typeof r?.personalScrobbles === 'number') {
+                              setExtraColMem('personalScrobbles', entry.key, r.personalScrobbles);
+                              if (!entry.isLocal) personalToSave.push({ key: entry.key, val: { count: r.personalScrobbles, pendingUpdate: false } });
+                          }
+                          if (globalToSave.length >= 25 || personalToSave.length >= 25) {
+                              flushLfmIdb();
+                              if (!isStale()) repaintUnprocessedPlaylistRows();
+                          }
+                      } catch (_) {}
+                  }
+              };
+              await Promise.all(Array.from({ length: Math.min(conc, missLfmTrackInfo.length) }, () => worker()));
+              flushLfmIdb();
+              if (!isStale()) repaintUnprocessedPlaylistRows();
+          })());
+      }
+
+      if (missLfmLast.length) {
+          tasks.push((async () => {
+              if (L_F_M_Key_Pool.length === 0) await fetchLastFmKeys();
+              if (isStale()) return;
+              const validKeys = Math.max(1, L_F_M_Key_Pool.length - revokedLfmKeys.size);
+              const conc = Math.min(6, Math.max(2, validKeys));
+              let idx = 0;
+              const worker = async () => {
+                  while (idx < missLfmLast.length && !isStale()) {
+                      const entry = missLfmLast[idx++];
+                      if (getExtraColMem('lastScrobbled', entry.key, CACHE_EXPIRE_PERSONAL_SCROBBLES) !== undefined) continue;
+                      try {
+                          await getTrackDetailsWithLastScrobbled(entry.track, true);
+                      } catch (_) {}
+                  }
+              };
+              await Promise.all(Array.from({ length: Math.min(conc, missLfmLast.length) }, () => worker()));
+              if (!isStale()) repaintUnprocessedPlaylistRows();
+          })());
+      }
+
+      if (tasks.length) await Promise.all(tasks);
+      if (!isStale()) {
+          if (playlistExtraColPrefetchState.completed.size >= 100) playlistExtraColPrefetchState.completed.clear();
+          playlistExtraColPrefetchState.completed.set(uri, { colSig, ts: Date.now() });
+      }
+  }
+
+  function schedulePlaylistExtraColPrefetch(uri) {
+      if (!uri || !URI.isPlaylistV1OrV2(uri)) {
+          if (playlistExtraColPrefetchState.activeUri) cancelPlaylistExtraColPrefetch();
+          return;
+      }
+      const activeCols = getActiveExtraColumns('playlist');
+      if (!activeCols.length) {
+          if (playlistExtraColPrefetchState.activeUri) cancelPlaylistExtraColPrefetch();
+          return;
+      }
+      const lfmUser = loadLastFmUsername() || '';
+      const colTypes = new Set(activeCols.map(c => c.type));
+      const colSig = [...colTypes].sort().join(',') + (lfmUser ? `|u:${lfmUser}` : '');
+      if (playlistExtraColPrefetchState.activeUri === uri && playlistExtraColPrefetchState.activeColSig === colSig) return;
+
+      cancelPlaylistExtraColPrefetch();
+      const mySession = playlistExtraColPrefetchState.sessionId;
+      playlistExtraColPrefetchState.activeUri = uri;
+      playlistExtraColPrefetchState.activeColSig = colSig;
+      const isStale = () => mySession !== playlistExtraColPrefetchState.sessionId || getCurrentUri() !== uri;
+
+      let phase1Promise = null;
+      let phase1Data = null;
+
+      playlistExtraColPrefetchState.warmupTimer = setTimeout(() => {
+          playlistExtraColPrefetchState.warmupTimer = null;
+          if (isStale()) return;
+          phase1Promise = runPlaylistExtraColWarmup(uri, colTypes, !!lfmUser, isStale)
+              .then(data => { phase1Data = data; return data; })
+              .catch(() => null);
+      }, 250);
+
+      playlistExtraColPrefetchState.networkTimer = setTimeout(async () => {
+          playlistExtraColPrefetchState.networkTimer = null;
+          if (isStale()) return;
+          const prevDone = playlistExtraColPrefetchState.completed.get(uri);
+          if (prevDone && prevDone.colSig === colSig && (Date.now() - prevDone.ts) < 5 * 60 * 1000) return;
+          const data = phase1Data || (phase1Promise ? await phase1Promise : await runPlaylistExtraColWarmup(uri, colTypes, !!lfmUser, isStale));
+          if (isStale() || !data) return;
+          await runPlaylistExtraColPrefetch(uri, colSig, colTypes, !!lfmUser, data, isStale);
+      }, 3200);
   }
 
   function createDefaultExtraColumnsConfig() {
@@ -69031,8 +70672,10 @@ shadowRoot.innerHTML = `
   }
 
   function refreshExtraColumnsForContext(context) {
-      if (context === 'playlist') updateTracklist();
-      else if (context === 'album') updateAlbumTracklist();
+      if (context === 'playlist') {
+          updateTracklist();
+          schedulePlaylistExtraColPrefetch(getCurrentUri());
+      } else if (context === 'album') updateAlbumTracklist();
       else if (context === 'artist') updateArtistTracklist();
   }
 
@@ -69987,8 +71630,11 @@ shadowRoot.innerHTML = `
     if (activeCols.length === 0) return;
 
     const currentUri = getCurrentUri();
-    const audioFeatureTypes = new Set(['key', 'tempo', 'energy', 'danceability', 'valence', 'djInfo']);
+    const isAlbumPage = URI.isAlbum(currentUri);
+    const tempoKeyTypes = new Set(['key', 'tempo']);
+    const fullAudioTypes = new Set(['energy', 'danceability', 'valence', 'djInfo']);
     const columnConfigs = activeCols.map(c => ({ id: c.id, type: c.type, format: c.format || null, dataSelector: `[data-sp-col-val="${c.id}"]` }));
+    const hasType = (t) => columnConfigs.some(c => c.type === t);
 
     const isRecGrid = !!tracklist_.closest?.('[data-testid="recommended-track"]');
     const rawRows = tracklist_.querySelectorAll('.main-trackList-trackListRow');
@@ -69998,8 +71644,17 @@ shadowRoot.innerHTML = `
     const spotifyTracksToProcess = [];
     const lfmUser = loadLastFmUsername() || '';
     const hasLfmUser = !!lfmUser;
+    const needsLfmPersonal = hasLfmUser && hasType('personalScrobbles');
+    const needsLfmLast = hasLfmUser && hasType('lastScrobbled');
+    const hasAnyLfm = hasType('scrobbles') || needsLfmPersonal || needsLfmLast;
+    const hasAnyLfmCol = hasType('scrobbles') || hasType('personalScrobbles') || hasType('lastScrobbled');
+    const hasTempoKeyCol = columnConfigs.some(c => tempoKeyTypes.has(c.type));
+    const hasFullAudioCol = columnConfigs.some(c => fullAudioTypes.has(c.type));
+    const needsPropsEagerly = hasAnyLfmCol || hasType('trueReleaseDate');
     const expectedCols = columnConfigs.map(c => `${c.id}:${c.type}:${c.format || ''}`).join('|')
         + (columnConfigs.some(c => c.type === 'personalScrobbles' || c.type === 'lastScrobbled') ? `|u:${lfmUser}` : '');
+
+    const isRowValid = (el, uri) => !!(el && el.dataset.spTrackUri === uri && el.dataset.spColTypes === expectedCols);
 
     const bindLfmClick = (el, info) => {
         el.classList.add('sp-col-clickable');
@@ -70017,13 +71672,17 @@ shadowRoot.innerHTML = `
         };
     };
 
-    const bindReleaseDateClick = (el, id, props, trackInfo) => {
+    const bindReleaseDateClick = (el, id, props, trackInfo, trackElement) => {
         el.classList.add('sp-col-clickable');
         el.title = "Click to view album";
         el.onclick = async (e) => {
             e.stopPropagation();
             e.preventDefault();
             let albId = props?.album?.id || props?.album?.uri?.split(':')[2] || trackInfo?.album?.id || trackInfo?.album?.uri?.split(':')[2];
+            if (!albId && trackElement) {
+                const lazyProps = getTrackDataObject(trackElement);
+                albId = lazyProps?.album?.id || lazyProps?.album?.uri?.split(':')[2];
+            }
             if (!albId) {
                 const meta = await idb.get('trackMetadata', id);
                 albId = meta?.album?.id || meta?.album?.uri?.split(':')[2];
@@ -70061,6 +71720,72 @@ shadowRoot.innerHTML = `
         };
     };
 
+    const getMemColValue = (type, id, lfmKey) => {
+        if (type === 'playCount') {
+            let v = getExtraColMem('playCounts', id, CACHE_EXPIRE_PLAYCOUNTS);
+            if (v === "N/A") v = getExtraColMem('playCounts', id, 5 * 60 * 1000);
+            return { val: v };
+        }
+        if (type === 'releaseDate') return { val: getExtraColMem('releaseDates', id, CACHE_EXPIRE_RELEASE_DATE) };
+        if (type === 'trueReleaseDate') {
+            const cached = getExtraColMem('trueReleaseDates', id, CACHE_EXPIRE_RELEASE_DATE);
+            if (cached !== undefined) {
+                const trdObj = (cached && typeof cached === 'object') ? cached : { date: cached };
+                return { val: trdObj.date, trdObj };
+            }
+            return { val: undefined };
+        }
+        if (type === 'scrobbles') return { val: lfmKey ? getExtraColMem('scrobbles', lfmKey, CACHE_EXPIRE_GLOBAL_SCROBBLES) : undefined };
+        if (type === 'personalScrobbles') return { val: lfmKey ? getExtraColMem('personalScrobbles', lfmKey, CACHE_EXPIRE_PERSONAL_SCROBBLES) : undefined };
+        if (type === 'lastScrobbled') return { val: lfmKey ? getExtraColMem('lastScrobbled', lfmKey, CACHE_EXPIRE_PERSONAL_SCROBBLES) : undefined };
+        if (type === 'popularity') return { val: getExtraColMem('popularity', id, CACHE_EXPIRE_METADATA) };
+        if (tempoKeyTypes.has(type)) {
+            const full = getExtraColMem('aiStats', id, CACHE_EXPIRE_AI_DATA);
+            if (full && !full._missing) {
+                return { val: type === 'key' ? full : ((full.tempo != null && full.tempo > 0) ? full.tempo : "―") };
+            }
+            let tk = getExtraColMem('tempoKey', id, CACHE_EXPIRE_AI_DATA);
+            if (tk?._missing) tk = getExtraColMem('tempoKey', id, 5 * 60 * 1000);
+            if (tk) {
+                if (tk._missing) return { val: "―" };
+                return { val: type === 'key' ? tk : ((tk.tempo != null && tk.tempo > 0) ? tk.tempo : "―") };
+            }
+            return { val: undefined };
+        }
+        if (fullAudioTypes.has(type)) {
+            let stats = getExtraColMem('aiStats', id, CACHE_EXPIRE_AI_DATA);
+            if (stats?._missing) stats = getExtraColMem('aiStats', id, 5 * 60 * 1000);
+            if (stats) {
+                if (stats._missing) return { val: "―" };
+                return { val: type === 'djInfo' ? stats : (stats[type] ?? "―") };
+            }
+            return { val: undefined };
+        }
+        return { val: undefined };
+    };
+
+    const paintCell = (row, config, dEl, val, extra = {}) => {
+        if (!dEl || dEl.dataset.spProcessed || !isRowValid(row.element, row.uri)) return;
+        const tInfo = extra.trackInfo || row.trackInfo;
+        if ((config.type === 'scrobbles' || config.type === 'personalScrobbles' || config.type === 'lastScrobbled') && tInfo) {
+            bindLfmClick(dEl, tInfo);
+        }
+        if (config.type === 'releaseDate' && val && val !== '―' && !isAlbumPage) {
+            bindReleaseDateClick(dEl, row.id, row.props, tInfo, row.element);
+        }
+        if (config.type === 'trueReleaseDate' && val && val !== '―' && tInfo) {
+            bindTrueReleaseDateClick(dEl, row.id, tInfo, extra.trdObj, () => getExtraColMem('playCounts', row.id, CACHE_EXPIRE_PLAYCOUNTS));
+        }
+        if ((config.type === 'scrobbles' || config.type === 'personalScrobbles' || config.type === 'lastScrobbled') && val === -1) {
+            updateDisplay(dEl, { error: "Track not found on Last.fm", errorLabel: "N/A" }, config.type, config.format);
+        } else if (config.type === 'playCount') {
+            const isPlayable = (Number(val) === 0) ? getTrackRowPlayable(row.element, row.props) : true;
+            updateDisplay(dEl, val, config.type, config.format, { isPlayable });
+        } else {
+            updateDisplay(dEl, val, config.type, config.format);
+        }
+    };
+
     for (const trackElement of allTrackRows) {
         const trackUri = getTracklistTrackUri(trackElement);
         if (!trackUri) continue;
@@ -70080,74 +71805,74 @@ shadowRoot.innerHTML = `
         }
 
         if (Spicetify.URI.isLocal(trackUri)) {
-            const hasUnprocessed = columnConfigs.some(c => {
+            const pendingLocal = [];
+            for (const c of columnConfigs) {
                 const dEl = trackElement.querySelector(c.dataSelector);
-                return dEl && !dEl.dataset.spProcessed;
-            });
-            if (!hasUnprocessed) continue;
+                if (dEl && !dEl.dataset.spProcessed) pendingLocal.push({ config: c, dataElement: dEl });
+            }
+            if (pendingLocal.length === 0) continue;
 
-            trackElement.classList.add('sort-play-processing');
             const trackData = getTrackDataObject(trackElement);
+            if (!trackData) {
+                for (const { config, dataElement } of pendingLocal) updateDisplay(dataElement, "―", config.type, config.format);
+                continue;
+            }
 
-            if (trackData) {
-                const rawArtistName = trackData.artists?.[0]?.name || "";
-                const cleanedArtistName = rawArtistName.includes(';') ? rawArtistName.split(';')[0].trim() : rawArtistName;
-                const localTrackInfo = { name: trackData.name, artistName: cleanedArtistName, artists: [{ name: cleanedArtistName }], albumName: trackData.album?.name, uri: trackData.uri };
+            const rawArtistName = trackData.artists?.[0]?.name || "";
+            const cleanedArtistName = rawArtistName.includes(';') ? rawArtistName.split(';')[0].trim() : rawArtistName;
+            const localTrackInfo = { name: trackData.name, artistName: cleanedArtistName, artists: [{ name: cleanedArtistName }], albumName: trackData.album?.name, uri: trackData.uri };
+            const localLfmKey = hasAnyLfmCol ? getLfmInfo(localTrackInfo)?.key : null;
+            const asyncLocalCols = [];
+
+            for (const { config, dataElement } of pendingLocal) {
+                if (config.type === 'scrobbles' || config.type === 'personalScrobbles' || config.type === 'lastScrobbled') {
+                    bindLfmClick(dataElement, localTrackInfo);
+                    if ((config.type === 'personalScrobbles' || config.type === 'lastScrobbled') && !hasLfmUser) {
+                        updateDisplay(dataElement, { error: "Set Last.fm username in setting", errorLabel: "No User" }, config.type, config.format);
+                        continue;
+                    }
+                    const { val } = getMemColValue(config.type, trackUri, localLfmKey);
+                    if (val !== undefined && val !== null) {
+                        if (val === -1) updateDisplay(dataElement, { error: "Track not found on Last.fm", errorLabel: "N/A" }, config.type, config.format);
+                        else updateDisplay(dataElement, val, config.type, config.format);
+                    } else {
+                        asyncLocalCols.push({ config, dataElement });
+                    }
+                } else {
+                    updateDisplay(dataElement, "―", config.type, config.format);
+                }
+            }
+
+            if (asyncLocalCols.length > 0) {
+                trackElement.classList.add('sort-play-processing');
                 const localResolved = {};
-
-                const localPromises = columnConfigs.map(async (config) => {
-                    const dataElement = trackElement.querySelector(config.dataSelector);
-                    if (!dataElement || dataElement.dataset.spProcessed) return;
-
+                const localPromises = asyncLocalCols.map(async ({ config, dataElement }) => {
                     try {
-                        if (config.type === 'scrobbles' || config.type === 'personalScrobbles' || config.type === 'lastScrobbled') {
-                            bindLfmClick(dataElement, localTrackInfo);
-                            if (config.type === 'scrobbles') {
-                                localResolved.scrobbles ??= getTrackDetailsWithScrobbles(localTrackInfo, true);
-                                const result = await localResolved.scrobbles;
-                                if (trackElement.dataset.spColTypes !== expectedCols) return;
-                                updateDisplay(dataElement, (result.scrobbles === -1 || result.error) ? { error: result.error || "Track not found on Last.fm", errorLabel: result.errorLabel || "N/A" } : result.scrobbles, config.type, config.format);
-                            } else if (config.type === 'personalScrobbles') {
-                                if (!hasLfmUser) {
-                                    if (trackElement.dataset.spColTypes !== expectedCols) return;
-                                    updateDisplay(dataElement, { error: "Set Last.fm username in setting", errorLabel: "No User" }, config.type, config.format);
-                                } else {
-                                    localResolved.personalScrobbles ??= getTrackDetailsWithPersonalScrobbles(localTrackInfo, true);
-                                    const result = await localResolved.personalScrobbles;
-                                    if (trackElement.dataset.spColTypes !== expectedCols) return;
-                                    updateDisplay(dataElement, (result.personalScrobbles === -1 || result.error) ? { error: result.error || "Track not found on Last.fm", errorLabel: result.errorLabel || "N/A" } : result.personalScrobbles, config.type, config.format);
-                                }
-                            } else {
-                                if (!hasLfmUser) {
-                                    if (trackElement.dataset.spColTypes !== expectedCols) return;
-                                    updateDisplay(dataElement, { error: "Set Last.fm username in setting", errorLabel: "No User" }, config.type, config.format);
-                                } else {
-                                    localResolved.lastScrobbled ??= getTrackDetailsWithLastScrobbled(localTrackInfo, true);
-                                    const result = await localResolved.lastScrobbled;
-                                    if (trackElement.dataset.spColTypes !== expectedCols) return;
-                                    updateDisplay(dataElement, (result.lastScrobbled === -1 || result.error) ? { error: result.error || "Track not found on Last.fm", errorLabel: result.errorLabel || "N/A" } : result.lastScrobbled, config.type, config.format);
-                                }
-                            }
+                        if (config.type === 'scrobbles') {
+                            localResolved.scrobbles ??= getTrackDetailsWithScrobbles(localTrackInfo, true);
+                            const result = await localResolved.scrobbles;
+                            if (!isRowValid(trackElement, trackUri)) return;
+                            updateDisplay(dataElement, (result.scrobbles === -1 || result.error) ? { error: result.error || "Track not found on Last.fm", errorLabel: result.errorLabel || "N/A" } : result.scrobbles, config.type, config.format);
+                        } else if (config.type === 'personalScrobbles') {
+                            localResolved.personalScrobbles ??= getTrackDetailsWithPersonalScrobbles(localTrackInfo, true);
+                            const result = await localResolved.personalScrobbles;
+                            if (!isRowValid(trackElement, trackUri)) return;
+                            updateDisplay(dataElement, (result.personalScrobbles === -1 || result.error) ? { error: result.error || "Track not found on Last.fm", errorLabel: result.errorLabel || "N/A" } : result.personalScrobbles, config.type, config.format);
                         } else {
-                            if (trackElement.dataset.spColTypes !== expectedCols) return;
-                            updateDisplay(dataElement, "―", config.type, config.format);
+                            localResolved.lastScrobbled ??= getTrackDetailsWithLastScrobbled(localTrackInfo, true);
+                            const result = await localResolved.lastScrobbled;
+                            if (!isRowValid(trackElement, trackUri)) return;
+                            updateDisplay(dataElement, (result.lastScrobbled === -1 || result.error) ? { error: result.error || "Track not found on Last.fm", errorLabel: result.errorLabel || "N/A" } : result.lastScrobbled, config.type, config.format);
                         }
                     } catch (_) {
-                        if (trackElement.dataset.spColTypes !== expectedCols) return;
+                        if (!isRowValid(trackElement, trackUri)) return;
                         updateDisplay(dataElement, { error: "Local Load Failed", errorLabel: "Err" }, config.type, config.format);
                         trackElement.setAttribute('data-sp-fetch-failed', 'true');
                     }
                 });
-
                 Promise.all(localPromises).finally(() => {
-                    if (trackElement.dataset.spColTypes === expectedCols) trackElement.classList.remove('sort-play-processing');
+                    if (isRowValid(trackElement, trackUri)) trackElement.classList.remove('sort-play-processing');
                 });
-            } else {
-                columnConfigs.forEach(config => {
-                    const dataElement = trackElement.querySelector(config.dataSelector);
-                    if (dataElement && !dataElement.dataset.spProcessed) updateDisplay(dataElement, "―", config.type, config.format);
-                });
-                trackElement.classList.remove('sort-play-processing');
             }
         } else if (trackUri.includes("track")) {
             const pendingCols = [];
@@ -70158,8 +71883,7 @@ shadowRoot.innerHTML = `
             if (pendingCols.length === 0) continue;
 
             const id = trackUri.split(":")[2];
-            const props = getTrackDataObject(trackElement);
-            const isPlayable = getTrackRowPlayable(trackElement, props);
+            const props = needsPropsEagerly ? getTrackDataObject(trackElement) : null;
             const trackInfo = props ? {
                 name: props.name,
                 artists: props.artists,
@@ -70168,7 +71892,7 @@ shadowRoot.innerHTML = `
                 album: props.album,
                 uri: props.uri
             } : null;
-            const lfmKey = trackInfo ? getLfmInfo({
+            const lfmKey = (hasAnyLfm && trackInfo) ? getLfmInfo({
                 name: trackInfo.name,
                 artists: trackInfo.artists,
                 artistName: trackInfo.artistName,
@@ -70176,562 +71900,519 @@ shadowRoot.innerHTML = `
                 allArtists: trackInfo.artists?.map(a => a.name).join(', ')
             })?.key : null;
 
-            let stillNeedsAsync = false;
+            const rowObj = { element: trackElement, uri: trackUri, id, props, trackInfo, lfmKey, asyncCols: [] };
+
             for (const { config, dataElement } of pendingCols) {
                 if ((config.type === 'personalScrobbles' || config.type === 'lastScrobbled') && !hasLfmUser) {
                     if (trackInfo) bindLfmClick(dataElement, trackInfo);
                     updateDisplay(dataElement, { error: "Set Last.fm username in setting", errorLabel: "No User" }, config.type, config.format);
                     continue;
                 }
-                let memVal = undefined;
-                let trdObj = null;
-                if (config.type === 'playCount') {
-                    memVal = getExtraColMem('playCounts', id, CACHE_EXPIRE_PLAYCOUNTS);
-                    if (memVal === "N/A") memVal = getExtraColMem('playCounts', id, 5 * 60 * 1000);
-                } else if (config.type === 'releaseDate') {
-                    memVal = getExtraColMem('releaseDates', id, CACHE_EXPIRE_RELEASE_DATE);
-                } else if (config.type === 'trueReleaseDate') {
-                    const cached = getExtraColMem('trueReleaseDates', id, CACHE_EXPIRE_RELEASE_DATE);
-                    if (cached !== undefined) {
-                        trdObj = (cached && typeof cached === 'object') ? cached : { date: cached };
-                        memVal = trdObj.date;
-                    }
-                } else if (config.type === 'scrobbles' && lfmKey) {
-                    memVal = getExtraColMem('scrobbles', lfmKey, CACHE_EXPIRE_GLOBAL_SCROBBLES);
-                } else if (config.type === 'personalScrobbles' && lfmKey) {
-                    memVal = getExtraColMem('personalScrobbles', lfmKey, CACHE_EXPIRE_PERSONAL_SCROBBLES);
-                } else if (config.type === 'lastScrobbled' && lfmKey) {
-                    memVal = getExtraColMem('lastScrobbled', lfmKey, CACHE_EXPIRE_PERSONAL_SCROBBLES);
-                } else if (config.type === 'popularity') {
-                    memVal = getExtraColMem('popularity', id, CACHE_EXPIRE_METADATA);
-                } else if (audioFeatureTypes.has(config.type)) {
-                    const stats = getExtraColMem('aiStats', id, CACHE_EXPIRE_AI_DATA);
-                    if (stats) memVal = stats._missing ? "―" : ((config.type === 'djInfo' || config.type === 'key') ? stats : stats[config.type]);
-                }
-
-                if (memVal !== undefined && memVal !== null) {
-                    if ((config.type === 'scrobbles' || config.type === 'personalScrobbles' || config.type === 'lastScrobbled') && trackInfo) {
-                        bindLfmClick(dataElement, trackInfo);
-                    }
-                    if (config.type === 'releaseDate' && memVal && memVal !== '―' && !URI.isAlbum(currentUri)) {
-                        bindReleaseDateClick(dataElement, id, props, trackInfo);
-                    }
-                    if (config.type === 'trueReleaseDate' && memVal && memVal !== '―' && trackInfo) {
-                        bindTrueReleaseDateClick(dataElement, id, trackInfo, trdObj, () => getExtraColMem('playCounts', id, CACHE_EXPIRE_PLAYCOUNTS));
-                    }
-                    if ((config.type === 'scrobbles' || config.type === 'personalScrobbles' || config.type === 'lastScrobbled') && memVal === -1) {
-                        updateDisplay(dataElement, { error: "Track not found on Last.fm", errorLabel: "N/A" }, config.type, config.format);
-                    } else {
-                        updateDisplay(dataElement, memVal, config.type, config.format, { isPlayable });
-                    }
+                const { val, trdObj } = getMemColValue(config.type, id, lfmKey);
+                if (val !== undefined && val !== null) {
+                    paintCell(rowObj, config, dataElement, val, { trdObj });
                 } else {
-                    stillNeedsAsync = true;
+                    rowObj.asyncCols.push({ config, dataElement });
                 }
             }
 
-            if (stillNeedsAsync) {
+            if (rowObj.asyncCols.length > 0) {
                 trackElement.classList.add('sort-play-processing');
-                spotifyTracksToProcess.push({ element: trackElement, id, props, isPlayable });
+                spotifyTracksToProcess.push(rowObj);
             }
         }
     }
 
     if (spotifyTracksToProcess.length === 0) return;
 
-    const hasType = (t) => columnConfigs.some(c => c.type === t);
-    const hasAudioCol = columnConfigs.some(c => audioFeatureTypes.has(c.type));
-    const nonAudioConfigs = columnConfigs.filter(c => !audioFeatureTypes.has(c.type));
-    const uniqueSpotifyIds = [...new Set(spotifyTracksToProcess.map(item => item.id))];
-    const rowPlayableMap = new WeakMap();
-    for (const item of spotifyTracksToProcess) rowPlayableMap.set(item.element, item.isPlayable);
-    const playCountBatchAttempted = new Set();
-    let prefetchedPC = null;
-    let prefetchedRD = null;
+    const rowsById = new Map();
+    for (const row of spotifyTracksToProcess) {
+        if (!rowsById.has(row.id)) rowsById.set(row.id, []);
+        rowsById.get(row.id).push(row);
+    }
+
+    const collectPendingIds = (pred) => {
+        const out = new Set();
+        for (const row of spotifyTracksToProcess) {
+            if (!isRowValid(row.element, row.uri)) continue;
+            for (const { config, dataElement } of row.asyncCols) {
+                if (!dataElement.dataset.spProcessed && pred(config.type, row)) {
+                    out.add(row.id);
+                    break;
+                }
+            }
+        }
+        return Array.from(out);
+    };
+
+    const paintFromMemForIds = (ids, pred, extraById = null) => {
+        for (const id of ids) {
+            const rows = rowsById.get(id);
+            if (!rows) continue;
+            for (const row of rows) {
+                if (!isRowValid(row.element, row.uri)) continue;
+                for (const { config, dataElement } of row.asyncCols) {
+                    if (dataElement.dataset.spProcessed || !pred(config.type)) continue;
+                    const { val, trdObj } = getMemColValue(config.type, row.id, row.lfmKey);
+                    if (val !== undefined && val !== null) {
+                        paintCell(row, config, dataElement, val, { trdObj: trdObj || extraById?.get(id) });
+                    }
+                }
+            }
+        }
+    };
+
+    const existingMetaMap = new Map();
+    const trdIdbMap = new Map();
 
     try {
-        const prefetchTasks = [];
-        if (hasType('playCount')) {
-            prefetchTasks.push((async () => {
-                prefetchedPC = await idb.getMany('playCounts', uniqueSpotifyIds, CACHE_EXPIRE_PLAYCOUNTS);
-                const missingPCIds = [];
-                for (const id of uniqueSpotifyIds) {
-                    const pc = prefetchedPC.get(id);
-                    if (pc === undefined || pc === null || pc === "N/A") missingPCIds.push(id);
-                    else setExtraColMem('playCounts', id, pc);
+        const pcIdbIds = hasType('playCount') ? collectPendingIds(t => t === 'playCount') : [];
+        const rdIdbIds = hasType('releaseDate') ? collectPendingIds(t => t === 'releaseDate') : [];
+        const popIdbIds = hasType('popularity') ? collectPendingIds(t => t === 'popularity') : [];
+        const trdIdbIds = hasType('trueReleaseDate') ? collectPendingIds(t => t === 'trueReleaseDate') : [];
+        const tkIdbIds = hasTempoKeyCol ? collectPendingIds(t => tempoKeyTypes.has(t)) : [];
+        const fullAudioIdbIds = hasFullAudioCol ? collectPendingIds(t => fullAudioTypes.has(t)) : [];
+        const needMetaForNoPropsIds = (hasAnyLfm || hasType('trueReleaseDate'))
+            ? collectPendingIds((t, r) => !r.trackInfo && (t === 'trueReleaseDate' || t === 'scrobbles' || t === 'personalScrobbles' || t === 'lastScrobbled'))
+            : [];
+        const metaIdbIds = [...new Set([...popIdbIds, ...needMetaForNoPropsIds])];
+
+        const knownLfmScrobbleKeys = new Set();
+        const knownLfmPersonalKeys = new Set();
+        const knownLfmLastKeys = new Set();
+        const rowsByLfmKey = new Map();
+        if (hasAnyLfm) {
+            for (const row of spotifyTracksToProcess) {
+                if (!row.lfmKey) continue;
+                if (!rowsByLfmKey.has(row.lfmKey)) rowsByLfmKey.set(row.lfmKey, []);
+                rowsByLfmKey.get(row.lfmKey).push(row);
+                for (const { config, dataElement } of row.asyncCols) {
+                    if (dataElement.dataset.spProcessed) continue;
+                    if (config.type === 'scrobbles') knownLfmScrobbleKeys.add(row.lfmKey);
+                    else if (config.type === 'personalScrobbles' && hasLfmUser) knownLfmPersonalKeys.add(row.lfmKey);
+                    else if (config.type === 'lastScrobbled' && hasLfmUser) knownLfmLastKeys.add(row.lfmKey);
                 }
-                if (missingPCIds.length === 0) return;
-                try {
-                    const PC_BATCH_SIZE = 500;
-                    for (let i = 0; i < missingPCIds.length; i += PC_BATCH_SIZE) {
-                        const batch = missingPCIds.slice(i, i + PC_BATCH_SIZE);
-                        const pcResults = await fetchPlayCountsBatchNew(batch.map(id => `spotify:track:${id}`));
-                        for (const id of batch) playCountBatchAttempted.add(id);
-                        const pcEntries = [];
-                        for (const [uri, count] of pcResults.entries()) {
-                            const tid = uri.split(":")[2];
-                            prefetchedPC.set(tid, count);
-                            setExtraColMem('playCounts', tid, count);
-                            pcEntries.push({ key: tid, val: count });
-                        }
-                        if (pcEntries.length > 0) await idb.setMany('playCounts', pcEntries);
-                    }
-                } catch (e) {
-                    console.warn("[Sort-Play] Global playcount prefetch failed", e);
-                }
-            })());
+            }
         }
 
-        if (hasType('releaseDate')) {
-            prefetchTasks.push((async () => {
-                prefetchedRD = await idb.getMany('releaseDates', uniqueSpotifyIds, CACHE_EXPIRE_RELEASE_DATE);
-                const missingRDIds = [];
-                for (const id of uniqueSpotifyIds) {
-                    const rd = prefetchedRD.get(id);
-                    if (rd === undefined || rd === null) missingRDIds.push(id);
-                    else setExtraColMem('releaseDates', id, (typeof rd === 'object' && rd.date !== undefined) ? rd.date : rd);
+        const idbTasks = [];
+        if (pcIdbIds.length) {
+            idbTasks.push(idb.getMany('playCounts', pcIdbIds, CACHE_EXPIRE_PLAYCOUNTS).then(map => {
+                for (const [id, pc] of map.entries()) {
+                    if (pc !== undefined && pc !== null && pc !== "N/A") setExtraColMem('playCounts', id, pc);
                 }
-                if (missingRDIds.length === 0) return;
-                try {
-                    const RD_BATCH_SIZE = 500;
-                    for (let i = 0; i < missingRDIds.length; i += RD_BATCH_SIZE) {
-                        const batch = missingRDIds.slice(i, i + RD_BATCH_SIZE);
-                        const rdResults = await fetchReleaseDatesBatchNew(batch.map(id => `spotify:track:${id}`));
-                        const rdEntries = [];
-                        for (const [uri, date] of rdResults.entries()) {
-                            const tid = uri.split(":")[2];
-                            prefetchedRD.set(tid, { date, trackNumber: 0 });
-                            setExtraColMem('releaseDates', tid, date);
-                            rdEntries.push({ key: tid, val: { date, trackNumber: 0 } });
+                paintFromMemForIds(pcIdbIds, t => t === 'playCount');
+            }));
+        }
+        if (rdIdbIds.length) {
+            idbTasks.push(idb.getMany('releaseDates', rdIdbIds, CACHE_EXPIRE_RELEASE_DATE).then(map => {
+                for (const [id, rd] of map.entries()) {
+                    const d = (rd && typeof rd === 'object' && rd.date !== undefined) ? rd.date : rd;
+                    if (d !== undefined && d !== null) setExtraColMem('releaseDates', id, d);
+                }
+                paintFromMemForIds(rdIdbIds, t => t === 'releaseDate');
+            }));
+        }
+        if (metaIdbIds.length) {
+            idbTasks.push(idb.getMany('trackMetadata', metaIdbIds, CACHE_EXPIRE_METADATA).then(map => {
+                for (const [id, meta] of map.entries()) {
+                    if (!meta) continue;
+                    existingMetaMap.set(id, meta);
+                    if (meta.popularity !== undefined && meta.popularity !== null) setExtraColMem('popularity', id, meta.popularity);
+                    const rows = rowsById.get(id);
+                    if (rows) {
+                        for (const row of rows) {
+                            if (!row.trackInfo && meta.name && Array.isArray(meta.artists) && meta.artists.length) {
+                                row.trackInfo = {
+                                    name: meta.name,
+                                    artists: meta.artists,
+                                    artistName: meta.artists[0]?.name,
+                                    albumName: meta.album?.name,
+                                    album: meta.album,
+                                    uri: meta.uri || row.uri
+                                };
+                                if (hasAnyLfm && !row.lfmKey) {
+                                    row.lfmKey = getLfmInfo({
+                                        name: row.trackInfo.name,
+                                        artists: row.trackInfo.artists,
+                                        artistName: row.trackInfo.artistName,
+                                        uri: row.trackInfo.uri,
+                                        allArtists: row.trackInfo.artists.map(a => a.name).join(', ')
+                                    })?.key || null;
+                                }
+                            }
                         }
-                        if (rdEntries.length > 0) await idb.setMany('releaseDates', rdEntries);
                     }
-                } catch (e) {
-                    console.warn("[Sort-Play] Global release date prefetch failed", e);
                 }
-            })());
+                if (popIdbIds.length) paintFromMemForIds(popIdbIds, t => t === 'popularity');
+            }));
+        }
+        if (trdIdbIds.length) {
+            idbTasks.push(idb.getMany('trueReleaseDates', trdIdbIds, CACHE_EXPIRE_RELEASE_DATE).then(map => {
+                for (const [id, cached] of map.entries()) {
+                    if (cached !== undefined && cached !== null) {
+                        trdIdbMap.set(id, cached);
+                        setExtraColMem('trueReleaseDates', id, cached);
+                    }
+                }
+                paintFromMemForIds(trdIdbIds, t => t === 'trueReleaseDate', trdIdbMap);
+            }));
+        }
+        if (fullAudioIdbIds.length || tkIdbIds.length) {
+            const fullUnionIds = [...new Set([...fullAudioIdbIds, ...tkIdbIds])];
+            const fullKeys = fullUnionIds.map(id => getCacheKey(id, true, false, "stats-column"));
+            const tkKeys = tkIdbIds.map(id => `${BPM_KEY_CACHE_PREFIX}${id}`);
+            idbTasks.push(idb.getMany('aiData', [...fullKeys, ...tkKeys], CACHE_EXPIRE_AI_DATA).then(map => {
+                const now = Date.now();
+                for (let i = 0; i < fullUnionIds.length; i++) {
+                    const id = fullUnionIds[i];
+                    const raw = map.get(fullKeys[i]);
+                    const stats = raw ? (raw.stats || raw) : null;
+                    if (!stats) continue;
+                    const hasFull = !stats._partialFallback && stats.energy !== undefined && stats.energy !== null && stats.key_raw !== undefined && stats.key_raw !== -1;
+                    const hasRecentPartial = stats._partialFallback && stats.key_raw !== undefined && stats.key_raw !== -1 && stats.tempo && (now - (stats._partialTs || 0) < CACHE_EXPIRE_METADATA);
+                    if (hasFull || hasRecentPartial) setExtraColMem('aiStats', id, stats);
+                }
+                for (let i = 0; i < tkIdbIds.length; i++) {
+                    const id = tkIdbIds[i];
+                    const full = getExtraColMem('aiStats', id, CACHE_EXPIRE_AI_DATA);
+                    if (full && !full._missing) continue;
+                    const tkRaw = map.get(tkKeys[i]);
+                    if (tkRaw && typeof tkRaw === 'object') setExtraColMem('tempoKey', id, tkRaw);
+                }
+                if (fullAudioIdbIds.length) paintFromMemForIds(fullAudioIdbIds, t => fullAudioTypes.has(t));
+                if (tkIdbIds.length) paintFromMemForIds(tkIdbIds, t => tempoKeyTypes.has(t));
+            }));
+        }
+        const paintLfmIdbMap = (map, type, storeKey, extract) => {
+            for (const [k, raw] of map.entries()) {
+                const val = extract ? extract(raw) : raw;
+                if (val === undefined || val === null) continue;
+                setExtraColMem(storeKey, k, val);
+                const rows = rowsByLfmKey.get(k);
+                if (!rows) continue;
+                for (const row of rows) {
+                    if (!isRowValid(row.element, row.uri) || !row.trackInfo) continue;
+                    for (const { config, dataElement } of row.asyncCols) {
+                        if (config.type === type && !dataElement.dataset.spProcessed) paintCell(row, config, dataElement, val);
+                    }
+                }
+            }
+        };
+        if (knownLfmScrobbleKeys.size) {
+            idbTasks.push(idb.getMany('scrobbles', Array.from(knownLfmScrobbleKeys), CACHE_EXPIRE_GLOBAL_SCROBBLES).then(m => paintLfmIdbMap(m, 'scrobbles', 'scrobbles')));
+        }
+        if (knownLfmPersonalKeys.size) {
+            idbTasks.push(idb.getMany('personalScrobbles', Array.from(knownLfmPersonalKeys), CACHE_EXPIRE_PERSONAL_SCROBBLES).then(m => paintLfmIdbMap(m, 'personalScrobbles', 'personalScrobbles', d => (d && !d.pendingUpdate) ? d.count : undefined)));
+        }
+        if (knownLfmLastKeys.size) {
+            idbTasks.push(idb.getMany('lastScrobbledDates', Array.from(knownLfmLastKeys), CACHE_EXPIRE_PERSONAL_SCROBBLES).then(m => paintLfmIdbMap(m, 'lastScrobbled', 'lastScrobbled')));
         }
 
-        if (prefetchTasks.length > 0) await Promise.all(prefetchTasks);
+        if (idbTasks.length) await Promise.all(idbTasks);
 
-        const BATCH_SIZE = 50;
-        for (let i = 0; i < spotifyTracksToProcess.length; i += BATCH_SIZE) {
-            const batch = spotifyTracksToProcess.slice(i, i + BATCH_SIZE);
-            const batchIds = [...new Set(batch.map(item => item.id))];
-
-            const dataMap = { playCounts: prefetchedPC, releaseDates: prefetchedRD, trueReleaseDates: null, scrobbles: null, personal: null, ai: null, metadata: null, lastScrobbled: null };
-            const fetchPromises1 = [];
-
-            const needsLfmPersonal = hasLfmUser && hasType('personalScrobbles');
-            const needsLfmLast = hasLfmUser && hasType('lastScrobbled');
-            const hasAnyLfm = hasType('scrobbles') || needsLfmPersonal || needsLfmLast;
-
-            if (hasType('trueReleaseDate')) fetchPromises1.push(idb.getMany('trueReleaseDates', batchIds, CACHE_EXPIRE_RELEASE_DATE).then(res => dataMap.trueReleaseDates = res));
-            if (hasAnyLfm || hasType('popularity') || hasType('trueReleaseDate')) {
-                fetchPromises1.push(idb.getMany('trackMetadata', batchIds, CACHE_EXPIRE_METADATA).then(res => dataMap.metadata = res));
-            }
-            if (hasAudioCol) {
-                fetchPromises1.push(idb.getMany('aiData', batchIds.map(id => getCacheKey(id, true, false, "stats-column")), CACHE_EXPIRE_AI_DATA).then(res => dataMap.ai = res));
-            }
-
-            if (fetchPromises1.length > 0) await Promise.all(fetchPromises1);
-
-            const lfmKeys = new Set();
-            const idToLfmKey = new Map();
-
-            if (hasAnyLfm) {
-                for (const { id, props } of batch) {
-                    if (idToLfmKey.has(id)) continue;
-                    const src = props || dataMap.metadata?.get(id);
-                    if (!src) continue;
-                    const lfmInfo = getLfmInfo({
-                        name: src.name,
-                        artists: src.artists,
-                        artistName: src.artists?.[0]?.name,
-                        uri: src.uri,
-                        allArtists: src.artists?.map(a => a.name).join(', ')
-                    });
-                    if (lfmInfo) {
-                        lfmKeys.add(lfmInfo.key);
-                        idToLfmKey.set(id, lfmInfo.key);
+        if (needMetaForNoPropsIds.length && hasAnyLfm) {
+            const extraScrobble = new Set();
+            const extraPersonal = new Set();
+            const extraLast = new Set();
+            for (const id of needMetaForNoPropsIds) {
+                for (const row of (rowsById.get(id) || [])) {
+                    if (!row.lfmKey || rowsByLfmKey.has(row.lfmKey)) continue;
+                    rowsByLfmKey.set(row.lfmKey, [row]);
+                    for (const { config, dataElement } of row.asyncCols) {
+                        if (dataElement.dataset.spProcessed) continue;
+                        if (config.type === 'scrobbles') extraScrobble.add(row.lfmKey);
+                        else if (config.type === 'personalScrobbles' && hasLfmUser) extraPersonal.add(row.lfmKey);
+                        else if (config.type === 'lastScrobbled' && hasLfmUser) extraLast.add(row.lfmKey);
                     }
-                }
-
-                if (lfmKeys.size > 0) {
-                    const lfmKeysArray = Array.from(lfmKeys);
-                    const fetchPromises2 = [];
-                    if (hasType('scrobbles')) fetchPromises2.push(idb.getMany('scrobbles', lfmKeysArray, CACHE_EXPIRE_GLOBAL_SCROBBLES).then(res => dataMap.scrobbles = res));
-                    if (needsLfmPersonal) fetchPromises2.push(idb.getMany('personalScrobbles', lfmKeysArray, CACHE_EXPIRE_PERSONAL_SCROBBLES).then(res => dataMap.personal = res));
-                    if (needsLfmLast) fetchPromises2.push(idb.getMany('lastScrobbledDates', lfmKeysArray, CACHE_EXPIRE_PERSONAL_SCROBBLES).then(res => dataMap.lastScrobbled = res));
-                    if (fetchPromises2.length > 0) await Promise.all(fetchPromises2);
                 }
             }
+            const extraLfmTasks = [];
+            if (extraScrobble.size) extraLfmTasks.push(idb.getMany('scrobbles', Array.from(extraScrobble), CACHE_EXPIRE_GLOBAL_SCROBBLES).then(m => paintLfmIdbMap(m, 'scrobbles', 'scrobbles')));
+            if (extraPersonal.size) extraLfmTasks.push(idb.getMany('personalScrobbles', Array.from(extraPersonal), CACHE_EXPIRE_PERSONAL_SCROBBLES).then(m => paintLfmIdbMap(m, 'personalScrobbles', 'personalScrobbles', d => (d && !d.pendingUpdate) ? d.count : undefined)));
+            if (extraLast.size) extraLfmTasks.push(idb.getMany('lastScrobbledDates', Array.from(extraLast), CACHE_EXPIRE_PERSONAL_SCROBBLES).then(m => paintLfmIdbMap(m, 'lastScrobbled', 'lastScrobbled')));
+            if (extraLfmTasks.length) await Promise.all(extraLfmTasks);
+        }
 
-            const idsToFetchFromApi = [];
-            const elementsToFetchFromApi = new Map();
-            const propsMap = new Map();
+        const netTasks = [];
+        const missPC = hasType('playCount') ? collectPendingIds(t => t === 'playCount') : [];
+        const missRD = hasType('releaseDate') ? collectPendingIds(t => t === 'releaseDate') : [];
+        const missPop = hasType('popularity') ? collectPendingIds(t => t === 'popularity') : [];
+        const missCore = [...new Set([...missRD, ...missPop])];
+        const missTK = hasTempoKeyCol ? collectPendingIds(t => tempoKeyTypes.has(t)) : [];
+        const missFullAudio = hasFullAudioCol ? collectPendingIds(t => fullAudioTypes.has(t)) : [];
 
-            for (const { element, id, props } of batch) {
-                if (element.dataset.spColTypes !== expectedCols) continue;
+        if (missPC.length || missCore.length || missTK.length) {
+            netTasks.push((async () => {
+                const waitPromises = new Set();
+                const fetchPC = [];
+                const fetchCore = [];
+                const fetchTK = [];
 
-                let isFullyCached = true;
-                const src = props || dataMap.metadata?.get(id);
-                const trackInfo = src ? {
-                    name: src.name,
-                    artists: src.artists,
-                    artistName: src.artists?.[0]?.name,
-                    albumName: src.album?.name,
-                    album: src.album,
-                    uri: src.uri
-                } : null;
-
-                for (const config of columnConfigs) {
-                    const dataElement = element.querySelector(config.dataSelector);
-                    if (!dataElement || dataElement.dataset.spProcessed) continue;
-
-                    let val = undefined;
-                    if (config.type === 'playCount' && dataMap.playCounts) {
-                        val = dataMap.playCounts.get(id);
-                    } else if (config.type === 'releaseDate' && dataMap.releaseDates) {
-                        const cached = dataMap.releaseDates.get(id);
-                        val = (cached && typeof cached === 'object' && cached.date !== undefined) ? cached.date : cached;
-                    } else if (config.type === 'trueReleaseDate' && dataMap.trueReleaseDates) {
-                        const cached = dataMap.trueReleaseDates.get(id);
-                        if (cached !== undefined && cached !== null) {
-                            setExtraColMem('trueReleaseDates', id, cached);
-                            val = (typeof cached === 'object' && cached.date !== undefined) ? cached.date : cached;
-                        }
-                    } else if (config.type === 'scrobbles' && dataMap.scrobbles) {
-                        const lfmKey = idToLfmKey.get(id);
-                        if (lfmKey) {
-                            val = dataMap.scrobbles.get(lfmKey);
-                            if (val !== undefined && val !== null) setExtraColMem('scrobbles', lfmKey, val);
-                        }
-                    } else if (config.type === 'personalScrobbles' && dataMap.personal) {
-                        const lfmKey = idToLfmKey.get(id);
-                        if (lfmKey) {
-                            const d = dataMap.personal.get(lfmKey);
-                            if (d && !d.pendingUpdate) {
-                                val = d.count;
-                                setExtraColMem('personalScrobbles', lfmKey, val);
-                            }
-                        }
-                    } else if (config.type === 'lastScrobbled' && dataMap.lastScrobbled) {
-                        const lfmKey = idToLfmKey.get(id);
-                        if (lfmKey) {
-                            val = dataMap.lastScrobbled.get(lfmKey);
-                            if (val !== undefined && val !== null) setExtraColMem('lastScrobbled', lfmKey, val);
-                        }
-                    } else if (audioFeatureTypes.has(config.type) && dataMap.ai) {
-                        const cached = dataMap.ai.get(getCacheKey(id, true, false, "stats-column"));
-                        const stats = cached ? (cached.stats || cached) : null;
-                        if (stats) {
-                            setExtraColMem('aiStats', id, stats);
-                            val = (config.type === 'djInfo' || config.type === 'key') ? stats : stats[config.type];
-                        }
-                    } else if (config.type === 'popularity' && dataMap.metadata) {
-                        const meta = dataMap.metadata.get(id);
-                        if (meta && meta.popularity !== undefined && meta.popularity !== null) {
-                            val = meta.popularity;
-                            setExtraColMem('popularity', id, val);
-                        }
-                    }
-
-                    if ((config.type === 'scrobbles' || config.type === 'personalScrobbles' || config.type === 'lastScrobbled') && !trackInfo) {
-                        val = undefined;
-                    }
-
-                    if ((config.type === 'scrobbles' || config.type === 'personalScrobbles' || config.type === 'lastScrobbled') && trackInfo) {
-                        bindLfmClick(dataElement, trackInfo);
-                    }
-
-                    if (config.type === 'releaseDate' && val && val !== '―' && !URI.isAlbum(currentUri)) {
-                        bindReleaseDateClick(dataElement, id, props, trackInfo);
-                    }
-
-                    if (config.type === 'trueReleaseDate' && val && val !== '―' && trackInfo) {
-                        const cachedObj = dataMap.trueReleaseDates?.get(id);
-                        bindTrueReleaseDateClick(dataElement, id, trackInfo, cachedObj, () => dataMap.playCounts?.get(id));
-                    }
-
-                    if (val !== undefined && val !== null) {
-                        if ((config.type === 'scrobbles' || config.type === 'personalScrobbles' || config.type === 'lastScrobbled') && val === -1) {
-                            updateDisplay(dataElement, { error: "Track not found on Last.fm", errorLabel: "N/A" }, config.type, config.format);
-                        } else {
-                            updateDisplay(dataElement, val, config.type, config.format, { isPlayable: rowPlayableMap.get(element) !== false });
-                        }
-                    } else {
-                        isFullyCached = false;
-                    }
+                for (const id of missPC) {
+                    const p = extraColInFlight.playCounts.get(id);
+                    if (p) waitPromises.add(p);
+                    else fetchPC.push(id);
+                }
+                for (const id of missCore) {
+                    const p = extraColInFlight.core.get(id);
+                    if (p) waitPromises.add(p);
+                    else fetchCore.push(id);
+                }
+                for (const id of missTK) {
+                    const p = extraColInFlight.tempoKey.get(id);
+                    if (p) waitPromises.add(p);
+                    else fetchTK.push(id);
                 }
 
-                if (isFullyCached) {
-                    if (element.dataset.spColTypes === expectedCols) element.classList.remove('sort-play-processing');
-                } else {
-                    if (!elementsToFetchFromApi.has(id)) {
-                        idsToFetchFromApi.push(id);
-                        elementsToFetchFromApi.set(id, []);
-                    }
-                    elementsToFetchFromApi.get(id).push(element);
-                    if (props && !propsMap.has(id)) propsMap.set(id, props);
-                }
-            }
-
-            if (idsToFetchFromApi.length > 0) {
-                const apiTasks = [];
-
-                if (hasAudioCol) {
-                    const audioCols = columnConfigs.filter(c => audioFeatureTypes.has(c.type));
-                    const audioFetchIds = idsToFetchFromApi.filter(id => (elementsToFetchFromApi.get(id) || []).some(el => audioCols.some(c => {
-                        const dEl = el.querySelector(c.dataSelector);
-                        return dEl && !dEl.dataset.spProcessed;
-                    })));
-                    if (audioFetchIds.length > 0) {
-                        apiTasks.push((async () => {
-                            try {
-                                const stats = await getBatchTrackStats(audioFetchIds);
-                                for (const id of audioFetchIds) {
-                                    const stat = stats?.[id];
-                                    const els = elementsToFetchFromApi.get(id) || [];
-                                    if (!stat) {
-                                        setExtraColMem('aiStats', id, { _missing: true });
-                                        els.forEach(el => {
-                                            if (el && el.dataset.spColTypes === expectedCols) {
-                                                audioCols.forEach(c => {
-                                                    const dEl = el.querySelector(c.dataSelector);
-                                                    if (dEl && !dEl.dataset.spProcessed) updateDisplay(dEl, "―", c.type, c.format);
-                                                });
-                                            }
-                                        });
-                                        continue;
-                                    }
-                                    setExtraColMem('aiStats', id, stat);
-                                    await setTrackCache(id, { stats: stat }, true, false, "stats-column");
-                                    els.forEach(el => {
-                                        if (el && el.dataset.spColTypes === expectedCols) {
-                                            audioCols.forEach(c => {
-                                                updateDisplay(el.querySelector(c.dataSelector), (c.type === 'djInfo' || c.type === 'key') ? stat : stat[c.type], c.type, c.format);
-                                            });
-                                        }
-                                    });
-                                }
-                            } catch (_) {}
-                        })());
-                    }
-                }
-
-                if (nonAudioConfigs.length > 0) {
-                    const nonAudioFetchIds = idsToFetchFromApi.filter(id => (elementsToFetchFromApi.get(id) || []).some(el => nonAudioConfigs.some(c => {
-                        const dEl = el.querySelector(c.dataSelector);
-                        return dEl && !dEl.dataset.spProcessed;
-                    })));
-                    if (nonAudioFetchIds.length > 0) {
-                    const processTrackData = async (t) => {
-                        if (!t) return;
-                        const els = elementsToFetchFromApi.get(t.id) || [];
-                        const activeEls = els.filter(el => el.dataset.spColTypes === expectedCols);
-                        if (activeEls.length === 0) return;
-
-                        const resolvedVals = {};
-                        const handledTypes = new Set();
-
-                        for (const c of nonAudioConfigs) {
-                            if (handledTypes.has(c.type)) continue;
-                            const needsCol = activeEls.some(el => {
-                                const dEl = el.querySelector(c.dataSelector);
-                                return dEl && !dEl.dataset.spProcessed;
-                            });
-                            if (!needsCol) continue;
-                            handledTypes.add(c.type);
-
-                            if (c.type === 'playCount') {
-                                const pc = dataMap.playCounts?.get(t.id);
-                                if (pc !== undefined && pc !== null && pc !== "N/A") {
-                                    resolvedVals.playCount = pc;
-                                } else {
-                                    const r = await getTrackDetailsWithPlayCount({ id: t.id, trackId: t.id, albumId: t.album?.id, name: t.name, uri: t.uri, track: t }, 3, 1000, playCountBatchAttempted.has(t.id));
-                                    resolvedVals.playCount = r?.playCount ?? "N/A";
-                                    if (r?.playCount !== "N/A" && r?.playCount !== undefined) await setCachedPlayCount(t.id, r.playCount);
-                                    else setExtraColMem('playCounts', t.id, "N/A");
-                                }
-                            } else if (c.type === 'releaseDate') {
-                                const relDate = t.album?.release_date ?? null;
-                                resolvedVals.releaseDate = relDate;
-                                if (relDate) await setCachedReleaseDate(t.id, relDate);
-                            } else if (c.type === 'trueReleaseDate') {
-                                const trackObjForFetch = { id: t.id, trackId: t.id, albumId: t.album?.id, name: t.name, uri: t.uri, artists: t.artists, track: t, playCount: dataMap.playCounts?.get(t.id) || "N/A" };
-                                const r = await getTrackDetailsWithTrueReleaseDate(trackObjForFetch);
-                                if (r?.trueReleaseDate) setExtraColMem('trueReleaseDates', t.id, { date: r.trueReleaseDate, albumId: r._exactAlbumIdFound ? r.trueAlbumId : null });
-                                resolvedVals.trueReleaseDateObj = { val: r?.trueReleaseDate, obj: r, trackObjForFetch };
-                            } else if (c.type === 'popularity') {
-                                resolvedVals.popularity = t.popularity;
-                                if (t.popularity !== undefined && t.popularity !== null) setExtraColMem('popularity', t.id, t.popularity);
-                            } else if (c.type === 'scrobbles' || c.type === 'personalScrobbles' || c.type === 'lastScrobbled') {
-                                const info = { name: t.name, artists: t.artists, uri: t.uri, albumName: t.album?.name };
-                                resolvedVals.info = info;
-                                const lfmK = getLfmInfo(info)?.key;
-
-                                if (c.type === 'scrobbles') {
-                                    if (resolvedVals.scrobbles === undefined) {
-                                        const r = await getTrackDetailsWithScrobbles(info, true);
-                                        resolvedVals.scrobbles = (r.scrobbles === -1 || r.error) ? { error: r.error || "Not found", errorLabel: r.errorLabel || "N/A" } : r.scrobbles;
-                                        if (lfmK && typeof r.scrobbles === 'number') setExtraColMem('scrobbles', lfmK, r.scrobbles);
-                                        if (r.personalScrobbles !== undefined && resolvedVals.personalScrobbles === undefined) {
-                                            resolvedVals.personalScrobbles = (r.personalScrobbles === -1 || r.error) ? { error: r.error || "Not found", errorLabel: r.errorLabel || "N/A" } : r.personalScrobbles;
-                                            if (lfmK && typeof r.personalScrobbles === 'number') setExtraColMem('personalScrobbles', lfmK, r.personalScrobbles);
-                                        }
-                                    }
-                                } else if (c.type === 'personalScrobbles') {
-                                    if (!hasLfmUser) {
-                                        resolvedVals.personalScrobbles = { error: "Set last.fm username", errorLabel: "No User" };
-                                    } else if (resolvedVals.personalScrobbles === undefined) {
-                                        const r = await getTrackDetailsWithPersonalScrobbles(info, true);
-                                        resolvedVals.personalScrobbles = (r.personalScrobbles === -1 || r.error) ? { error: r.error || "Not found", errorLabel: r.errorLabel || "N/A" } : r.personalScrobbles;
-                                        if (lfmK && typeof r.personalScrobbles === 'number') setExtraColMem('personalScrobbles', lfmK, r.personalScrobbles);
-                                        if (r.scrobbles !== undefined && resolvedVals.scrobbles === undefined) {
-                                            resolvedVals.scrobbles = (r.scrobbles === -1 || r.error) ? { error: r.error || "Not found", errorLabel: r.errorLabel || "N/A" } : r.scrobbles;
-                                            if (lfmK && typeof r.scrobbles === 'number') setExtraColMem('scrobbles', lfmK, r.scrobbles);
-                                        }
-                                    }
-                                } else {
-                                    if (hasLfmUser) {
-                                        const r = await getTrackDetailsWithLastScrobbled(info, true);
-                                        resolvedVals.lastScrobbled = (r.lastScrobbled === -1 || r.error) ? { error: r.error || "Not found", errorLabel: "N/A" } : r.lastScrobbled;
-                                        if (lfmK && r.lastScrobbled !== undefined && !r.error) setExtraColMem('lastScrobbled', lfmK, r.lastScrobbled);
-                                    } else {
-                                        resolvedVals.lastScrobbled = { error: "Set last.fm username", errorLabel: "No User" };
-                                    }
-                                }
-                            }
-                        }
-
-                        for (const el of activeEls) {
-                            if (el.dataset.spColTypes !== expectedCols) continue;
-                            for (const c of nonAudioConfigs) {
-                                const dEl = el.querySelector(c.dataSelector);
-                                if (!dEl || dEl.dataset.spProcessed) continue;
-
-                                if (c.type === 'playCount') {
-                                    updateDisplay(dEl, resolvedVals.playCount, c.type, c.format, { isPlayable: rowPlayableMap.get(el) !== false });
-                                } else if (c.type === 'releaseDate') {
-                                    updateDisplay(dEl, resolvedVals.releaseDate, c.type, c.format);
-                                    if (resolvedVals.releaseDate && resolvedVals.releaseDate !== '―' && !URI.isAlbum(currentUri)) {
-                                        dEl.classList.add('sp-col-clickable');
-                                        dEl.title = "Click to view album";
-                                        dEl.onclick = (e) => {
-                                            e.stopPropagation();
-                                            e.preventDefault();
-                                            const rawAlbId = t.album?.id || t.album?.uri?.split(':')[2];
-                                            const albId = rawAlbId ? rawAlbId.split(':').pop() : null;
-                                            if (albId) Spicetify.Platform.History.push(`/album/${albId}`);
-                                            else showNotification("Album not found.", true);
-                                        };
-                                    }
-                                } else if (c.type === 'trueReleaseDate') {
-                                    const res = resolvedVals.trueReleaseDateObj;
-                                    updateDisplay(dEl, res?.val, c.type, c.format);
-                                    if (res?.val && res.val !== '―') {
-                                        dEl.classList.add('sp-col-clickable');
-                                        dEl.title = "Click to view album";
-                                        dEl.onclick = async (e) => {
-                                            e.stopPropagation();
-                                            e.preventDefault();
-                                            if (res.obj?._exactAlbumIdFound && res.obj.trueAlbumId) {
-                                                Spicetify.Platform.History.push(`/album/${res.obj.trueAlbumId}`);
-                                            } else {
-                                                try {
-                                                    const freshR = await getTrackDetailsWithTrueReleaseDate(res.trackObjForFetch, true);
-                                                    const clickAlbId = freshR.trueAlbumId || t.album?.id || res.trackObjForFetch.albumId;
-                                                    if (clickAlbId) Spicetify.Platform.History.push(`/album/${clickAlbId}`);
-                                                    else showNotification("Album not found.", true);
-                                                } catch (_) {
-                                                    showNotification("Failed to find album.", true);
-                                                }
-                                            }
-                                        };
-                                    }
-                                } else if (c.type === 'popularity') {
-                                    updateDisplay(dEl, resolvedVals.popularity, c.type, c.format);
-                                } else if (c.type === 'scrobbles' || c.type === 'personalScrobbles' || c.type === 'lastScrobbled') {
-                                    if (resolvedVals.info) bindLfmClick(dEl, resolvedVals.info);
-                                    updateDisplay(dEl, resolvedVals[c.type], c.type, c.format);
-                                }
-                            }
-                        }
-                    };
-
-                    const fetchAndProcessInternal = async () => {
-                        const isAlbum = Spicetify.URI.isAlbum(currentUri);
-                        const albumIdFromUrl = isAlbum ? currentUri.split(':')[2] : null;
-                        const needsPopularity = nonAudioConfigs.some(c => c.type === 'popularity');
-                        const needsReleaseDate = nonAudioConfigs.some(c => c.type === 'releaseDate');
-
-                        const processItem = async (id) => {
-                            let t = null;
-                            const props = propsMap.get(id);
-                            if (props) {
-                                const albId = props.album?.uri ? props.album.uri.split(':')[2] : albumIdFromUrl;
-                                const hasReleaseDate = props.album?.release_date;
-                                if (albId && !needsPopularity && (!needsReleaseDate || hasReleaseDate)) {
-                                    t = {
-                                        id,
-                                        name: props.name,
-                                        album: { id: albId, release_date: props.album?.release_date },
-                                        artists: props.artists || [],
-                                        uri: `spotify:track:${id}`
-                                    };
-                                }
-                            }
-                            if (!t) {
-                                t = await fetchInternalTrackMetadata(id);
-                                if (t) {
-                                    const cacheData = formatTrackCacheData(t);
-                                    const existing = dataMap.metadata?.get(id);
-                                    if (existing) {
-                                        if (existing.external_ids) cacheData.external_ids = { ...existing.external_ids, ...cacheData.external_ids };
-                                        if (existing.album) {
-                                            cacheData.album = { ...existing.album, ...cacheData.album };
-                                            if (existing.album.album_type) cacheData.album.album_type = existing.album.album_type;
-                                        }
-                                        if (existing.albumType) cacheData.albumType = existing.albumType;
-                                    }
-                                    idb.set('trackMetadata', t.id, cacheData);
-                                    if (t.popularity !== undefined && t.popularity !== null) setExtraColMem('popularity', t.id, t.popularity);
-                                }
-                            }
-                            await processTrackData(t);
-                        };
-
-                        const hasLfmCol = nonAudioConfigs.some(c => c.type === 'scrobbles' || (hasLfmUser && (c.type === 'personalScrobbles' || c.type === 'lastScrobbled')));
-                        if (hasLfmCol && L_F_M_Key_Pool.length === 0) await fetchLastFmKeys();
-                        const validLfmKeys = Math.max(1, L_F_M_Key_Pool.length - revokedLfmKeys.size);
-                        const CONCURRENCY_LIMIT = hasLfmCol ? Math.min(25, Math.max(5, validLfmKeys * 2)) : 5;
-                        const queue = [...nonAudioFetchIds];
-                        const workers = Array(Math.min(CONCURRENCY_LIMIT, queue.length)).fill(null).map(async () => {
-                            while (queue.length > 0) {
-                                const id = queue.shift();
-                                if (id) await processItem(id);
-                            }
+                let espOk = true;
+                const CHUNK = 500;
+                const espJobs = [];
+                const maxLen = Math.max(fetchPC.length, fetchCore.length, fetchTK.length);
+                for (let i = 0; i < maxLen; i += CHUNK) {
+                    const pcSlice = fetchPC.slice(i, i + CHUNK);
+                    const coreSlice = fetchCore.slice(i, i + CHUNK);
+                    const tkSlice = fetchTK.slice(i, i + CHUNK);
+                    const p = fetchFastExtraColsEsperanto({ playCountIds: pcSlice, coreIds: coreSlice, tempoKeyIds: tkSlice, existingMetaMap })
+                        .then(res => {
+                            if (!res.ok) espOk = false;
+                            if (pcSlice.length) paintFromMemForIds(pcSlice, t => t === 'playCount');
+                            if (coreSlice.length) paintFromMemForIds(coreSlice, t => t === 'releaseDate' || t === 'popularity');
+                            if (tkSlice.length) paintFromMemForIds(tkSlice, t => tempoKeyTypes.has(t));
+                            return res;
                         });
-                        await Promise.all(workers);
-                    };
-
-                    apiTasks.push(fetchAndProcessInternal());
-                    }
+                    if (pcSlice.length) registerExtraColInFlight('playCounts', pcSlice, p);
+                    if (coreSlice.length) registerExtraColInFlight('core', coreSlice, p);
+                    if (tkSlice.length) registerExtraColInFlight('tempoKey', tkSlice, p);
+                    espJobs.push(p);
                 }
 
-                await Promise.all(apiTasks);
+                if (waitPromises.size) {
+                    await Promise.allSettled(Array.from(waitPromises));
+                    if (missPC.length) paintFromMemForIds(missPC, t => t === 'playCount');
+                    if (missCore.length) paintFromMemForIds(missCore, t => t === 'releaseDate' || t === 'popularity');
+                    if (missTK.length) paintFromMemForIds(missTK, t => tempoKeyTypes.has(t));
+                }
+                if (espJobs.length) await Promise.all(espJobs);
 
-                idsToFetchFromApi.forEach(id => {
-                    const els = elementsToFetchFromApi.get(id) || [];
-                    els.forEach(el => {
-                        if (el && el.dataset.spColTypes === expectedCols) el.classList.remove('sort-play-processing');
-                    });
-                });
-            }
+                const stillMissPC = missPC.length ? collectPendingIds(t => t === 'playCount').filter(id => missPC.includes(id)) : [];
+                const stillMissCore = missCore.length ? collectPendingIds(t => t === 'releaseDate' || t === 'popularity').filter(id => missCore.includes(id)) : [];
+                const stillMissTK = missTK.length ? collectPendingIds(t => tempoKeyTypes.has(t)).filter(id => missTK.includes(id)) : [];
+
+                const fbTasks = [];
+                if (stillMissPC.length) {
+                    const albumIdFromUrl = isAlbumPage ? currentUri.split(':')[2] : null;
+                    fbTasks.push((async () => {
+                        const q = [...stillMissPC];
+                        const runW = async () => {
+                            while (q.length) {
+                                const id = q.shift();
+                                const row0 = rowsById.get(id)?.[0];
+                                const pObj = row0?.props || existingMetaMap.get(id) || (row0 ? getTrackDataObject(row0.element) : null);
+                                const albId = pObj?.album?.id || pObj?.album?.uri?.split(':')[2] || albumIdFromUrl;
+                                try {
+                                    const r = await getTrackDetailsWithPlayCount({ id, trackId: id, albumId: albId, name: pObj?.name, uri: `spotify:track:${id}` }, 3, 1000, espOk && fetchPC.includes(id));
+                                    const val = r?.playCount ?? "N/A";
+                                    if (val !== "N/A" && val !== undefined) await setCachedPlayCount(id, val);
+                                    else setExtraColMem('playCounts', id, "N/A");
+                                    paintFromMemForIds([id], t => t === 'playCount');
+                                } catch (_) {
+                                    setExtraColMem('playCounts', id, "N/A");
+                                    paintFromMemForIds([id], t => t === 'playCount');
+                                }
+                            }
+                        };
+                        await Promise.all(Array.from({ length: Math.min(5, q.length) }, () => runW()));
+                    })());
+                }
+                if (stillMissCore.length) {
+                    fbTasks.push((async () => {
+                        const q = [...stillMissCore];
+                        const runW = async () => {
+                            while (q.length) {
+                                const id = q.shift();
+                                try {
+                                    const t = await fetchInternalTrackMetadata(id);
+                                    if (t) {
+                                        const merged = mergeTrackCacheData(existingMetaMap.get(id), t, !existingMetaMap.get(id)?.album?.album_type);
+                                        idb.set('trackMetadata', t.id, merged).catch(() => {});
+                                        if (t.popularity !== undefined && t.popularity !== null) setExtraColMem('popularity', id, t.popularity);
+                                        if (t.album?.release_date) await setCachedReleaseDate(id, t.album.release_date);
+                                    }
+                                    paintFromMemForIds([id], t => t === 'releaseDate' || t === 'popularity');
+                                    for (const row of (rowsById.get(id) || [])) {
+                                        if (!isRowValid(row.element, row.uri)) continue;
+                                        for (const { config, dataElement } of row.asyncCols) {
+                                            if (!dataElement.dataset.spProcessed && (config.type === 'releaseDate' || config.type === 'popularity')) {
+                                                paintCell(row, config, dataElement, "―");
+                                            }
+                                        }
+                                    }
+                                } catch (_) {}
+                            }
+                        };
+                        await Promise.all(Array.from({ length: Math.min(5, q.length) }, () => runW()));
+                    })());
+                }
+                if (stillMissTK.length) {
+                    fbTasks.push((async () => {
+                        if (!espOk) {
+                            try {
+                                const fb = await fetchInternalAudioFeaturesBatch(stillMissTK);
+                                const tkEntries = [];
+                                for (const id of stillMissTK) {
+                                    const parsed = fb?.[id];
+                                    if (parsed) {
+                                        const tk = { tempo: parsed.tempo, key_raw: parsed.key_raw, mode: parsed.mode, key: parsed.key, camelot: parsed.camelot };
+                                        setExtraColMem('tempoKey', id, tk);
+                                        tkEntries.push({ key: `${BPM_KEY_CACHE_PREFIX}${id}`, val: tk });
+                                    } else {
+                                        setExtraColMem('tempoKey', id, { _missing: true });
+                                    }
+                                }
+                                if (tkEntries.length && idb.setMany) idb.setMany('aiData', tkEntries).catch(() => {});
+                            } catch (_) {
+                                for (const id of stillMissTK) setExtraColMem('tempoKey', id, { _missing: true });
+                            }
+                        } else {
+                            for (const id of stillMissTK) setExtraColMem('tempoKey', id, { _missing: true });
+                        }
+                        paintFromMemForIds(stillMissTK, t => tempoKeyTypes.has(t));
+                    })());
+                }
+                if (fbTasks.length) await Promise.all(fbTasks);
+            })());
         }
+
+        if (missFullAudio.length) {
+            netTasks.push((async () => {
+                try {
+                    const waitP = new Set();
+                    const newIds = [];
+                    for (const id of missFullAudio) {
+                        const p = extraColInFlight.aiStats.get(id);
+                        if (p) waitP.add(p);
+                        else newIds.push(id);
+                    }
+                    const runNew = newIds.length ? registerExtraColInFlight('aiStats', newIds, getBatchTrackStats(newIds).then(stats => {
+                        for (const id of newIds) {
+                            const stat = stats?.[id];
+                            setExtraColMem('aiStats', id, stat || { _missing: true });
+                        }
+                    })) : null;
+                    if (waitP.size) await Promise.allSettled(Array.from(waitP));
+                    if (runNew) await runNew;
+                    paintFromMemForIds(missFullAudio, t => fullAudioTypes.has(t) || tempoKeyTypes.has(t));
+                } catch (_) {}
+            })());
+        }
+
+        const slowTypes = new Set(['trueReleaseDate', 'scrobbles', 'personalScrobbles', 'lastScrobbled']);
+        const missSlowIds = (hasType('trueReleaseDate') || hasAnyLfm) ? collectPendingIds(t => slowTypes.has(t)) : [];
+        if (missSlowIds.length) {
+            netTasks.push((async () => {
+                const albumIdFromUrl = isAlbumPage ? currentUri.split(':')[2] : null;
+                if (hasAnyLfm && L_F_M_Key_Pool.length === 0) await fetchLastFmKeys();
+                const validLfmKeys = Math.max(1, L_F_M_Key_Pool.length - revokedLfmKeys.size);
+                const CONCURRENCY_LIMIT = hasAnyLfm ? Math.min(25, Math.max(5, validLfmKeys * 2)) : 5;
+
+                const processSlowId = async (id) => {
+                    const rows = (rowsById.get(id) || []).filter(r => isRowValid(r.element, r.uri));
+                    if (!rows.length) return;
+                    let t = null;
+                    const firstWithInfo = rows.find(r => r.trackInfo);
+                    const props = firstWithInfo?.props || rows[0]?.props;
+                    const cachedMeta = existingMetaMap.get(id);
+                    if (props) {
+                        const albId = props.album?.id || props.album?.uri?.split(':')[2] || albumIdFromUrl;
+                        t = {
+                            id,
+                            name: props.name,
+                            album: { id: albId, name: props.album?.name, release_date: props.album?.release_date },
+                            artists: props.artists || [],
+                            uri: `spotify:track:${id}`
+                        };
+                    } else if (cachedMeta?.name && Array.isArray(cachedMeta.artists) && cachedMeta.artists.length) {
+                        t = cachedMeta;
+                    } else {
+                        t = await fetchInternalTrackMetadata(id);
+                        if (t) {
+                            const merged = mergeTrackCacheData(cachedMeta, t, !cachedMeta?.album?.album_type);
+                            idb.set('trackMetadata', t.id, merged).catch(() => {});
+                            if (t.popularity !== undefined && t.popularity !== null) setExtraColMem('popularity', t.id, t.popularity);
+                        }
+                    }
+                    if (!t) return;
+
+                    const info = { name: t.name, artists: t.artists, artistName: t.artists?.[0]?.name, albumName: t.album?.name, album: t.album, uri: t.uri || `spotify:track:${id}` };
+                    const lfmK = hasAnyLfm ? getLfmInfo(info)?.key : null;
+                    const resolved = {};
+                    const activeSlowTypes = new Set();
+                    for (const row of rows) {
+                        for (const { config, dataElement } of row.asyncCols) {
+                            if (!dataElement.dataset.spProcessed && slowTypes.has(config.type)) activeSlowTypes.add(config.type);
+                        }
+                    }
+
+                    if (activeSlowTypes.has('trueReleaseDate')) {
+                        const trackObjForFetch = { id, trackId: id, albumId: t.album?.id || albumIdFromUrl, name: t.name, uri: info.uri, artists: t.artists, track: t, playCount: getExtraColMem('playCounts', id, CACHE_EXPIRE_PLAYCOUNTS) || "N/A" };
+                        const r = await getTrackDetailsWithTrueReleaseDate(trackObjForFetch);
+                        const trdCached = r?.trueReleaseDate ? { date: r.trueReleaseDate, albumId: r._exactAlbumIdFound ? r.trueAlbumId : null } : null;
+                        if (trdCached) setExtraColMem('trueReleaseDates', id, trdCached);
+                        resolved.trueReleaseDate = { val: r?.trueReleaseDate ?? "―", trdObj: trdCached };
+                    }
+                    if (activeSlowTypes.has('scrobbles') && resolved.scrobbles === undefined) {
+                        const r = await getTrackDetailsWithScrobbles(info, true);
+                        resolved.scrobbles = (r.scrobbles === -1 || r.error) ? { error: r.error || "Not found", errorLabel: r.errorLabel || "N/A" } : r.scrobbles;
+                        if (lfmK && typeof r.scrobbles === 'number') setExtraColMem('scrobbles', lfmK, r.scrobbles);
+                        if (r.personalScrobbles !== undefined && resolved.personalScrobbles === undefined) {
+                            resolved.personalScrobbles = (r.personalScrobbles === -1 || r.error) ? { error: r.error || "Not found", errorLabel: r.errorLabel || "N/A" } : r.personalScrobbles;
+                            if (lfmK && typeof r.personalScrobbles === 'number') setExtraColMem('personalScrobbles', lfmK, r.personalScrobbles);
+                        }
+                    }
+                    if (activeSlowTypes.has('personalScrobbles') && resolved.personalScrobbles === undefined) {
+                        const r = await getTrackDetailsWithPersonalScrobbles(info, true);
+                        resolved.personalScrobbles = (r.personalScrobbles === -1 || r.error) ? { error: r.error || "Not found", errorLabel: r.errorLabel || "N/A" } : r.personalScrobbles;
+                        if (lfmK && typeof r.personalScrobbles === 'number') setExtraColMem('personalScrobbles', lfmK, r.personalScrobbles);
+                        if (r.scrobbles !== undefined && resolved.scrobbles === undefined) {
+                            resolved.scrobbles = (r.scrobbles === -1 || r.error) ? { error: r.error || "Not found", errorLabel: r.errorLabel || "N/A" } : r.scrobbles;
+                            if (lfmK && typeof r.scrobbles === 'number') setExtraColMem('scrobbles', lfmK, r.scrobbles);
+                        }
+                    }
+                    if (activeSlowTypes.has('lastScrobbled')) {
+                        const r = await getTrackDetailsWithLastScrobbled(info, true);
+                        resolved.lastScrobbled = (r.lastScrobbled === -1 || r.error) ? { error: r.error || "Not found", errorLabel: "N/A" } : r.lastScrobbled;
+                        if (lfmK && r.lastScrobbled !== undefined && !r.error) setExtraColMem('lastScrobbled', lfmK, r.lastScrobbled);
+                    }
+
+                    for (const row of rows) {
+                        if (!isRowValid(row.element, row.uri)) continue;
+                        if (!row.trackInfo) row.trackInfo = info;
+                        for (const { config, dataElement } of row.asyncCols) {
+                            if (dataElement.dataset.spProcessed || !slowTypes.has(config.type)) continue;
+                            if (config.type === 'trueReleaseDate' && resolved.trueReleaseDate) {
+                                paintCell(row, config, dataElement, resolved.trueReleaseDate.val, { trackInfo: info, trdObj: resolved.trueReleaseDate.trdObj });
+                            } else if (resolved[config.type] !== undefined) {
+                                paintCell(row, config, dataElement, resolved[config.type], { trackInfo: info });
+                            }
+                        }
+                    }
+                };
+
+                const queue = [...missSlowIds];
+                await Promise.all(Array.from({ length: Math.min(CONCURRENCY_LIMIT, queue.length) }, async () => {
+                    while (queue.length) {
+                        const id = queue.shift();
+                        if (id) await processSlowId(id);
+                    }
+                }));
+            })());
+        }
+
+        if (netTasks.length) await Promise.all(netTasks);
     } finally {
-        for (const { element } of spotifyTracksToProcess) {
-            if (element.dataset.spColTypes === expectedCols) element.classList.remove('sort-play-processing');
+        for (const row of spotifyTracksToProcess) {
+            if (isRowValid(row.element, row.uri)) row.element.classList.remove('sort-play-processing');
         }
     }
   }
@@ -72138,6 +73819,12 @@ shadowRoot.innerHTML = `
       node.classList.contains('likeControl-wrapper') ||
       node.classList.contains('sort-play-like-button')
     ));
+    const isRowNode = (node) => {
+      if (node.nodeType !== Node.ELEMENT_NODE || isOwnNode(node)) return false;
+      const cl = node.classList;
+      if (cl?.contains('main-trackList-trackListRow') || node.getAttribute?.('role') === 'row') return true;
+      return Boolean(node.querySelector?.('.main-trackList-trackListRow, [role="row"]'));
+    };
     const isRelevantNode = (node) => {
       if (node.nodeType !== Node.ELEMENT_NODE || isOwnNode(node)) return false;
       const cl = node.classList;
@@ -72160,6 +73847,7 @@ shadowRoot.innerHTML = `
 
     return (mutations) => {
       let shouldUpdate = false;
+      let hasAddedRow = false;
       for (const mutation of mutations) {
         if (mutation.type === 'attributes') {
           const target = mutation.target;
@@ -72167,29 +73855,29 @@ shadowRoot.innerHTML = `
             const role = target.getAttribute?.('role');
             if (role === 'columnheader' || role === 'gridcell' || target.classList?.contains('main-trackList-rowSectionVariable')) {
               shouldUpdate = true;
-              break;
             }
           }
           continue;
         }
         for (const node of mutation.addedNodes) {
-          if (isRelevantNode(node)) { shouldUpdate = true; break; }
+          if (isRowNode(node)) { shouldUpdate = true; hasAddedRow = true; break; }
+          if (!shouldUpdate && isRelevantNode(node)) shouldUpdate = true;
         }
-        if (shouldUpdate) break;
-        for (const node of mutation.removedNodes) {
-          if (node.nodeType === Node.ELEMENT_NODE && !isOwnNode(node)) {
-            const role = node.getAttribute?.('role');
-            if (role === 'columnheader' || node.classList?.contains('djInfoList') || node.classList?.contains('starRatings')) {
-              shouldUpdate = true;
-              break;
+        if (hasAddedRow) break;
+        if (!shouldUpdate) {
+          for (const node of mutation.removedNodes) {
+            if (node.nodeType === Node.ELEMENT_NODE && !isOwnNode(node)) {
+              const role = node.getAttribute?.('role');
+              if (role === 'columnheader' || node.classList?.contains('djInfoList') || node.classList?.contains('starRatings')) {
+                shouldUpdate = true;
+                break;
+              }
             }
           }
         }
-        if (shouldUpdate) break;
       }
       if (!shouldUpdate) return;
-      const now = performance.now();
-      if (now - lastRun >= 16) {
+      if (hasAddedRow || performance.now() - lastRun >= 16) {
         flush();
       } else if (!trailingTimer && !trailingRaf) {
         trailingRaf = requestAnimationFrame(flush);
@@ -74859,6 +76547,12 @@ shadowRoot.innerHTML = `
     const currentUri = getCurrentUri();
     const path = Spicetify.Platform.History.location?.pathname;
     const isSearchPage = path && path.startsWith('/search');
+
+    if (currentUri && URI.isPlaylistV1OrV2(currentUri)) {
+        schedulePlaylistExtraColPrefetch(currentUri);
+    } else if (playlistExtraColPrefetchState.activeUri) {
+        cancelPlaylistExtraColPrefetch();
+    }
 
     if (showLikeButton) {
         likeButton_connectObserver();
