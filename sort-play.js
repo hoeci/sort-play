@@ -423,9 +423,18 @@
   let genreBlacklistNotify = true;
   let genreBlacklistProtectLiked = true;
   let genreBlacklistRules = [];
+  const DEFAULT_GENRE_FILTER_SOURCES = {
+    spotify_track: true,
+    spotify_artist: true,
+    lastfm_track: false,
+    lastfm_artist: false,
+    deezer: false,
+    everynoise_artist: true
+  };
   let genreBlacklistConfig = {
     sources: {
       spotify_track: true,
+      spotify_artist: true,
       everynoise_artist: true,
       lastfm_track: true,
       lastfm_artist: true,
@@ -523,6 +532,9 @@
   const pendingArtistPageFetches = new Map();
   const everyNoiseCache = new Map();
   const pendingEveryNoiseFetches = new Map();
+  const pendingSpotifyArtistFetches = new Map();
+  const tursoPrefetchedTrackCache = new Map();
+  const tursoQueueWarmedUris = new Set();
   const albumDataCache = {};
   const albumReleaseDateCache = {};
   const albumTracksDataCache = {};
@@ -7783,6 +7795,7 @@
     const defaultGblConfig = {
       sources: {
         spotify_track: true,
+        spotify_artist: true,
         everynoise_artist: true,
         lastfm_track: true,
         lastfm_artist: true,
@@ -8069,7 +8082,7 @@
           [STORAGE_KEY_RANGE_EXCLUDE_UNLISTENED]: "false",
           [STORAGE_KEY_FOLLOWED_RELEASES_CONFIG]: JSON.stringify(DEFAULT_FR_CONFIG),
           [STORAGE_KEY_LOCAL_FILES_HANDLING]: "convert_keep",
-          [STORAGE_KEY_GENRE_FILTER_SOURCES]: '{"spotify_track":true,"lastfm_track":false,"lastfm_artist":false,"deezer":false,"everynoise_artist":true}',
+          [STORAGE_KEY_GENRE_FILTER_SOURCES]: JSON.stringify(DEFAULT_GENRE_FILTER_SOURCES),
           [STORAGE_KEY_CF_FETCH_LASTFM]: "false",
           [STORAGE_KEY_CF_RELEASE_DATE_FORMAT]: "YYYY-MM-DD",
           [STORAGE_KEY_CF_MY_SCROBBLES_MODE]: "number",
@@ -8082,7 +8095,7 @@
           [STORAGE_KEY_GENRE_BLACKLIST_NOTIFY]: "true",
           [STORAGE_KEY_GENRE_BLACKLIST_PROTECT_LIKED]: "true",
           [STORAGE_KEY_GENRE_BLACKLIST]: "[]",
-          [STORAGE_KEY_GENRE_BLACKLIST_CONFIG]: JSON.stringify({ sources: { spotify_track: true, everynoise_artist: true, lastfm_track: true, lastfm_artist: true, deezer: false }, minSpotifyConfidence: 25 }),
+          [STORAGE_KEY_GENRE_BLACKLIST_CONFIG]: JSON.stringify({ sources: { spotify_track: true, spotify_artist: true, everynoise_artist: true, lastfm_track: true, lastfm_artist: true, deezer: false }, minSpotifyConfidence: 25 }),
           [STORAGE_KEY_EXTRA_COLUMN_WIDTHS]: JSON.stringify({ layouts: {}, cols: {} }),
           "sort-play-dedicated-playlist-meta": "{}"
         };
@@ -9432,6 +9445,7 @@
       const allResolvedGenres = [];
       const coveredSources = {
         spotify_track: false,
+        spotify_artist: false,
         everynoise_artist: false,
         lastfm_track: false,
         lastfm_artist: false,
@@ -9441,6 +9455,7 @@
       const cachedMap = nowPlayingGenreCache.get(track.uri);
       if (cachedMap instanceof Map) {
         if (genreSourcesNpSpotifyTrack && minConf >= 5) coveredSources.spotify_track = true;
+        if (genreSourcesNpSpotify) coveredSources.spotify_artist = true;
         if (genreSourcesNpEveryNoise) coveredSources.everynoise_artist = true;
         if (genreSourcesNpLastfm) {
           coveredSources.lastfm_track = true;
@@ -9457,6 +9472,8 @@
                 const score = match ? parseInt(match[1], 10) : 100;
                 if (score >= minConf) isSourceActive = true;
               }
+            } else if (s.startsWith("Spotify Artist") && confSources.spotify_artist) {
+              isSourceActive = true;
             } else if (s.startsWith("EveryNoise") && confSources.everynoise_artist) {
               isSourceActive = true;
             } else if (s.startsWith("Last.fm Track") && confSources.lastfm_track) {
@@ -9484,6 +9501,7 @@
           : null;
 
         if (spTrackItems && minConf > 5) coveredSources.spotify_track = true;
+        if (cachedRecord._sp_artist_checked) coveredSources.spotify_artist = true;
         if (cachedRecord._everynoise_checked) coveredSources.everynoise_artist = true;
         if (cachedRecord._lfm_track_checked) coveredSources.lastfm_track = true;
         if (cachedRecord._lfm_artist_checked) coveredSources.lastfm_artist = true;
@@ -9502,6 +9520,7 @@
         };
 
         if (confSources.spotify_track && spTrackItems) addCachedList(spTrackItems, true);
+        if (confSources.spotify_artist) addCachedList(cachedRecord.spotify_artist_genres);
         if (confSources.everynoise_artist) addCachedList(cachedRecord.everynoise_artist_genres);
         if (confSources.lastfm_track) addCachedList(cachedRecord.lastfm_track_genres);
         if (confSources.lastfm_artist) addCachedList(cachedRecord.lastfm_artist_genres);
@@ -9509,11 +9528,12 @@
       }
 
       const needSpotifyTrack = Boolean(confSources.spotify_track && !coveredSources.spotify_track);
+      const needSpotifyArtist = Boolean(confSources.spotify_artist && !coveredSources.spotify_artist);
       const needEveryNoise = Boolean(confSources.everynoise_artist && !coveredSources.everynoise_artist);
       const needLfmTrack = Boolean(confSources.lastfm_track && !coveredSources.lastfm_track);
       const needLfmArtist = Boolean(confSources.lastfm_artist && !coveredSources.lastfm_artist);
       const needDeezer = Boolean(confSources.deezer && !coveredSources.deezer);
-      const hasUncoveredSources = needSpotifyTrack || needEveryNoise || needLfmTrack || needLfmArtist || needDeezer;
+      const hasUncoveredSources = needSpotifyTrack || needSpotifyArtist || needEveryNoise || needLfmTrack || needLfmArtist || needDeezer;
 
       const deferredMatches = [];
 
@@ -9588,6 +9608,21 @@
         ...(track.artistUris || []).map(u => u ? u.split(':')[2] : null),
         track.metadata?.artist_uri ? track.metadata.artist_uri.split(':')[2] : null
       ].filter(Boolean))];
+
+      if (needSpotifyArtist && artistIds.length > 0) {
+        promises.push((async () => {
+          try {
+            await fetchSpotifyArtistGenresFromCache(artistIds);
+            for (let i = 0; i < artistIds.length; i++) {
+              const tags = artistGenreCache.get(artistIds[i]);
+              if (Array.isArray(tags) && tags.length > 0) {
+                checkSourceResult(tags, 'spotify_artist');
+                if (hasSkipped) return;
+              }
+            }
+          } catch (e) {}
+        })());
+      }
 
       if (needEveryNoise && artistIds.length > 0) {
         promises.push((async () => {
@@ -10751,6 +10786,13 @@
                 </div>
               </div>
               <div class="setting-row">
+                <label class="setting-label" for="srcSpotifyArtist">Spotify (Artist Tags)</label>
+                <label class="switch">
+                  <input type="checkbox" id="srcSpotifyArtist" ${genreBlacklistConfig.sources.spotify_artist ? 'checked' : ''}>
+                  <span class="sliderx"></span>
+                </label>
+              </div>
+              <div class="setting-row">
                 <label class="setting-label" for="srcLastfmTrack">Last.fm (Track Tags)</label>
                 <label class="switch">
                   <input type="checkbox" id="srcLastfmTrack" ${genreBlacklistConfig.sources.lastfm_track ? 'checked' : ''}>
@@ -10834,6 +10876,7 @@
     addHoverEffect(doneBtn, "#1ED760", "#3BE377");
 
     const srcSpotifyTrack = shadowRoot.querySelector("#srcSpotifyTrack");
+    const srcSpotifyArtist = shadowRoot.querySelector("#srcSpotifyArtist");
     const srcEverynoise = shadowRoot.querySelector("#srcEverynoise");
     const srcLastfmTrack = shadowRoot.querySelector("#srcLastfmTrack");
     const srcLastfmArtist = shadowRoot.querySelector("#srcLastfmArtist");
@@ -10852,6 +10895,7 @@
 
     const saveSourcesConfig = () => {
       genreBlacklistConfig.sources.spotify_track = srcSpotifyTrack.checked;
+      genreBlacklistConfig.sources.spotify_artist = srcSpotifyArtist.checked;
       genreBlacklistConfig.sources.everynoise_artist = srcEverynoise.checked;
       genreBlacklistConfig.sources.lastfm_track = srcLastfmTrack.checked;
       genreBlacklistConfig.sources.lastfm_artist = srcLastfmArtist.checked;
@@ -10863,7 +10907,7 @@
       recheckLiveTrack();
     };
 
-    [srcSpotifyTrack, srcEverynoise, srcLastfmTrack, srcLastfmArtist, srcDeezer, confSelect].forEach(el => {
+    [srcSpotifyTrack, srcSpotifyArtist, srcEverynoise, srcLastfmTrack, srcLastfmArtist, srcDeezer, confSelect].forEach(el => {
       el.addEventListener("change", saveSourcesConfig);
     });
     const mgrNotifyToggle = shadowRoot.querySelector("#mgrNotifyToggle");
@@ -16435,7 +16479,6 @@
                               <span class="sliderx"></span>
                           </label>
                       </div>
-                      ${DEVELOPER_HAS_SPOTIFY_PREMIUM ? `
                       <div class="setting-row">
                           <label class="setting-label" for="npSpotifyToggle">Spotify (Artist Tags)</label>
                           <label class="switch">
@@ -16443,7 +16486,6 @@
                               <span class="sliderx"></span>
                           </label>
                       </div>
-                      ` : ''}
                       <div class="setting-row">
                           <label class="setting-label" for="npLastfmToggle">Last.fm (Filtered Track & Artist Tags)</label>
                           <label class="switch">
@@ -16470,7 +16512,6 @@
                   <div style="display: flex; flex-direction: column; gap: 4px;">
                       <div class="section-header">Artist Page Sources</div>
                       
-                      ${DEVELOPER_HAS_SPOTIFY_PREMIUM ? `
                       <div class="setting-row">
                           <label class="setting-label" for="apSpotifyToggle">Spotify (Artist Tags)</label>
                           <label class="switch">
@@ -16478,7 +16519,6 @@
                               <span class="sliderx"></span>
                           </label>
                       </div>
-                      ` : ''}
                       <div class="setting-row">
                           <label class="setting-label" for="apLastfmToggle">Last.fm (Filtered Artist Tags)</label>
                           <label class="switch">
@@ -16592,10 +16632,10 @@
         genreSourcesNpSpotifyTrack = npSpotifyTrackToggle.checked;
         showGenreTagsArtistPage = showTagsApToggle.checked;
         showGenresContextMenu = showGenresCtxToggle2.checked;
-        genreSourcesNpSpotify = (DEVELOPER_HAS_SPOTIFY_PREMIUM && npSpotifyToggle) ? npSpotifyToggle.checked : genreSourcesNpSpotify;
+        genreSourcesNpSpotify = npSpotifyToggle ? npSpotifyToggle.checked : genreSourcesNpSpotify;
         genreSourcesNpLastfm = npLastfmToggle.checked;
         genreSourcesNpDeezer = npDeezerToggle.checked;
-        genreSourcesApSpotify = (DEVELOPER_HAS_SPOTIFY_PREMIUM && apSpotifyToggle) ? apSpotifyToggle.checked : genreSourcesApSpotify;
+        genreSourcesApSpotify = apSpotifyToggle ? apSpotifyToggle.checked : genreSourcesApSpotify;
         genreSourcesApLastfm = apLastfmToggle.checked;
         genreSourcesNpEveryNoise = npEveryNoiseToggle.checked;
         genreSourcesApEveryNoise = apEveryNoiseToggle.checked;
@@ -16609,6 +16649,7 @@
 
         nowPlayingGenreCache.clear();
         artistPageGenreCache.clear();
+        tursoQueueWarmedUris.clear();
         
         displayGenreTags();
         updateArtistPageGenres();
@@ -21819,7 +21860,7 @@
           everynoise_artist: genreSourcesNpEveryNoise,
           lastfm_artist: genreSourcesNpLastfm,
           lastfm_track: false,
-          spotify_artist: (DEVELOPER_HAS_SPOTIFY_PREMIUM && genreSourcesNpSpotify),
+          spotify_artist: genreSourcesNpSpotify,
           deezer: false,
           apple_music: false
       };
@@ -22775,10 +22816,7 @@
           const categoryMap = new Map();
           const order = ['Spotify (Track)', 'Spotify (Artist)', 'Every Noise (Artist)', 'Last.fm (Track)', 'Last.fm (Artist)', 'Deezer (Album)', 'Other'];
           
-          order.forEach(c => {
-              if (!DEVELOPER_HAS_SPOTIFY_PREMIUM && c === 'Spotify (Artist)') return;
-              categoryMap.set(c, []);
-          });
+          order.forEach(c => categoryMap.set(c, []));
 
           const allItems = Array.from(genreMap.values());
           const nonMoodItems = allItems.filter(item => !MOOD_DESCRIPTORS_SET.has(normalizeGenre(item.name)));
@@ -22790,7 +22828,8 @@
                   if (s.startsWith("Spotify Track") && confSources.spotify_track) {
                       const m = s.match(/\(([\d.]+)%\)/);
                       if ((m ? parseFloat(m[1]) : 100) >= minConf) return true;
-                  } else if (s.startsWith("EveryNoise") && confSources.everynoise_artist) return true;
+                  } else if (s.startsWith("Spotify Artist") && confSources.spotify_artist) return true;
+                  else if (s.startsWith("EveryNoise") && confSources.everynoise_artist) return true;
                   else if (s.startsWith("Last.fm Track") && confSources.lastfm_track) return true;
                   else if (s.startsWith("Last.fm Artist") && confSources.lastfm_artist) return true;
                   else if (s.startsWith("Deezer") && confSources.deezer) return true;
@@ -22808,10 +22847,7 @@
                       const match = source.match(/\(([\d.]+%)\)/);
                       if (match) score = match[1];
                   }
-                  else if (source.startsWith("Spotify Artist")) {
-                      if (!DEVELOPER_HAS_SPOTIFY_PREMIUM) return;
-                      category = 'Spotify (Artist)';
-                  }
+                  else if (source.startsWith("Spotify Artist")) category = 'Spotify (Artist)';
                   else if (source.startsWith("Last.fm Track")) category = 'Last.fm (Track)';
                   else if (source.startsWith("EveryNoise Artist")) category = 'Every Noise (Artist)';
                   else if (source.startsWith("Last.fm Artist")) category = 'Last.fm (Artist)';
@@ -22886,6 +22922,7 @@
                       }
                       const isCategorySourceEnabled =
                           (category === 'Spotify (Track)' && confSources.spotify_track) ||
+                          (category === 'Spotify (Artist)' && confSources.spotify_artist) ||
                           (category === 'Every Noise (Artist)' && confSources.everynoise_artist) ||
                           (category === 'Last.fm (Track)' && confSources.lastfm_track) ||
                           (category === 'Last.fm (Artist)' && confSources.lastfm_artist) ||
@@ -23115,6 +23152,9 @@
                       } else {
                           hasDisabledSource = true;
                       }
+                  } else if (s.startsWith("Spotify Artist")) {
+                      if (confSources.spotify_artist) isFromActiveSource = true;
+                      else hasDisabledSource = true;
                   } else if (s.startsWith("EveryNoise")) {
                       if (confSources.everynoise_artist) isFromActiveSource = true;
                       else hasDisabledSource = true;
@@ -24020,166 +24060,312 @@
                   : (track.metadata?.artist_uri
                       ? [{ id: track.metadata.artist_uri.split(':')[2], uri: track.metadata.artist_uri, name: track.metadata.artist_name || "Artist" }]
                       : []);
-              const artistsToFetch = rawArtists.filter(a => a.id || (a.uri && a.uri.split(':')[2]));
-
-              if (genreSourcesNpEveryNoise && artistsToFetch.length > 0) {
-                  const idsToFetch = [];
-                  
-                  for (const artist of artistsToFetch) {
-                      const id = artist.id || artist.uri.split(':')[2];
-                      if (!id) continue;
-
-                      if (pendingEveryNoiseFetches.has(id)) {
-                          try { await pendingEveryNoiseFetches.get(id); } catch (_) {}
-                      }
-                      
-                      if (everyNoiseCache.has(id)) {
-                          addGenres(everyNoiseCache.get(id), `EveryNoise Artist (${artist.name})`);
-                      } else {
-                          const cached = await idb.get('everyNoiseArtistTags', id, CACHE_EXPIRE_EVERYNOISE);
-                          if (cached) {
-                              everyNoiseCache.set(id, cached);
-                              addGenres(cached, `EveryNoise Artist (${artist.name})`);
-                          } else {
-                              idsToFetch.push({ id, name: artist.name });
-                          }
-                      }
-                  }
-
-                  if (idsToFetch.length > 0) {
-                      const sortedIds = [...new Set(idsToFetch.map(a => a.id))].sort();
-                      const idsString = sortedIds.join(',');
-
-                      const executionPromise = (async () => {
-                          try {
-                              const res = await fetch(`${EVERYNOISE_GATEWAY_URL}${idsString}`, { signal: AbortSignal.timeout(11000) });
-                              if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                              const data = await res.json();
-
-                              idsToFetch.forEach(artist => {
-                                  const rawGenres = (sortedIds.length === 1 && Array.isArray(data)) ? data : (data?.[artist.id] || []);
-                                  const validGenres = rawGenres.filter(g => !isCountryOnly(g) && isWhitelistedGenre(g, genreMap));
-                                  everyNoiseCache.set(artist.id, validGenres);
-                                  idb.set('everyNoiseArtistTags', artist.id, validGenres);
-                                  if (validGenres.length > 0) {
-                                      addGenres(validGenres, `EveryNoise Artist (${artist.name})`);
-                                  }
-                              });
-                          } catch (_) {
-                          } finally {
-                              idsToFetch.forEach(a => pendingEveryNoiseFetches.delete(a.id));
-                          }
-                      })();
-
-                      idsToFetch.forEach(a => pendingEveryNoiseFetches.set(a.id, executionPromise));
-                      promises.push(executionPromise);
-                  }
-              }
-
-              if (DEVELOPER_HAS_SPOTIFY_PREMIUM && genreSourcesNpSpotify && artistsToFetch.length > 0) {
-                  const idsToFetch = [];
-                  
-                  for (const artist of artistsToFetch) {
-                      const id = artist.id || artist.uri.split(':')[2];
-                      if (artistGenreCache.has(id)) {
-                          addGenres(artistGenreCache.get(id), `Spotify Artist (${artist.name})`);
-                      } else {
-                          const cached = await idb.get('artistGenres', id, CACHE_EXPIRE_GENRES);
-                          if (cached) {
-                              artistGenreCache.set(id, cached);
-                              addGenres(cached, `Spotify Artist (${artist.name})`);
-                          } else {
-                              idsToFetch.push({ id, name: artist.name });
-                          }
-                      }
-                  }
-
-                  if (idsToFetch.length > 0) {
-                      promises.push((async () => {
-                          const fetchArtistGenres = async (artistId) => {
-                              try {
-                                  const token = await get_S_Client_Token();
-                                  if (!token) throw new Error("No client token");
-                                  const res = await fetch(`https://api.spotify.com/v1/artists/${artistId}`, {
-                                      headers: { 
-                                          "Authorization": `Bearer ${token}`,
-                                          "Accept-Language": "en,en-US;q=0.9"
-                                      }
-                                  });
-                                  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                                  const data = await res.json();
-                                  return data.genres || [];
-                              } catch (e) { return []; }
-                          };
-
-                          await Promise.all(idsToFetch.map(async (artist) => {
-                              const genres = await fetchArtistGenres(artist.id);
-                              if (genres && genres.length > 0) {
-                                  artistGenreCache.set(artist.id, genres);
-                                  idb.set('artistGenres', artist.id, genres);
-                                  addGenres(genres, `Spotify Artist (${artist.name})`);
-                              } else {
-                                  artistGenreCache.set(artist.id, []);
-                                  idb.set('artistGenres', artist.id, []);
-                              }
-                          }));
-                      })());
-                  }
-              }
-
+              const artistsToFetch = rawArtists
+                  .map(a => ({ id: a.id || (a.uri ? a.uri.split(':')[2] : null), name: a.name || "Artist" }))
+                  .filter(a => a.id);
+              const primaryArtistId = artistsToFetch[0]?.id || null;
               const artistName = track.artists?.[0]?.name || track.artistName || track.metadata?.artist_name || "";
               const trackName = track.name || track.songTitle || track.metadata?.title || "";
+              const trackCacheKey = artistName && trackName ? `${artistName}|${trackName}` : null;
+              const artistNamesLower = [...new Set([artistName, ...artistsToFetch.map(a => a.name)].filter(Boolean).map(n => n.toLowerCase()))];
+              const filterEveryNoiseDisplay = (list) => (Array.isArray(list) ? list : []).filter(g => !isCountryOnly(g) && isWhitelistedGenre(g, genreMap));
+
+              const [localTrackCheck, localArtistCheck] = await Promise.all([
+                  (async () => {
+                      let cachedLfmTrack = null;
+                      if (genreSourcesNpLastfm && trackCacheKey) {
+                          cachedLfmTrack = lastfmTrackTagsCache.get(trackCacheKey) ?? await idb.get('lastfmTrackTags', trackCacheKey, CACHE_EXPIRE_GENRES);
+                          if (Array.isArray(cachedLfmTrack)) lastfmTrackTagsCache.set(trackCacheKey, cachedLfmTrack);
+                          else cachedLfmTrack = null;
+                      }
+                      let isrc = track.metadata?.isrc || track.external_ids?.isrc || null;
+                      let releaseDateInDays = null;
+                      const parseDays = (raw) => {
+                          if (!raw) return null;
+                          const ms = new Date(raw).getTime();
+                          return isNaN(ms) ? null : Math.floor(ms / 86400000);
+                      };
+                      releaseDateInDays = parseDays(track.releaseDate || track.album?.release_date || track.metadata?.release_date);
+                      const needIsrc = Boolean(genreSourcesNpDeezer || (genreSourcesNpLastfm && trackCacheKey && !cachedLfmTrack));
+                      if (needIsrc && !isrc) {
+                          try {
+                              const metaMap = await fetchCoreMetadataBatch([track.uri]);
+                              const coreMeta = metaMap.get(track.uri);
+                              if (coreMeta?.isrc) isrc = coreMeta.isrc;
+                              if (!releaseDateInDays && coreMeta?.releaseDate) releaseDateInDays = parseDays(coreMeta.releaseDate);
+                              if (!isrc) {
+                                  const meta = await fetchInternalTrackMetadata(trackId);
+                                  isrc = meta?.external_ids?.isrc || null;
+                                  if (!releaseDateInDays && meta?.album?.release_date) releaseDateInDays = parseDays(meta.album.release_date);
+                              }
+                          } catch (_) {}
+                      }
+                      let cachedDeezer = null;
+                      if (genreSourcesNpDeezer && isrc) {
+                          const dbDz = await idb.get('deezerGenres', isrc);
+                          if (Array.isArray(dbDz)) cachedDeezer = dbDz;
+                      }
+                      return { cachedLfmTrack, isrc, releaseDateInDays, cachedDeezer };
+                  })(),
+                  (async () => {
+                      const allIds = [...new Set(artistsToFetch.map(a => a.id))];
+                      let cachedLfmArtist = null;
+                      await Promise.all([
+                          (genreSourcesNpSpotify && allIds.length > 0) ? (async () => {
+                              const missingMem = allIds.filter(id => !artistGenreCache.has(id));
+                              if (missingMem.length > 0) {
+                                  const cached = await idb.getMany('artistGenres', missingMem, CACHE_EXPIRE_GENRES);
+                                  cached.forEach((val, key) => { if (Array.isArray(val)) artistGenreCache.set(key, val); });
+                              }
+                              const inFlight = allIds.filter(id => !artistGenreCache.has(id) && pendingSpotifyArtistFetches.has(id));
+                              if (inFlight.length > 0) await Promise.allSettled(inFlight.map(id => pendingSpotifyArtistFetches.get(id)));
+                          })() : Promise.resolve(),
+                          (genreSourcesNpEveryNoise && allIds.length > 0) ? (async () => {
+                              const missingMem = allIds.filter(id => !everyNoiseCache.has(id));
+                              if (missingMem.length > 0) {
+                                  const cached = await idb.getMany('everyNoiseArtistTags', missingMem, CACHE_EXPIRE_EVERYNOISE);
+                                  cached.forEach((val, key) => { if (Array.isArray(val)) everyNoiseCache.set(key, val); });
+                              }
+                              const inFlight = allIds.filter(id => !everyNoiseCache.has(id) && pendingEveryNoiseFetches.has(id));
+                              if (inFlight.length > 0) await Promise.allSettled(inFlight.map(id => pendingEveryNoiseFetches.get(id)));
+                          })() : Promise.resolve(),
+                          (genreSourcesNpLastfm && artistName) ? (async () => {
+                              const normKey = artistName.toLowerCase();
+                              if (!lastfmArtistTagsCache.has(artistName) && pendingLfmArtistFetches.has(normKey)) {
+                                  try { await pendingLfmArtistFetches.get(normKey); } catch (_) {}
+                              }
+                              const found = lastfmArtistTagsCache.get(artistName) ?? await idb.get('lastfmArtistTags', artistName, CACHE_EXPIRE_GENRES);
+                              if (Array.isArray(found)) {
+                                  lastfmArtistTagsCache.set(artistName, found);
+                                  cachedLfmArtist = found;
+                              }
+                          })() : Promise.resolve()
+                      ]);
+                      const missingSpIds = genreSourcesNpSpotify ? allIds.filter(id => !artistGenreCache.has(id)) : [];
+                      const missingEnIds = genreSourcesNpEveryNoise ? allIds.filter(id => !everyNoiseCache.has(id)) : [];
+                      return { cachedLfmArtist, missingSpIds, missingEnIds };
+                  })()
+              ]);
+
+              let { cachedLfmTrack, isrc, releaseDateInDays, cachedDeezer } = localTrackCheck;
+              let { cachedLfmArtist, missingSpIds, missingEnIds } = localArtistCheck;
+
+              if (genreSourcesNpSpotify) {
+                  artistsToFetch.forEach(artist => {
+                      const genres = artistGenreCache.get(artist.id);
+                      if (Array.isArray(genres) && genres.length > 0) addGenres(genres, `Spotify Artist (${artist.name})`);
+                  });
+              }
+              if (genreSourcesNpEveryNoise) {
+                  artistsToFetch.forEach(artist => {
+                      if (everyNoiseCache.has(artist.id)) {
+                          const valid = filterEveryNoiseDisplay(everyNoiseCache.get(artist.id));
+                          if (valid.length > 0) addGenres(valid, `EveryNoise Artist (${artist.name})`);
+                      }
+                  });
+              }
+
+              const needLfmArtistTurso = Boolean(genreSourcesNpLastfm && artistName && !cachedLfmArtist && primaryArtistId);
+              const tursoArtistIds = [...new Set([...missingSpIds, ...missingEnIds, ...(needLfmArtistTurso ? [primaryArtistId] : [])])];
+              const needTrackTurso = Boolean(
+                  (genreSourcesNpLastfm && trackCacheKey && !cachedLfmTrack) ||
+                  (genreSourcesNpDeezer && isrc && !cachedDeezer)
+              );
+
+              const prefetchedTrackKey = isrc && tursoPrefetchedTrackCache.has(isrc)
+                  ? isrc
+                  : (tursoPrefetchedTrackCache.has(track.uri) ? track.uri : null);
+              const needFreshTrackTurso = needTrackTurso && prefetchedTrackKey === null;
+
+              let tursoArtistPromise = Promise.resolve(null);
+              let tursoTrackPromise = !needTrackTurso
+                  ? Promise.resolve(null)
+                  : (prefetchedTrackKey !== null ? Promise.resolve(tursoPrefetchedTrackCache.get(prefetchedTrackKey)) : Promise.resolve(null));
+
+              if (tursoArtistIds.length > 0 && needFreshTrackTurso) {
+                  const syncPromise = syncReadFromTurso({
+                      artistIds: tursoArtistIds,
+                      includeEveryNoise: missingEnIds.length > 0,
+                      includeLastfm: needLfmArtistTurso,
+                      includeSpotify: missingSpIds.length > 0,
+                      trackIsrcs: isrc ? [isrc] : [],
+                      trackIds: isrc ? [] : [trackId]
+                  }).catch(() => null);
+                  tursoArtistPromise = syncPromise.then(res => res?.artists || null);
+                  tursoTrackPromise = syncPromise.then(res => {
+                      const map = isrc ? res?.tracksByIsrc : res?.tracksById;
+                      const key = isrc || track.uri;
+                      const row = map?.get(key) || null;
+                      if (map?._queriedKeys?.has(key)) {
+                          tursoPrefetchedTrackCache.set(key, row);
+                          if (tursoPrefetchedTrackCache.size > 250) {
+                              tursoPrefetchedTrackCache.delete(tursoPrefetchedTrackCache.keys().next().value);
+                          }
+                      }
+                      return row;
+                  });
+              } else {
+                  if (tursoArtistIds.length > 0) {
+                      tursoArtistPromise = getArtistGenresFromTurso(tursoArtistIds, {
+                          includeEveryNoise: missingEnIds.length > 0,
+                          includeLastfm: needLfmArtistTurso,
+                          includeSpotify: missingSpIds.length > 0
+                      }).catch(() => null);
+                  }
+                  if (needFreshTrackTurso) {
+                      tursoTrackPromise = getGenresFromTurso(isrc ? [isrc] : [trackId], isrc ? 'isrcs' : 'ids')
+                          .then(m => {
+                              const key = isrc || track.uri;
+                              const row = m.get(key) || null;
+                              if (m._queriedKeys?.has(key)) {
+                                  tursoPrefetchedTrackCache.set(key, row);
+                                  if (tursoPrefetchedTrackCache.size > 250) {
+                                      tursoPrefetchedTrackCache.delete(tursoPrefetchedTrackCache.keys().next().value);
+                                  }
+                              }
+                              return row;
+                          })
+                          .catch(() => null);
+                  }
+              }
+
+              if (tursoArtistIds.length > 0 && missingSpIds.length > 0) {
+                  const spHydratePromise = tursoArtistPromise.then(async (tursoMap) => {
+                      if (!tursoMap?._queriedIds) return;
+                      const idbSp = [];
+                      missingSpIds.forEach(id => {
+                          if (!tursoMap._queriedIds.has(id)) return;
+                          const genres = Array.isArray(tursoMap.get(id)?.spotify_genres) ? tursoMap.get(id).spotify_genres : [];
+                          artistGenreCache.set(id, genres);
+                          idbSp.push({ key: id, val: genres });
+                      });
+                      if (idbSp.length > 0 && idb.setMany) await idb.setMany('artistGenres', idbSp);
+                      artistsToFetch.forEach(artist => {
+                          if (!missingSpIds.includes(artist.id)) return;
+                          const genres = artistGenreCache.get(artist.id);
+                          if (Array.isArray(genres) && genres.length > 0) addGenres(genres, `Spotify Artist (${artist.name})`);
+                      });
+                  });
+                  missingSpIds.forEach(id => pendingSpotifyArtistFetches.set(id, spHydratePromise));
+                  promises.push(spHydratePromise.finally(() => missingSpIds.forEach(id => pendingSpotifyArtistFetches.delete(id))));
+              }
+
+              if (genreSourcesNpEveryNoise && missingEnIds.length > 0) {
+                  const enArtistsMissing = artistsToFetch.filter(a => missingEnIds.includes(a.id));
+                  const enTask = (async () => {
+                      const tursoMap = await tursoArtistPromise;
+                      const idbEn = [];
+                      const gwMissing = [];
+                      enArtistsMissing.forEach(artist => {
+                          const val = tursoMap?.get(artist.id);
+                          if (val && Array.isArray(val.genres)) {
+                              everyNoiseCache.set(artist.id, val.genres);
+                              idbEn.push({ key: artist.id, val: val.genres });
+                              const valid = filterEveryNoiseDisplay(val.genres);
+                              if (valid.length > 0) addGenres(valid, `EveryNoise Artist (${artist.name})`);
+                          } else if (!everyNoiseCache.has(artist.id)) {
+                              gwMissing.push(artist);
+                          }
+                      });
+                      if (idbEn.length > 0 && idb.setMany) await idb.setMany('everyNoiseArtistTags', idbEn);
+                      if (gwMissing.length > 0) {
+                          const sortedIds = [...new Set(gwMissing.map(a => a.id))].sort();
+                          try {
+                              const res = await fetch(`${EVERYNOISE_GATEWAY_URL}${sortedIds.join(',')}`, { signal: AbortSignal.timeout(11000) });
+                              if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                              const data = await res.json();
+                              const idbGw = [];
+                              gwMissing.forEach(artist => {
+                                  const rawGenres = (sortedIds.length === 1 && Array.isArray(data)) ? data : (data?.[artist.id] || []);
+                                  everyNoiseCache.set(artist.id, rawGenres);
+                                  idbGw.push({ key: artist.id, val: rawGenres });
+                                  queueSingleArtistTursoWrite('everynoise', artist.id, rawGenres);
+                                  const valid = filterEveryNoiseDisplay(rawGenres);
+                                  if (valid.length > 0) addGenres(valid, `EveryNoise Artist (${artist.name})`);
+                              });
+                              if (idbGw.length > 0 && idb.setMany) await idb.setMany('everyNoiseArtistTags', idbGw);
+                          } catch (_) {}
+                      }
+                  })();
+                  missingEnIds.forEach(id => pendingEveryNoiseFetches.set(id, enTask));
+                  promises.push(enTask.finally(() => missingEnIds.forEach(id => pendingEveryNoiseFetches.delete(id))));
+              }
+
+              let freshLfmArtistTags;
+              let freshLfmTrackTags;
+              let freshDeezerGenres;
+              let resolvedTursoTrackRow = null;
 
               if (genreSourcesNpLastfm && artistName && trackName) {
                   promises.push((async () => {
-                      const trackCacheKey = `${artistName}|${trackName}`;
-                      let cachedLastfmArtist = lastfmArtistTagsCache.get(artistName) ?? await idb.get('lastfmArtistTags', artistName, CACHE_EXPIRE_GENRES);
-                      let cachedLastfmTrack = lastfmTrackTagsCache.get(trackCacheKey) ?? await idb.get('lastfmTrackTags', trackCacheKey, CACHE_EXPIRE_GENRES);
+                      const [tursoArtistMap, tursoTrackRow] = await Promise.all([tursoArtistPromise, tursoTrackPromise]);
+                      resolvedTursoTrackRow = tursoTrackRow;
 
-                      const fetchArtistTask = cachedLastfmArtist ? Promise.resolve(cachedLastfmArtist) : (async () => {
+                      if (!cachedLfmArtist && primaryArtistId) {
+                          const fromArtistTable = tursoArtistMap?.get(primaryArtistId);
+                          if (fromArtistTable && Array.isArray(fromArtistTable.lastfm_genres)) {
+                              const synth = synthesizeLastfmSplitTags(fromArtistTable.lastfm_genres);
+                              lastfmArtistTagsCache.set(artistName, synth);
+                              idb.set('lastfmArtistTags', artistName, synth);
+                              cachedLfmArtist = synth;
+                          } else if (Array.isArray(tursoTrackRow?.lastfm_artist_genres) && tursoTrackRow.lastfm_artist_genres.length > 0) {
+                              const synth = synthesizeLastfmSplitTags(tursoTrackRow.lastfm_artist_genres);
+                              lastfmArtistTagsCache.set(artistName, synth);
+                              idb.set('lastfmArtistTags', artistName, synth);
+                              cachedLfmArtist = synth;
+                              queueSingleArtistTursoWrite('lastfm', primaryArtistId, synth);
+                          }
+                      }
+
+                      const fetchArtistTask = cachedLfmArtist ? Promise.resolve(cachedLfmArtist) : (async () => {
                           try {
                               const params = new URLSearchParams({ method: 'artist.getInfo', artist: artistName, format: 'json' });
                               const res = await fetchLfmWithGateway(params);
                               if (res.ok) {
                                   const data = await res.json();
-                                  if (data?.artist?.tags?.tag) {
-                                      const rawTags = data.artist.tags.tag
-                                          .map(t => t.name.toLowerCase())
-                                          .filter(g => !/^\d+$/.test(g));
-                                      lastfmArtistRawTagsCache.set(artistName, rawTags);
-                                      const synthTags = synthesizeLastfmSplitTags(rawTags);
-                                      lastfmArtistTagsCache.set(artistName, synthTags);
-                                      idb.set('lastfmArtistTags', artistName, synthTags);
-                                      return synthTags;
-                                  }
+                                  const rawTags = Array.isArray(data?.artist?.tags?.tag)
+                                      ? data.artist.tags.tag.map(t => t.name.toLowerCase()).filter(g => !/^\d+$/.test(g))
+                                      : [];
+                                  lastfmArtistRawTagsCache.set(artistName, rawTags);
+                                  const synthTags = synthesizeLastfmSplitTags(rawTags);
+                                  lastfmArtistTagsCache.set(artistName, synthTags);
+                                  idb.set('lastfmArtistTags', artistName, synthTags);
+                                  freshLfmArtistTags = synthTags.filter(g => !containsYear(g) && !artistNamesLower.some(n => g.includes(n)));
+                                  if (primaryArtistId) queueSingleArtistTursoWrite('lastfm', primaryArtistId, synthTags);
+                                  return synthTags;
                               }
                           } catch (e) { console.warn("LFM Artist fetch failed", e); }
-                          lastfmArtistTagsCache.set(artistName, []);
-                          idb.set('lastfmArtistTags', artistName, []);
                           return [];
                       })();
 
-                      const fetchTrackTask = cachedLastfmTrack ? Promise.resolve({ fromCache: true, tags: cachedLastfmTrack }) : (async () => {
-                          try {
-                              const params = new URLSearchParams({ method: 'track.getInfo', artist: artistName, track: trackName, format: 'json' });
-                              const res = await fetchLfmWithGateway(params);
-                              if (res.ok) {
-                                  const data = await res.json();
-                                  if (data?.track?.toptags?.tag) {
-                                      const rawTags = data.track.toptags.tag
-                                          .map(t => t.name.toLowerCase())
-                                          .filter(g => !/^\d+$/.test(g));
-                                      return { fromCache: false, tags: rawTags };
-                                  }
-                              }
-                          } catch (e) {}
-                          return { fromCache: false, tags: [] };
-                      })();
+                      const tursoTrackTags = !cachedLfmTrack && Array.isArray(tursoTrackRow?.lastfm_track_genres) && tursoTrackRow.lastfm_track_genres.length > 0
+                          ? tursoTrackRow.lastfm_track_genres
+                          : null;
+
+                      const fetchTrackTask = cachedLfmTrack
+                          ? Promise.resolve({ fromCache: true, tags: cachedLfmTrack })
+                          : (tursoTrackTags
+                              ? Promise.resolve({ fromCache: false, tags: tursoTrackTags })
+                              : (async () => {
+                                  try {
+                                      const params = new URLSearchParams({ method: 'track.getInfo', artist: artistName, track: trackName, format: 'json' });
+                                      const res = await fetchLfmWithGateway(params);
+                                      if (res.ok) {
+                                          const data = await res.json();
+                                          const rawTags = Array.isArray(data?.track?.toptags?.tag)
+                                              ? data.track.toptags.tag.map(t => t.name.toLowerCase()).filter(g => !/^\d+$/.test(g))
+                                              : [];
+                                          freshLfmTrackTags = rawTags.filter(g => !containsYear(g) && !artistNamesLower.some(n => g.includes(n)));
+                                          return { fromCache: false, tags: rawTags };
+                                      }
+                                  } catch (e) {}
+                                  return { fromCache: true, tags: [] };
+                              })());
 
                       const [artistTagsResult, trackTagsObj] = await Promise.all([fetchArtistTask, fetchTrackTask]);
                       const rawArtistCtx = lastfmArtistRawTagsCache.get(artistName) || artistTagsResult || [];
                       const synthArtistTags = synthesizeLastfmSplitTags(artistTagsResult || [], trackTagsObj?.tags || []);
-                      if (cachedLastfmArtist) {
+                      if (cachedLfmArtist) {
                           lastfmArtistTagsCache.set(artistName, synthArtistTags);
                       }
                       const finalArtistTags = synthArtistTags.filter(tag => !isCountryOnly(tag) && isWhitelistedGenre(tag, genreMap));
@@ -24189,8 +24375,8 @@
 
                       const synthTrackTags = synthesizeLastfmSplitTags(trackTagsObj?.tags || [], [...rawArtistCtx, ...finalArtistTags]);
                       const finalTrackTags = synthTrackTags.filter(tag => !isCountryOnly(tag) && isWhitelistedGenre(tag, genreMap));
-                      lastfmTrackTagsCache.set(trackCacheKey, finalTrackTags);
                       if (!trackTagsObj?.fromCache) {
+                          lastfmTrackTagsCache.set(trackCacheKey, finalTrackTags);
                           idb.set('lastfmTrackTags', trackCacheKey, finalTrackTags);
                       }
                       if (finalTrackTags.length > 0) {
@@ -24199,50 +24385,51 @@
                   })());
               }
 
-              if (genreSourcesNpDeezer) {
+              if (genreSourcesNpDeezer && isrc) {
                   promises.push((async () => {
-                      let isrc = null;
-                      if (track.metadata && track.metadata.isrc) {
-                          isrc = track.metadata.isrc;
-                      } else if (track.external_ids && track.external_ids.isrc) {
-                          isrc = track.external_ids.isrc;
-                      } else {
-                          try {
-                              const metaMap = await fetchCoreMetadataBatch([track.uri]);
-                              const coreMeta = metaMap.get(track.uri);
-                              if (coreMeta && coreMeta.isrc) {
-                                  isrc = coreMeta.isrc;
-                              } else {
-                                  const meta = await fetchInternalTrackMetadata(trackId);
-                                  isrc = meta?.external_ids?.isrc;
-                              }
-                          } catch(e) {}
+                      if (cachedDeezer) {
+                          if (cachedDeezer.length > 0) addGenres(cachedDeezer, 'Deezer Album');
+                          return;
                       }
-
-                      if (isrc) {
-                          try {
-                              const cachedDeezer = await idb.get('deezerGenres', isrc);
-                              if (cachedDeezer) {
-                                  if (cachedDeezer.length > 0) {
-                                      addGenres(cachedDeezer, 'Deezer Album');
-                                  }
-                              } else {
-                                  const deezerGenres = await getDeezerGenres(isrc);
-                                  if (deezerGenres) {
-                                      idb.set('deezerGenres', isrc, deezerGenres);
-                                      if (deezerGenres.length > 0) {
-                                          addGenres(deezerGenres, 'Deezer Album');
-                                      }
-                                  } else {
-                                      idb.set('deezerGenres', isrc, []);
-                                  }
-                              }
-                          } catch (e) {}
+                      const tursoTrackRow = await tursoTrackPromise;
+                      resolvedTursoTrackRow = tursoTrackRow;
+                      if (Array.isArray(tursoTrackRow?.deezer_genres) && tursoTrackRow.deezer_genres.length > 0) {
+                          idb.set('deezerGenres', isrc, tursoTrackRow.deezer_genres);
+                          addGenres(tursoTrackRow.deezer_genres, 'Deezer Album');
+                          return;
                       }
+                      try {
+                          const deezerGenres = await getDeezerGenres(isrc);
+                          const finalDz = Array.isArray(deezerGenres) ? deezerGenres : [];
+                          idb.set('deezerGenres', isrc, finalDz);
+                          freshDeezerGenres = finalDz;
+                          if (finalDz.length > 0) addGenres(finalDz, 'Deezer Album');
+                      } catch (e) {}
                   })());
               }
 
               await Promise.all(promises);
+
+              if (isrc && (freshLfmTrackTags !== undefined || freshLfmArtistTags !== undefined || freshDeezerGenres !== undefined)) {
+                  const hasNewVal = !resolvedTursoTrackRow
+                      || (freshLfmTrackTags?.length > 0 && !resolvedTursoTrackRow.lastfm_track_genres?.length)
+                      || (freshLfmArtistTags?.length > 0 && !resolvedTursoTrackRow.lastfm_artist_genres?.length)
+                      || (freshDeezerGenres?.length > 0 && !resolvedTursoTrackRow.deezer_genres?.length);
+                  if (hasNewVal) {
+                      tursoPrefetchedTrackCache.delete(isrc);
+                      tursoPrefetchedTrackCache.delete(track.uri);
+                      queueSingleTrackTursoWrite({
+                          track_uri: track.uri,
+                          isrc,
+                          spotify_artist_genres: null,
+                          lastfm_track_genres: freshLfmTrackTags ?? null,
+                          lastfm_artist_genres: freshLfmArtistTags ?? null,
+                          deezer_genres: freshDeezerGenres ?? null,
+                          apple_music_genres: null,
+                          release_date: releaseDateInDays
+                      });
+                  }
+              }
 
               nowPlayingGenreCache.set(track.uri, genreSourcesMap);
               return genreSourcesMap;
@@ -24256,6 +24443,218 @@
   }
 
   
+  async function prefetchQueueTursoCache(upcomingTracks, { shouldPrefetchDisplayGenres = false, shouldPrefetchBlacklist = false } = {}) {
+      const headTrack = upcomingTracks?.[0];
+      if (!headTrack?.uri || !headTrack.uri.startsWith('spotify:track:') || Spicetify.URI.isLocal(headTrack.uri)) return;
+      if (tursoQueueWarmedUris.has(headTrack.uri)) return;
+
+      const confSources = shouldPrefetchBlacklist ? (genreBlacklistConfig?.sources || {}) : {};
+      const wantSp = Boolean((shouldPrefetchDisplayGenres && genreSourcesNpSpotify) || (shouldPrefetchBlacklist && confSources.spotify_artist));
+      const wantEn = Boolean((shouldPrefetchDisplayGenres && genreSourcesNpEveryNoise) || (shouldPrefetchBlacklist && confSources.everynoise_artist));
+      const wantLfmA = Boolean((shouldPrefetchDisplayGenres && genreSourcesNpLastfm) || (shouldPrefetchBlacklist && confSources.lastfm_artist));
+      const wantLfmT = Boolean((shouldPrefetchDisplayGenres && genreSourcesNpLastfm) || (shouldPrefetchBlacklist && confSources.lastfm_track));
+      const wantDz = Boolean((shouldPrefetchDisplayGenres && genreSourcesNpDeezer) || (shouldPrefetchBlacklist && confSources.deezer));
+      if (!wantSp && !wantEn && !wantLfmA && !wantLfmT && !wantDz) return;
+
+      const batchTracks = upcomingTracks
+          .slice(0, 20)
+          .filter(t => t?.uri && t.uri.startsWith('spotify:track:') && !Spicetify.URI.isLocal(t.uri) && !tursoQueueWarmedUris.has(t.uri));
+      if (batchTracks.length === 0) return;
+
+      const extractArtists = (t) => {
+          const list = Array.isArray(t.artists) && t.artists.length > 0
+              ? t.artists
+              : (t.metadata?.artist_uri || t.metadata?.artist_name
+                  ? [{ id: t.metadata.artist_uri ? t.metadata.artist_uri.split(':')[2] : null, uri: t.metadata.artist_uri || null, name: t.metadata.artist_name || "" }]
+                  : []);
+          return list
+              .map(a => ({ id: a.id || (a.uri ? a.uri.split(':')[2] : null), name: a.name || "" }))
+              .filter(a => a.id || a.name);
+      };
+
+      const artistIdSet = new Set();
+      const primaryArtistByName = new Map();
+      const parsedTracks = batchTracks.map(t => {
+          const artists = extractArtists(t);
+          artists.forEach(a => { if (a.id) artistIdSet.add(a.id); });
+          const primaryName = artists[0]?.name || t.metadata?.artist_name || "";
+          const primaryId = artists[0]?.id || null;
+          if (primaryName && primaryId && !primaryArtistByName.has(primaryName)) {
+              primaryArtistByName.set(primaryName, primaryId);
+          }
+          return {
+              uri: t.uri,
+              trackId: t.uri.split(':')[2],
+              name: t.name || t.metadata?.title || "",
+              artistName: primaryName,
+              primaryArtistId: primaryId,
+              isrc: t.metadata?.isrc || t.external_ids?.isrc || null
+          };
+      });
+
+      const allArtistIds = Array.from(artistIdSet);
+      const lfmNames = wantLfmA ? Array.from(primaryArtistByName.keys()) : [];
+      const urisMissingIsrc = (wantLfmT || wantDz) ? parsedTracks.filter(t => !t.isrc).map(t => t.uri) : [];
+      const lfmKeys = wantLfmT ? parsedTracks.filter(t => t.artistName && t.name).map(t => `${t.artistName}|${t.name}`) : [];
+
+      const [metaMap, cachedLfmTrackMap] = await Promise.all([
+          urisMissingIsrc.length > 0 ? fetchCoreMetadataBatch(urisMissingIsrc).catch(() => new Map()) : Promise.resolve(new Map()),
+          lfmKeys.length > 0 ? idb.getMany('lastfmTrackTags', lfmKeys.filter(k => !lastfmTrackTagsCache.has(k)), CACHE_EXPIRE_GENRES).catch(() => new Map()) : Promise.resolve(new Map()),
+          (wantSp && allArtistIds.length > 0) ? (async () => {
+              const missing = allArtistIds.filter(id => !artistGenreCache.has(id));
+              if (missing.length > 0) {
+                  const cached = await idb.getMany('artistGenres', missing, CACHE_EXPIRE_GENRES);
+                  cached.forEach((val, key) => { if (Array.isArray(val)) artistGenreCache.set(key, val); });
+              }
+          })() : Promise.resolve(),
+          (wantEn && allArtistIds.length > 0) ? (async () => {
+              const missing = allArtistIds.filter(id => !everyNoiseCache.has(id));
+              if (missing.length > 0) {
+                  const cached = await idb.getMany('everyNoiseArtistTags', missing, CACHE_EXPIRE_EVERYNOISE);
+                  cached.forEach((val, key) => { if (Array.isArray(val)) everyNoiseCache.set(key, val); });
+              }
+          })() : Promise.resolve(),
+          (wantLfmA && lfmNames.length > 0) ? (async () => {
+              const missing = lfmNames.filter(n => !lastfmArtistTagsCache.has(n));
+              if (missing.length > 0) {
+                  const cached = await idb.getMany('lastfmArtistTags', missing, CACHE_EXPIRE_GENRES);
+                  cached.forEach((val, key) => { if (Array.isArray(val)) lastfmArtistTagsCache.set(key, val); });
+              }
+          })() : Promise.resolve()
+      ]);
+
+      cachedLfmTrackMap.forEach((val, key) => { if (Array.isArray(val)) lastfmTrackTagsCache.set(key, val); });
+      parsedTracks.forEach(t => { if (!t.isrc) t.isrc = metaMap.get(t.uri)?.isrc || null; });
+
+      const isrcsForDz = wantDz ? [...new Set(parsedTracks.map(t => t.isrc).filter(Boolean))] : [];
+      const cachedDzMap = isrcsForDz.length > 0 ? await idb.getMany('deezerGenres', isrcsForDz).catch(() => new Map()) : new Map();
+
+      const missingSpIds = wantSp ? allArtistIds.filter(id => !artistGenreCache.has(id) && !pendingSpotifyArtistFetches.has(id)) : [];
+      const missingEnIds = wantEn ? allArtistIds.filter(id => !everyNoiseCache.has(id) && !pendingEveryNoiseFetches.has(id)) : [];
+      const missingLfmNames = wantLfmA ? lfmNames.filter(n => !lastfmArtistTagsCache.has(n) && !pendingLfmArtistFetches.has(n.toLowerCase())) : [];
+      const missingLfmIds = missingLfmNames.map(n => primaryArtistByName.get(n)).filter(Boolean);
+      const unionIds = [...new Set([...missingSpIds, ...missingEnIds, ...missingLfmIds])];
+
+      const isrcsToQuery = [];
+      const trackIdsToQuery = [];
+      const trackByIsrc = new Map();
+      const trackByUri = new Map();
+      if (wantLfmT || wantDz) {
+          parsedTracks.forEach(t => {
+              const lfmKey = t.artistName && t.name ? `${t.artistName}|${t.name}` : null;
+              const needLfm = Boolean(wantLfmT && lfmKey && !lastfmTrackTagsCache.has(lfmKey));
+              const needDz = Boolean(wantDz && t.isrc && !Array.isArray(cachedDzMap.get(t.isrc)));
+              if (!needLfm && !needDz) return;
+              if (t.isrc) {
+                  if (!tursoPrefetchedTrackCache.has(t.isrc)) {
+                      isrcsToQuery.push(t.isrc);
+                      trackByIsrc.set(t.isrc, t);
+                  }
+              } else if (!tursoPrefetchedTrackCache.has(t.uri)) {
+                  trackIdsToQuery.push(t.trackId);
+                  trackByUri.set(t.uri, t);
+              }
+          });
+      }
+
+      let artistQueryOk = true;
+      let trackQueryOk = true;
+
+      if (unionIds.length > 0 || isrcsToQuery.length > 0 || trackIdsToQuery.length > 0) {
+          const syncRes = await syncReadFromTurso({
+              artistIds: unionIds,
+              includeEveryNoise: missingEnIds.length > 0,
+              includeLastfm: missingLfmIds.length > 0,
+              includeSpotify: missingSpIds.length > 0,
+              trackIsrcs: isrcsToQuery,
+              trackIds: trackIdsToQuery
+          }).catch(() => null);
+
+          const idbSp = [];
+          const idbEn = [];
+          const idbLfmA = [];
+          const idbDz = [];
+
+          if (unionIds.length > 0) {
+              const tursoMap = syncRes?.artists;
+              if (!tursoMap?._queriedIds?.size) {
+                  artistQueryOk = false;
+              } else {
+                  missingSpIds.forEach(id => {
+                      if (!tursoMap._queriedIds.has(id)) return;
+                      const genres = Array.isArray(tursoMap.get(id)?.spotify_genres) ? tursoMap.get(id).spotify_genres : [];
+                      artistGenreCache.set(id, genres);
+                      idbSp.push({ key: id, val: genres });
+                  });
+                  missingEnIds.forEach(id => {
+                      const val = tursoMap.get(id);
+                      if (val && Array.isArray(val.genres)) {
+                          everyNoiseCache.set(id, val.genres);
+                          idbEn.push({ key: id, val: val.genres });
+                      }
+                  });
+                  missingLfmNames.forEach(name => {
+                      const aId = primaryArtistByName.get(name);
+                      const val = aId ? tursoMap.get(aId) : null;
+                      if (val && Array.isArray(val.lastfm_genres)) {
+                          const synth = synthesizeLastfmSplitTags(val.lastfm_genres);
+                          lastfmArtistTagsCache.set(name, synth);
+                          idbLfmA.push({ key: name, val: synth });
+                      }
+                  });
+              }
+          }
+
+          const recordRow = (key, row, trackMeta) => {
+              tursoPrefetchedTrackCache.set(key, row || null);
+              if (tursoPrefetchedTrackCache.size > 250) {
+                  tursoPrefetchedTrackCache.delete(tursoPrefetchedTrackCache.keys().next().value);
+              }
+              if (!row) return;
+              if (wantDz && trackMeta?.isrc && Array.isArray(row.deezer_genres) && row.deezer_genres.length > 0 && !Array.isArray(cachedDzMap.get(trackMeta.isrc))) {
+                  idbDz.push({ key: trackMeta.isrc, val: row.deezer_genres });
+              }
+              if (wantLfmA && trackMeta?.artistName && !lastfmArtistTagsCache.has(trackMeta.artistName) && Array.isArray(row.lastfm_artist_genres) && row.lastfm_artist_genres.length > 0) {
+                  const synth = synthesizeLastfmSplitTags(row.lastfm_artist_genres);
+                  lastfmArtistTagsCache.set(trackMeta.artistName, synth);
+                  idbLfmA.push({ key: trackMeta.artistName, val: synth });
+                  if (trackMeta.primaryArtistId) queueSingleArtistTursoWrite('lastfm', trackMeta.primaryArtistId, synth);
+              }
+          };
+
+          if (isrcsToQuery.length > 0) {
+              const byIsrcRes = syncRes?.tracksByIsrc;
+              if (!byIsrcRes?._queriedKeys?.size) trackQueryOk = false;
+              else isrcsToQuery.forEach(isrc => {
+                  if (byIsrcRes._queriedKeys.has(isrc)) recordRow(isrc, byIsrcRes.get(isrc) || null, trackByIsrc.get(isrc));
+              });
+          }
+          if (trackIdsToQuery.length > 0) {
+              const byIdRes = syncRes?.tracksById;
+              if (!byIdRes?._queriedKeys?.size) trackQueryOk = false;
+              else trackByUri.forEach((t, uri) => {
+                  if (byIdRes._queriedKeys.has(uri)) recordRow(uri, byIdRes.get(uri) || null, t);
+              });
+          }
+
+          await Promise.all([
+              idbSp.length > 0 && idb.setMany ? idb.setMany('artistGenres', idbSp) : Promise.resolve(),
+              idbEn.length > 0 && idb.setMany ? idb.setMany('everyNoiseArtistTags', idbEn) : Promise.resolve(),
+              idbLfmA.length > 0 && idb.setMany ? idb.setMany('lastfmArtistTags', idbLfmA) : Promise.resolve(),
+              idbDz.length > 0 && idb.setMany ? idb.setMany('deezerGenres', idbDz) : Promise.resolve()
+          ]);
+      }
+
+      if (artistQueryOk && trackQueryOk) {
+          batchTracks.forEach(t => {
+              tursoQueueWarmedUris.add(t.uri);
+              if (tursoQueueWarmedUris.size > 300) {
+                  tursoQueueWarmedUris.delete(tursoQueueWarmedUris.values().next().value);
+              }
+          });
+      }
+  }
+
   async function prefetchNextTrackData() {
       if (!Spicetify.Platform?.PlayerAPI?.getQueue) return;
 
@@ -24276,6 +24675,10 @@
           const nextTrack = allUpcoming[0];
           
           if (!nextTrack || !nextTrack.uri || Spicetify.URI.isLocal(nextTrack.uri)) return;
+
+          if (shouldPrefetchDisplayGenres || shouldPrefetchBlacklist) {
+              await prefetchQueueTursoCache(allUpcoming, { shouldPrefetchDisplayGenres, shouldPrefetchBlacklist }).catch(() => {});
+          }
 
           const trackId = nextTrack.uri.split(":")[2];
           let albumId = nextTrack.album?.uri?.split(":")[2];
@@ -24971,144 +25374,124 @@
                   if (changed) renderCurrentUI(false);
               };
 
-              const promises = [];
+              const nameLabel = domArtistName || "This Artist";
+              const filterApGenres = (list) => (Array.isArray(list) ? list : []).filter(g => !isCountryOnly(g) && isWhitelistedGenre(g, genreMap) && !MOOD_DESCRIPTORS_SET.has(normalizeGenre(g)));
 
-              let spotifyFetchPromise;
-              if (DEVELOPER_HAS_SPOTIFY_PREMIUM && genreSourcesApSpotify) {
-                  spotifyFetchPromise = (async () => {
-                      try {
-                          if (artistGenreCache.has(artistId)) {
-                              const cachedGenres = artistGenreCache.get(artistId);
-                              const nameLabel = domArtistName || "This Artist";
-                              addGenres(cachedGenres, `Spotify Artist (${nameLabel})`);
-                              return domArtistName;
-                          }
+              let cachedLfm = null;
+              await Promise.all([
+                  genreSourcesApSpotify ? (async () => {
+                      if (!artistGenreCache.has(artistId) && pendingSpotifyArtistFetches.has(artistId)) {
+                          try { await pendingSpotifyArtistFetches.get(artistId); } catch (_) {}
+                      }
+                      if (!artistGenreCache.has(artistId)) {
                           const dbCached = await idb.get('artistGenres', artistId, CACHE_EXPIRE_GENRES);
-                          if (dbCached) {
-                              artistGenreCache.set(artistId, dbCached);
-                              const nameLabel = domArtistName || "This Artist";
-                              addGenres(dbCached, `Spotify Artist (${nameLabel})`);
-                              return domArtistName;
+                          if (Array.isArray(dbCached)) artistGenreCache.set(artistId, dbCached);
+                      }
+                      const cached = artistGenreCache.get(artistId);
+                      if (Array.isArray(cached) && cached.length > 0) addGenres(cached, `Spotify Artist (${nameLabel})`);
+                  })() : Promise.resolve(),
+                  genreSourcesApEveryNoise ? (async () => {
+                      if (!everyNoiseCache.has(artistId) && pendingEveryNoiseFetches.has(artistId)) {
+                          try { await pendingEveryNoiseFetches.get(artistId); } catch (_) {}
+                      }
+                      if (!everyNoiseCache.has(artistId)) {
+                          const dbCached = await idb.get('everyNoiseArtistTags', artistId, CACHE_EXPIRE_EVERYNOISE);
+                          if (Array.isArray(dbCached)) everyNoiseCache.set(artistId, dbCached);
+                      }
+                      if (everyNoiseCache.has(artistId)) {
+                          const valid = filterApGenres(everyNoiseCache.get(artistId));
+                          if (valid.length > 0) addGenres(valid, `EveryNoise Artist (${nameLabel})`);
+                      }
+                  })() : Promise.resolve(),
+                  (genreSourcesApLastfm && domArtistName) ? (async () => {
+                      if (lastfmArtistTagsCache.has(domArtistName)) {
+                          cachedLfm = lastfmArtistTagsCache.get(domArtistName);
+                      } else {
+                          const dbCached = await idb.get('lastfmArtistTags', domArtistName, CACHE_EXPIRE_GENRES);
+                          if (Array.isArray(dbCached)) {
+                              const synthCached = synthesizeLastfmSplitTags(dbCached, lastfmArtistRawTagsCache.get(domArtistName));
+                              lastfmArtistTagsCache.set(domArtistName, synthCached);
+                              cachedLfm = synthCached;
                           }
+                      }
+                      if (Array.isArray(cachedLfm)) {
+                          const valid = filterApGenres(synthesizeLastfmSplitTags(cachedLfm, lastfmArtistRawTagsCache.get(domArtistName)));
+                          if (valid.length > 0) addGenres(valid, 'Last.fm Artist');
+                      }
+                  })() : Promise.resolve()
+              ]);
 
-                          const token = await get_S_Client_Token();
-                          if (!token) throw new Error("No client token");
-                          const res = await fetch(`https://api.spotify.com/v1/artists/${artistId}`, {
-                              headers: { 
-                                  "Authorization": `Bearer ${token}`,
-                                  "Accept-Language": "en,en-US;q=0.9"
-                              }
-                          });
-                          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                          const data = await res.json();
-                          
-                          if (data) {
-                              if (data.genres) {
-                                  artistGenreCache.set(artistId, data.genres);
-                                  idb.set('artistGenres', artistId, data.genres);
-                              }
-                              addGenres(data.genres, `Spotify Artist (${data.name})`);
-                              return data.name;
-                          }
-                      } catch (e) {}
-                      return null;
-                  })();
-                  promises.push(spotifyFetchPromise);
-              } else {
-                  spotifyFetchPromise = Promise.resolve(null);
+              const needSp = Boolean(genreSourcesApSpotify && !artistGenreCache.has(artistId));
+              const needEn = Boolean(genreSourcesApEveryNoise && !everyNoiseCache.has(artistId));
+              const needLfm = Boolean(genreSourcesApLastfm && domArtistName && !Array.isArray(cachedLfm));
+
+              const tursoArtistMap = (needSp || needEn || needLfm)
+                  ? await getArtistGenresFromTurso([artistId], { includeEveryNoise: needEn, includeLastfm: needLfm, includeSpotify: needSp }).catch(() => null)
+                  : null;
+              const tursoRow = tursoArtistMap?.get(artistId) || null;
+
+              if (needSp && tursoArtistMap?._queriedIds?.has(artistId)) {
+                  const spGenres = Array.isArray(tursoRow?.spotify_genres) ? tursoRow.spotify_genres : [];
+                  artistGenreCache.set(artistId, spGenres);
+                  idb.set('artistGenres', artistId, spGenres);
+                  if (spGenres.length > 0) addGenres(spGenres, `Spotify Artist (${nameLabel})`);
               }
 
-              if (genreSourcesApEveryNoise) {
-                  promises.push((async () => {
-                      try {
-                          const nameToUse = domArtistName || "This Artist";
+              const promises = [];
 
-                          if (pendingEveryNoiseFetches.has(artistId)) {
-                              try { await pendingEveryNoiseFetches.get(artistId); } catch (_) {}
-                          }
-
-                          if (everyNoiseCache.has(artistId)) {
-                              const cached = everyNoiseCache.get(artistId);
-                              if (cached.length > 0) addGenres(cached, `EveryNoise Artist (${nameToUse})`);
-                              return;
-                          }
-                          const dbCached = await idb.get('everyNoiseArtistTags', artistId, CACHE_EXPIRE_EVERYNOISE);
-                          if (dbCached) {
-                              everyNoiseCache.set(artistId, dbCached);
-                              if (dbCached.length > 0) addGenres(dbCached, `EveryNoise Artist (${nameToUse})`);
-                              return;
-                          }
-
+              if (needEn) {
+                  if (tursoRow && Array.isArray(tursoRow.genres)) {
+                      everyNoiseCache.set(artistId, tursoRow.genres);
+                      idb.set('everyNoiseArtistTags', artistId, tursoRow.genres);
+                      const valid = filterApGenres(tursoRow.genres);
+                      if (valid.length > 0) addGenres(valid, `EveryNoise Artist (${nameLabel})`);
+                  } else {
+                      promises.push((async () => {
                           const executionPromise = (async () => {
                               try {
                                   const res = await fetch(`${EVERYNOISE_GATEWAY_URL}${artistId}`, { signal: AbortSignal.timeout(11000) });
                                   if (!res.ok) throw new Error(`HTTP ${res.status}`);
                                   const data = await res.json();
-                                  
                                   const rawGenres = Array.isArray(data) ? data : (data?.[artistId] || []);
-                                  const validGenres = rawGenres.filter(g => !isCountryOnly(g) && isWhitelistedGenre(g, genreMap) && !MOOD_DESCRIPTORS_SET.has(normalizeGenre(g)));
-
-                                  everyNoiseCache.set(artistId, validGenres);
-                                  idb.set('everyNoiseArtistTags', artistId, validGenres);
-                                  
-                                  if (validGenres.length > 0) {
-                                      addGenres(validGenres, `EveryNoise Artist (${nameToUse})`);
-                                  }
+                                  everyNoiseCache.set(artistId, rawGenres);
+                                  idb.set('everyNoiseArtistTags', artistId, rawGenres);
+                                  queueSingleArtistTursoWrite('everynoise', artistId, rawGenres);
+                                  const validGenres = filterApGenres(rawGenres);
+                                  if (validGenres.length > 0) addGenres(validGenres, `EveryNoise Artist (${nameLabel})`);
                               } catch (_) {
                                   fetchFailed = true;
                               } finally {
                                   pendingEveryNoiseFetches.delete(artistId);
                               }
                           })();
-
                           pendingEveryNoiseFetches.set(artistId, executionPromise);
                           await executionPromise;
-                      } catch (e) {
-                          fetchFailed = true;
-                      }
-                  })());
+                      })());
+                  }
               }
 
-              if (genreSourcesApLastfm) {
-                  promises.push((async () => {
-                      try {
-                          let nameToUse = domArtistName;
-                          if (!nameToUse && DEVELOPER_HAS_SPOTIFY_PREMIUM && genreSourcesApSpotify) {
-                              nameToUse = await spotifyFetchPromise;
-                          }
-
-                          if (nameToUse) {
-                              if (lastfmArtistTagsCache.has(nameToUse)) {
-                                  const cached = synthesizeLastfmSplitTags(lastfmArtistTagsCache.get(nameToUse), lastfmArtistRawTagsCache.get(nameToUse))
-                                      .filter(tag => !isCountryOnly(tag) && isWhitelistedGenre(tag, genreMap) && !MOOD_DESCRIPTORS_SET.has(normalizeGenre(tag)));
-                                  if (cached.length > 0) addGenres(cached, 'Last.fm Artist');
-                                  return;
-                              }
-                              const dbCachedLfm = await idb.get('lastfmArtistTags', nameToUse, CACHE_EXPIRE_GENRES);
-                              if (dbCachedLfm) {
-                                  const synthCached = synthesizeLastfmSplitTags(dbCachedLfm, lastfmArtistRawTagsCache.get(nameToUse));
-                                  lastfmArtistTagsCache.set(nameToUse, synthCached);
-                                  const validCached = synthCached.filter(tag => !isCountryOnly(tag) && isWhitelistedGenre(tag, genreMap) && !MOOD_DESCRIPTORS_SET.has(normalizeGenre(tag)));
-                                  if (validCached.length > 0) addGenres(validCached, 'Last.fm Artist');
-                                  return;
-                              }
-
-                              let validTags = [];
-                              let canonicalArtistName = nameToUse;
+              if (needLfm) {
+                  if (tursoRow && Array.isArray(tursoRow.lastfm_genres)) {
+                      const synthTags = synthesizeLastfmSplitTags(tursoRow.lastfm_genres);
+                      lastfmArtistTagsCache.set(domArtistName, synthTags);
+                      idb.set('lastfmArtistTags', domArtistName, synthTags);
+                      const validTags = filterApGenres(synthTags);
+                      if (validTags.length > 0) addGenres(validTags, 'Last.fm Artist');
+                  } else {
+                      promises.push((async () => {
+                          try {
+                              let canonicalArtistName = domArtistName;
                               const topTracksItems = gqlRes?.data?.artistUnion?.discography?.topTracks?.items;
-                              
                               if (topTracksItems?.length > 0) {
                                   const tracks = topTracksItems.map(item => item.track);
                                   const simpleTracks = tracks.filter(t => {
                                       const lower = t.name.toLowerCase();
                                       return !lower.includes('(') && !lower.includes('-') && !lower.includes('[') && !lower.includes('remix') && !lower.includes('live');
                                   }).sort((a, b) => a.name.length - b.name.length);
-
                                   const trackToUse = simpleTracks.length > 0 ? simpleTracks[0] : tracks[0];
-                                  const trackParams = new URLSearchParams({ 
-                                      method: 'track.getInfo', artist: nameToUse, track: trackToUse.name, format: 'json', autocorrect: '1'
+                                  const trackParams = new URLSearchParams({
+                                      method: 'track.getInfo', artist: domArtistName, track: trackToUse.name, format: 'json', autocorrect: '1'
                                   });
-                                  
                                   const trackRes = await fetchLfmWithGateway(trackParams);
                                   if (trackRes.ok) {
                                       const trackData = await trackRes.json();
@@ -25116,25 +25499,24 @@
                                   }
                               }
 
-                              let synthTags = [];
                               const artistParams = new URLSearchParams({ method: 'artist.getInfo', artist: canonicalArtistName, format: 'json' });
                               const artistRes = await fetchLfmWithGateway(artistParams);
                               if (artistRes.ok) {
                                   const data = await artistRes.json();
-                                  if (data?.artist?.tags?.tag) {
-                                      const rawTags = data.artist.tags.tag.map(t => t.name.toLowerCase()).filter(g => !/^\d+$/.test(g));
-                                      lastfmArtistRawTagsCache.set(nameToUse, rawTags);
-                                      synthTags = synthesizeLastfmSplitTags(rawTags);
-                                      validTags = synthTags.filter(tag => !isCountryOnly(tag) && isWhitelistedGenre(tag, genreMap) && !MOOD_DESCRIPTORS_SET.has(normalizeGenre(tag)));
-                                  }
+                                  const rawTags = Array.isArray(data?.artist?.tags?.tag)
+                                      ? data.artist.tags.tag.map(t => t.name.toLowerCase()).filter(g => !/^\d+$/.test(g))
+                                      : [];
+                                  lastfmArtistRawTagsCache.set(domArtistName, rawTags);
+                                  const synthTags = synthesizeLastfmSplitTags(rawTags);
+                                  lastfmArtistTagsCache.set(domArtistName, synthTags);
+                                  idb.set('lastfmArtistTags', domArtistName, synthTags);
+                                  queueSingleArtistTursoWrite('lastfm', artistId, synthTags);
+                                  const validTags = filterApGenres(synthTags);
+                                  if (validTags.length > 0) addGenres(validTags, 'Last.fm Artist');
                               }
-
-                              lastfmArtistTagsCache.set(nameToUse, synthTags);
-                              idb.set('lastfmArtistTags', nameToUse, synthTags);
-                              if (validTags.length > 0) addGenres(validTags, 'Last.fm Artist');
-                          }
-                      } catch (e) {}
-                  })());
+                          } catch (e) {}
+                      })());
+                  }
               }
 
               await Promise.all(promises);
@@ -27734,7 +28116,7 @@ shadowRoot.innerHTML = `
         tracks = convertedTracks;
 
         const openModal = async () => {
-            const gfSources = JSON.parse(localStorage.getItem(STORAGE_KEY_GENRE_FILTER_SOURCES) || '{"spotify_track":true,"lastfm_track":false,"lastfm_artist":false,"deezer":false,"everynoise_artist":true}');
+            const gfSources = getGenreFilterSources();
             const { trackGenreMap, rawTrackGenres } = await fetchAllTrackGenres(
                 tracks,
                 null,
@@ -36856,7 +37238,7 @@ shadowRoot.innerHTML = `
             groupGenres: jobGroupGenres = true,
             filterNoise: jobFilterNoise = true
         } = filters.genreFilterSettings;
-        const gfSources = JSON.parse(localStorage.getItem(STORAGE_KEY_GENRE_FILTER_SOURCES) || '{"spotify_track":true,"lastfm_track":false,"lastfm_artist":false,"deezer":false,"everynoise_artist":true}');
+        const gfSources = getGenreFilterSources();
 
         const { rawTrackGenres } = await fetchAllTrackGenres(
             filteredTracks,
@@ -38763,7 +39145,7 @@ shadowRoot.innerHTML = `
         let ungroupedDetectedGenres = [];
         let ungroupedDetectedSet = new Set();
 
-        let gfSources = JSON.parse(localStorage.getItem(STORAGE_KEY_GENRE_FILTER_SOURCES) || '{"spotify_track":true,"lastfm_track":false,"lastfm_artist":false,"deezer":false,"everynoise_artist":true}');
+        let gfSources = getGenreFilterSources();
 
         const syncSets = () => {
             selectedSet.clear();
@@ -38774,7 +39156,7 @@ shadowRoot.innerHTML = `
 
         const resolveSavedList = (list, useGrouping = groupGenres) => {
             if (!list || list.length === 0) return [];
-            const onlySpTrack = gfSources.spotify_track && !gfSources.lastfm_track && !gfSources.lastfm_artist && !gfSources.everynoise_artist && !gfSources.deezer;
+            const onlySpTrack = gfSources.spotify_track && !gfSources.spotify_artist && !gfSources.lastfm_track && !gfSources.lastfm_artist && !gfSources.everynoise_artist && !gfSources.deezer;
             const defaultSrc = onlySpTrack ? 'spotify_track' : 'lastfm_artist';
             const out = new Set();
             for (let i = 0; i < list.length; i++) {
@@ -39135,6 +39517,7 @@ shadowRoot.innerHTML = `
                     if (!data) return;
                     hydrateCachedGenreRecord(data);
                     if (gfSources.spotify_track && data.spotify_track_genres) data.spotify_track_genres.forEach(g => add(g, 'spotify_track'));
+                    if (gfSources.spotify_artist && data.spotify_artist_genres) data.spotify_artist_genres.forEach(g => add(g, 'spotify'));
                     if (gfSources.everynoise_artist && data.everynoise_artist_genres) data.everynoise_artist_genres.forEach(g => add(g, 'everynoise'));
                     if (gfSources.deezer) {
                         if (data.deezer_genres) data.deezer_genres.forEach(g => add(g, 'deezer'));
@@ -39164,6 +39547,7 @@ shadowRoot.innerHTML = `
                 if (!data) return;
                 hydrateCachedGenreRecord(data);
                 if (gfSources.spotify_track && data.spotify_track_genres) data.spotify_track_genres.forEach(countRaw);
+                if (gfSources.spotify_artist && data.spotify_artist_genres) data.spotify_artist_genres.forEach(countRaw);
                 if (gfSources.lastfm_track && data.lastfm_track_genres) data.lastfm_track_genres.forEach(countRaw);
                 if (gfSources.lastfm_artist && data.lastfm_artist_genres) data.lastfm_artist_genres.forEach(countRaw);
                 if (gfSources.everynoise_artist && data.everynoise_artist_genres) data.everynoise_artist_genres.forEach(countRaw);
@@ -42598,6 +42982,14 @@ shadowRoot.innerHTML = `
       });
   }
 
+  function getGenreFilterSources() {
+      try {
+          const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY_GENRE_FILTER_SOURCES) || 'null');
+          if (parsed && typeof parsed === 'object') return { ...DEFAULT_GENRE_FILTER_SOURCES, ...parsed };
+      } catch (e) {}
+      return { ...DEFAULT_GENRE_FILTER_SOURCES };
+  }
+
   function showGenreFilterSettingsModal(currentSources, onSave) {
       const descriptionHtml = `
           <div style="background-color: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 12px; margin-bottom: 5px;">
@@ -42612,14 +43004,15 @@ shadowRoot.innerHTML = `
           descriptionHtml: descriptionHtml,
           saveButtonText: "Done",
           toggleOptions: [
-              { id: "spotify_track", label: "Spotify (Track Genres)", checked: currentSources.spotify_track },
-              { id: "lastfm_track", label: "Last.fm (Track Tags)", checked: currentSources.lastfm_track },
-              { id: "lastfm_artist", label: "Last.fm (Artist Tags)", checked: currentSources.lastfm_artist },
-              { id: "everynoise_artist", label: "Every Noise (Artist Tags)", checked: currentSources.everynoise_artist },
+              { id: "spotify_track", label: "Spotify (Track Genres)", checked: !!currentSources.spotify_track },
+              { id: "spotify_artist", label: "Spotify (Artist Tags)", checked: !!currentSources.spotify_artist },
+              { id: "lastfm_track", label: "Last.fm (Track Tags)", checked: !!currentSources.lastfm_track },
+              { id: "lastfm_artist", label: "Last.fm (Artist Tags)", checked: !!currentSources.lastfm_artist },
+              { id: "everynoise_artist", label: "Every Noise (Artist Tags)", checked: !!currentSources.everynoise_artist },
               { 
                   id: "deezer", 
                   label: "Deezer (Album Genres)", 
-                  checked: currentSources.deezer,
+                  checked: !!currentSources.deezer,
                   subtext: "May significantly increase processing time for tracks not cached in the cloud."
               }
           ],
@@ -42632,15 +43025,7 @@ shadowRoot.innerHTML = `
 
   async function showGenreFilterModal(tracks, initialTrackGenreMap, rawGenreData, sourceUri) {
     const abortController = new AbortController();
-    const defaultGfSources = { spotify_track: true, lastfm_track: false, lastfm_artist: false, deezer: false, everynoise_artist: true };
-    let gfSources = { ...defaultGfSources };
-    try {
-        const storedGf = localStorage.getItem(STORAGE_KEY_GENRE_FILTER_SOURCES);
-        if (storedGf) {
-            const parsedGf = JSON.parse(storedGf);
-            if (parsedGf && typeof parsedGf === 'object') gfSources = parsedGf;
-        }
-    } catch (e) {}
+    let gfSources = getGenreFilterSources();
     let activeTitleSources = { ...gfSources };
     const originallyFetchedSources = { ...gfSources };
 
@@ -43668,6 +44053,7 @@ shadowRoot.innerHTML = `
             if (!rawData) return;
             hydrateCachedGenreRecord(rawData);
             if (gfSources.spotify_track && rawData.spotify_track_genres) rawData.spotify_track_genres.forEach(r => add(r, 'spotify_track'));
+            if (gfSources.spotify_artist && rawData.spotify_artist_genres) rawData.spotify_artist_genres.forEach(r => add(r, 'spotify'));
             if (gfSources.everynoise_artist && rawData.everynoise_artist_genres) rawData.everynoise_artist_genres.forEach(r => add(r, 'everynoise'));
             if (gfSources.deezer) {
                 if (rawData.deezer_genres) rawData.deezer_genres.forEach(r => add(r, 'deezer'));
@@ -44290,10 +44676,11 @@ shadowRoot.innerHTML = `
   }
 
   async function getGenresFromTurso(identifiers, type = 'ids') {
-    if (!identifiers || identifiers.length === 0) return new Map();
-
     const results = new Map();
-    const BATCH_SIZE = 200;
+    results._queriedKeys = new Set();
+    if (!identifiers || identifiers.length === 0) return results;
+
+    const BATCH_SIZE = 400;
     const cleanIds = [...new Set((type === 'ids' ? identifiers.map(uri => uri.split(':').pop()) : identifiers).filter(Boolean))];
     if (cleanIds.length === 0) return results;
 
@@ -44310,7 +44697,7 @@ shadowRoot.innerHTML = `
         try {
           const response = await fetch(`${TURSO_GATEWAY_URL}/genres/read`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'text/plain' },
             body: JSON.stringify(payload)
           });
           if (!response.ok) {
@@ -44320,6 +44707,9 @@ shadowRoot.innerHTML = `
           }
           const data = await response.json();
           for (const key in data) results.set(key, data[key]);
+          for (let j = 0; j < batch.length; j++) {
+            results._queriedKeys.add(type === 'ids' ? `spotify:track:${batch[j]}` : batch[j]);
+          }
         } catch (error) {
           console.error(`Error fetching genres from Turso gateway (${type}):`, error);
         }
@@ -44342,12 +44732,12 @@ shadowRoot.innerHTML = `
       const batch = newGenresData.slice(i, i + BATCH_SIZE).map(data => ({
         isrc: data.isrc,
         track_id: data.track_uri.split(':').pop(),
-        spotify_artist_genres: JSON.stringify(data.spotify_artist_genres || []),
-        lastfm_track_genres: JSON.stringify(data.lastfm_track_genres || []),
-        lastfm_artist_genres: JSON.stringify(data.lastfm_artist_genres || []),
-        deezer_genres: JSON.stringify(data.deezer_genres || []),
-        apple_music_genres: JSON.stringify(data.apple_music_genres || []),
-        release_date: data.release_date,
+        spotify_artist_genres: Array.isArray(data.spotify_artist_genres) ? JSON.stringify(data.spotify_artist_genres) : null,
+        lastfm_track_genres: Array.isArray(data.lastfm_track_genres) ? JSON.stringify(data.lastfm_track_genres) : null,
+        lastfm_artist_genres: Array.isArray(data.lastfm_artist_genres) ? JSON.stringify(data.lastfm_artist_genres) : null,
+        deezer_genres: Array.isArray(data.deezer_genres) ? JSON.stringify(data.deezer_genres) : null,
+        apple_music_genres: Array.isArray(data.apple_music_genres) ? JSON.stringify(data.apple_music_genres) : null,
+        release_date: data.release_date || null,
         updated_at: Math.floor(Date.now() / 86400000)
       }));
 
@@ -44356,7 +44746,7 @@ shadowRoot.innerHTML = `
         try {
           const response = await fetch(`${TURSO_GATEWAY_URL}/genres`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'text/plain' },
             body: JSON.stringify(batch),
           });
 
@@ -44390,10 +44780,12 @@ shadowRoot.innerHTML = `
     }
   }
 
-  async function getArtistGenresFromTurso(artistIds, { includeEveryNoise = true, includeLastfm = false } = {}) {
-    if (!artistIds || artistIds.length === 0 || (!includeEveryNoise && !includeLastfm)) return new Map();
+  async function getArtistGenresFromTurso(artistIds, { includeEveryNoise = true, includeLastfm = false, includeSpotify = false } = {}) {
     const results = new Map();
-    const BATCH_SIZE = 200;
+    results._queriedIds = new Set();
+    results._flags = { includeEveryNoise, includeLastfm, includeSpotify };
+    if (!artistIds || artistIds.length === 0 || (!includeEveryNoise && !includeLastfm && !includeSpotify)) return results;
+    const BATCH_SIZE = 400;
     const cleanIds = [...new Set(artistIds.map(id => id?.includes(':') ? id.split(':').pop() : id).filter(Boolean))];
     if (cleanIds.length === 0) return results;
 
@@ -44407,17 +44799,18 @@ shadowRoot.innerHTML = `
       while (idx < batches.length) {
         const batch = batches[idx++];
         try {
-          const payload = includeLastfm
-            ? { ids: batch, include_everynoise: includeEveryNoise, include_lastfm: true }
-            : { ids: batch };
+          const payload = { ids: batch, include_everynoise: includeEveryNoise };
+          if (includeLastfm) payload.include_lastfm = true;
+          if (includeSpotify) payload.include_spotify = true;
           const response = await fetch(`${TURSO_GATEWAY_URL}/artists/read`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'text/plain' },
             body: JSON.stringify(payload)
           });
           if (!response.ok) continue;
           const data = await response.json();
           for (const id in data) results.set(id, data[id]);
+          for (let j = 0; j < batch.length; j++) results._queriedIds.add(batch[j]);
         } catch (e) {
           console.warn("[Sort-Play] Failed to fetch artist genres from Turso:", e);
         }
@@ -44429,12 +44822,79 @@ shadowRoot.innerHTML = `
   }
 
   async function getArtistEveryNoiseFromTurso(artistIds) {
-    return getArtistGenresFromTurso(artistIds, { includeEveryNoise: true, includeLastfm: false });
+    return getArtistGenresFromTurso(artistIds, { includeEveryNoise: true, includeLastfm: false, includeSpotify: false });
+  }
+
+  async function fetchSpotifyArtistGenresFromCache(artistIds, preFetchedTursoMap = null) {
+    const cleanIds = [...new Set((artistIds || []).map(id => (typeof id === 'string' && id.includes(':')) ? id.split(':').pop() : id).filter(Boolean))];
+    if (cleanIds.length === 0) return artistGenreCache;
+
+    const missingInMem = cleanIds.filter(id => !artistGenreCache.has(id));
+    if (missingInMem.length > 0) {
+      const cachedIdb = await idb.getMany('artistGenres', missingInMem, CACHE_EXPIRE_GENRES);
+      cachedIdb.forEach((val, key) => {
+        if (Array.isArray(val)) artistGenreCache.set(key, val);
+      });
+    }
+
+    const inFlight = cleanIds.filter(id => !artistGenreCache.has(id) && pendingSpotifyArtistFetches.has(id));
+    if (inFlight.length > 0) {
+      await Promise.allSettled(inFlight.map(id => pendingSpotifyArtistFetches.get(id)));
+    }
+
+    const missingInIdb = cleanIds.filter(id => !artistGenreCache.has(id));
+    if (missingInIdb.length > 0) {
+      const idbEntries = [];
+      const canUsePreFetched = Boolean(preFetchedTursoMap?._flags?.includeSpotify);
+      const stillMissing = [];
+
+      for (let i = 0; i < missingInIdb.length; i++) {
+        const id = missingInIdb[i];
+        if (canUsePreFetched && preFetchedTursoMap._queriedIds?.has(id)) {
+          const val = preFetchedTursoMap.get(id);
+          const genres = Array.isArray(val?.spotify_genres) ? val.spotify_genres : [];
+          artistGenreCache.set(id, genres);
+          idbEntries.push({ key: id, val: genres });
+        } else {
+          stillMissing.push(id);
+        }
+      }
+
+      if (stillMissing.length > 0) {
+        const fetchPromise = (async () => {
+          const tursoResults = await getArtistGenresFromTurso(stillMissing, { includeEveryNoise: false, includeLastfm: false, includeSpotify: true });
+          const fetchedIdbEntries = [];
+          for (let i = 0; i < stillMissing.length; i++) {
+            const id = stillMissing[i];
+            if (!tursoResults._queriedIds?.has(id)) continue;
+            const val = tursoResults.get(id);
+            const genres = Array.isArray(val?.spotify_genres) ? val.spotify_genres : [];
+            artistGenreCache.set(id, genres);
+            fetchedIdbEntries.push({ key: id, val: genres });
+          }
+          if (fetchedIdbEntries.length > 0 && idb.setMany) {
+            await idb.setMany('artistGenres', fetchedIdbEntries);
+          }
+        })();
+        stillMissing.forEach(id => pendingSpotifyArtistFetches.set(id, fetchPromise));
+        try {
+          await fetchPromise;
+        } finally {
+          stillMissing.forEach(id => pendingSpotifyArtistFetches.delete(id));
+        }
+      }
+
+      if (idbEntries.length > 0 && idb.setMany) {
+        await idb.setMany('artistGenres', idbEntries);
+      }
+    }
+
+    return artistGenreCache;
   }
 
   async function saveArtistEveryNoiseToTurso(artistDataList) {
     if (!artistDataList || artistDataList.length === 0) return;
-    const BATCH_SIZE = 200;
+    const BATCH_SIZE = 500;
 
     for (let i = 0; i < artistDataList.length; i += BATCH_SIZE) {
       const batch = artistDataList.slice(i, i + BATCH_SIZE).map(item => ({
@@ -44446,7 +44906,7 @@ shadowRoot.innerHTML = `
       try {
         await fetch(`${TURSO_GATEWAY_URL}/artists`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'text/plain' },
           body: JSON.stringify(batch)
         });
       } catch (e) {
@@ -44457,7 +44917,7 @@ shadowRoot.innerHTML = `
 
   async function saveArtistLastfmToTurso(artistDataList) {
     if (!artistDataList || artistDataList.length === 0) return;
-    const BATCH_SIZE = 200;
+    const BATCH_SIZE = 500;
 
     for (let i = 0; i < artistDataList.length; i += BATCH_SIZE) {
       const batch = artistDataList.slice(i, i + BATCH_SIZE).map(item => ({
@@ -44469,13 +44929,260 @@ shadowRoot.innerHTML = `
       try {
         await fetch(`${TURSO_GATEWAY_URL}/artists/lastfm`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'text/plain' },
           body: JSON.stringify(batch)
         });
       } catch (e) {
         console.warn("[Sort-Play] Failed to save artist Last.fm to Turso:", e);
       }
     }
+  }
+
+  const singleTursoWriteBuffer = {
+    tracks: new Map(),
+    everynoise: new Map(),
+    lastfmArtists: new Map(),
+    timer: null,
+    lastFlushAt: 0,
+    flushing: false,
+    listenersBound: false,
+    syncSupported: true,
+    TRACK_THRESHOLD: 25,
+    ARTIST_THRESHOLD: 40,
+    MAX_WAIT_MS: 20 * 60 * 1000,
+    MIN_GAP_MS: 5 * 60 * 1000
+  };
+
+  async function syncReadFromTurso({ artistIds = [], includeEveryNoise = false, includeLastfm = false, includeSpotify = false, trackIsrcs = [], trackIds = [] } = {}) {
+    const cleanArtistIds = [...new Set((artistIds || []).map(id => id?.includes(':') ? id.split(':').pop() : id).filter(Boolean))];
+    const cleanIsrcs = [...new Set((trackIsrcs || []).filter(Boolean))];
+    const cleanTrackIds = [...new Set((trackIds || []).map(id => id?.includes(':') ? id.split(':').pop() : id).filter(Boolean))];
+    const wantArtists = cleanArtistIds.length > 0 && (includeEveryNoise || includeLastfm || includeSpotify);
+
+    const artists = new Map();
+    artists._queriedIds = new Set();
+    artists._flags = { includeEveryNoise, includeLastfm, includeSpotify };
+    const tracksByIsrc = new Map();
+    tracksByIsrc._queriedKeys = new Set();
+    const tracksById = new Map();
+    tracksById._queriedKeys = new Set();
+
+    if (!wantArtists && cleanIsrcs.length === 0 && cleanTrackIds.length === 0) {
+      return { artists, tracksByIsrc, tracksById };
+    }
+
+    if (singleTursoWriteBuffer.syncSupported && cleanArtistIds.length <= 400 && cleanIsrcs.length <= 400 && cleanTrackIds.length <= 400) {
+      try {
+        const response = await fetch(`${TURSO_GATEWAY_URL}/sync/read`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({
+            artist_ids: wantArtists ? cleanArtistIds : [],
+            include_everynoise: includeEveryNoise,
+            include_lastfm: includeLastfm,
+            include_spotify: includeSpotify,
+            track_isrcs: cleanIsrcs,
+            track_ids: cleanTrackIds
+          })
+        });
+        if (response.status === 404) {
+          singleTursoWriteBuffer.syncSupported = false;
+        } else {
+          if (!response.ok) return { artists, tracksByIsrc, tracksById };
+          const data = await response.json();
+          if (wantArtists) {
+            for (const id in (data.artists || {})) artists.set(id, data.artists[id]);
+            for (let i = 0; i < cleanArtistIds.length; i++) artists._queriedIds.add(cleanArtistIds[i]);
+          }
+          if (cleanIsrcs.length > 0) {
+            for (const k in (data.tracks_by_isrc || {})) tracksByIsrc.set(k, data.tracks_by_isrc[k]);
+            for (let i = 0; i < cleanIsrcs.length; i++) tracksByIsrc._queriedKeys.add(cleanIsrcs[i]);
+          }
+          if (cleanTrackIds.length > 0) {
+            for (const k in (data.tracks_by_id || {})) tracksById.set(k, data.tracks_by_id[k]);
+            for (let i = 0; i < cleanTrackIds.length; i++) tracksById._queriedKeys.add(`spotify:track:${cleanTrackIds[i]}`);
+          }
+          return { artists, tracksByIsrc, tracksById };
+        }
+      } catch (e) {
+        console.warn("[Sort-Play] Failed to sync read genres from Turso:", e);
+        return { artists, tracksByIsrc, tracksById };
+      }
+    }
+
+    const [fbArtists, fbIsrc, fbId] = await Promise.all([
+      wantArtists ? getArtistGenresFromTurso(cleanArtistIds, { includeEveryNoise, includeLastfm, includeSpotify }) : Promise.resolve(artists),
+      cleanIsrcs.length > 0 ? getGenresFromTurso(cleanIsrcs, 'isrcs') : Promise.resolve(tracksByIsrc),
+      cleanTrackIds.length > 0 ? getGenresFromTurso(cleanTrackIds, 'ids') : Promise.resolve(tracksById)
+    ]);
+    return { artists: fbArtists, tracksByIsrc: fbIsrc, tracksById: fbId };
+  }
+
+  async function flushSingleTursoWrites({ useKeepalive = false } = {}) {
+    if (singleTursoWriteBuffer.flushing && !useKeepalive) return;
+    if (singleTursoWriteBuffer.timer) {
+      clearTimeout(singleTursoWriteBuffer.timer);
+      singleTursoWriteBuffer.timer = null;
+    }
+
+    const tracks = Array.from(singleTursoWriteBuffer.tracks.values());
+    const everynoise = Array.from(singleTursoWriteBuffer.everynoise.values());
+    const lastfmArtists = Array.from(singleTursoWriteBuffer.lastfmArtists.values());
+    singleTursoWriteBuffer.tracks.clear();
+    singleTursoWriteBuffer.everynoise.clear();
+    singleTursoWriteBuffer.lastfmArtists.clear();
+
+    if (tracks.length === 0 && everynoise.length === 0 && lastfmArtists.length === 0) return;
+    singleTursoWriteBuffer.lastFlushAt = Date.now();
+
+    const today = Math.floor(Date.now() / 86400000);
+    const trackRows = tracks.map(d => ({
+      isrc: d.isrc,
+      track_id: d.track_uri.split(':').pop(),
+      spotify_artist_genres: Array.isArray(d.spotify_artist_genres) ? JSON.stringify(d.spotify_artist_genres) : null,
+      lastfm_track_genres: Array.isArray(d.lastfm_track_genres) ? JSON.stringify(d.lastfm_track_genres) : null,
+      lastfm_artist_genres: Array.isArray(d.lastfm_artist_genres) ? JSON.stringify(d.lastfm_artist_genres) : null,
+      deezer_genres: Array.isArray(d.deezer_genres) ? JSON.stringify(d.deezer_genres) : null,
+      apple_music_genres: Array.isArray(d.apple_music_genres) ? JSON.stringify(d.apple_music_genres) : null,
+      release_date: d.release_date || null,
+      updated_at: today
+    }));
+    const enRows = everynoise.map(a => ({ artist_id: a.artist_id, genres: JSON.stringify(a.genres || []), updated_at: today }));
+    const lfmRows = lastfmArtists.map(a => ({ artist_id: a.artist_id, genres: JSON.stringify(a.genres || []), updated_at: today }));
+
+    if (useKeepalive) {
+      if (singleTursoWriteBuffer.syncSupported) {
+        const combinedBody = JSON.stringify({ tracks: trackRows, everynoise: enRows, lastfm_artists: lfmRows });
+        if (combinedBody.length <= 58000) {
+          fetch(`${TURSO_GATEWAY_URL}/sync/write`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: combinedBody,
+            keepalive: true
+          }).catch(() => {});
+          return;
+        }
+      }
+      const sendKeepalive = (path, rows) => {
+        if (rows.length === 0) return;
+        let chunk = [];
+        let size = 2;
+        const dispatch = (items) => {
+          if (items.length === 0) return;
+          fetch(`${TURSO_GATEWAY_URL}${path}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify(items),
+            keepalive: true
+          }).catch(() => {});
+        };
+        for (let i = 0; i < rows.length; i++) {
+          const itemStr = JSON.stringify(rows[i]);
+          if (chunk.length > 0 && size + itemStr.length + 1 > 58000) {
+            dispatch(chunk);
+            chunk = [];
+            size = 2;
+          }
+          chunk.push(rows[i]);
+          size += itemStr.length + 1;
+        }
+        dispatch(chunk);
+      };
+      sendKeepalive('/genres', trackRows);
+      sendKeepalive('/artists', enRows);
+      sendKeepalive('/artists/lastfm', lfmRows);
+      return;
+    }
+
+    singleTursoWriteBuffer.flushing = true;
+    try {
+      let usedSync = false;
+      if (singleTursoWriteBuffer.syncSupported) {
+        const TRACK_CHUNK = 70;
+        const chunks = Math.max(1, Math.ceil(trackRows.length / TRACK_CHUNK));
+        usedSync = true;
+        for (let c = 0; c < chunks; c++) {
+          const payload = {
+            tracks: trackRows.slice(c * TRACK_CHUNK, (c + 1) * TRACK_CHUNK),
+            everynoise: c === 0 ? enRows : [],
+            lastfm_artists: c === 0 ? lfmRows : []
+          };
+          const res = await fetch(`${TURSO_GATEWAY_URL}/sync/write`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify(payload)
+          }).catch(() => null);
+          if (res?.status === 404) {
+            singleTursoWriteBuffer.syncSupported = false;
+            usedSync = false;
+            break;
+          }
+        }
+      }
+      if (!usedSync) {
+        await Promise.allSettled([
+          tracks.length ? saveGenresToTurso(tracks) : Promise.resolve(),
+          everynoise.length ? saveArtistEveryNoiseToTurso(everynoise) : Promise.resolve(),
+          lastfmArtists.length ? saveArtistLastfmToTurso(lastfmArtists) : Promise.resolve()
+        ]);
+      }
+    } finally {
+      singleTursoWriteBuffer.flushing = false;
+      if (singleTursoWriteBuffer.tracks.size > 0 || singleTursoWriteBuffer.everynoise.size > 0 || singleTursoWriteBuffer.lastfmArtists.size > 0) {
+        scheduleSingleTursoFlush();
+      }
+    }
+  }
+
+  function scheduleSingleTursoFlush() {
+    if (!singleTursoWriteBuffer.listenersBound) {
+      singleTursoWriteBuffer.listenersBound = true;
+      window.addEventListener('pagehide', () => flushSingleTursoWrites({ useKeepalive: true }));
+    }
+    const hitThreshold =
+      singleTursoWriteBuffer.tracks.size >= singleTursoWriteBuffer.TRACK_THRESHOLD ||
+      singleTursoWriteBuffer.everynoise.size >= singleTursoWriteBuffer.ARTIST_THRESHOLD ||
+      singleTursoWriteBuffer.lastfmArtists.size >= singleTursoWriteBuffer.ARTIST_THRESHOLD;
+
+    if (hitThreshold) {
+      const elapsed = Date.now() - singleTursoWriteBuffer.lastFlushAt;
+      if (singleTursoWriteBuffer.lastFlushAt === 0 || elapsed >= singleTursoWriteBuffer.MIN_GAP_MS) {
+        flushSingleTursoWrites();
+      } else {
+        if (singleTursoWriteBuffer.timer) clearTimeout(singleTursoWriteBuffer.timer);
+        singleTursoWriteBuffer.timer = setTimeout(() => flushSingleTursoWrites(), singleTursoWriteBuffer.MIN_GAP_MS - elapsed);
+      }
+    } else if (!singleTursoWriteBuffer.timer) {
+      singleTursoWriteBuffer.timer = setTimeout(() => flushSingleTursoWrites(), singleTursoWriteBuffer.MAX_WAIT_MS);
+    }
+  }
+
+  function queueSingleArtistTursoWrite(type, artistId, genres) {
+    if (!artistId || !Array.isArray(genres)) return;
+    const id = artistId.includes(':') ? artistId.split(':').pop() : artistId;
+    if (!id) return;
+    const map = type === 'everynoise' ? singleTursoWriteBuffer.everynoise : singleTursoWriteBuffer.lastfmArtists;
+    const existing = map.get(id);
+    if (existing && existing.genres.length > 0 && genres.length === 0) return;
+    map.set(id, { artist_id: id, genres });
+    scheduleSingleTursoFlush();
+  }
+
+  function queueSingleTrackTursoWrite(entry) {
+    if (!entry?.isrc || !entry?.track_uri) return;
+    const prev = singleTursoWriteBuffer.tracks.get(entry.isrc);
+    const mergeArr = (a, b) => Array.isArray(b) ? (Array.isArray(a) && a.length > 0 && b.length === 0 ? a : b) : (Array.isArray(a) ? a : null);
+    singleTursoWriteBuffer.tracks.set(entry.isrc, {
+      track_uri: entry.track_uri,
+      isrc: entry.isrc,
+      spotify_artist_genres: mergeArr(prev?.spotify_artist_genres, entry.spotify_artist_genres),
+      lastfm_track_genres: mergeArr(prev?.lastfm_track_genres, entry.lastfm_track_genres),
+      lastfm_artist_genres: mergeArr(prev?.lastfm_artist_genres, entry.lastfm_artist_genres),
+      deezer_genres: mergeArr(prev?.deezer_genres, entry.deezer_genres),
+      apple_music_genres: mergeArr(prev?.apple_music_genres, entry.apple_music_genres),
+      release_date: entry.release_date || prev?.release_date || null
+    });
+    scheduleSingleTursoFlush();
   }
 
   async function fetchEveryNoiseArtistGenres(artistIds, onProgress = null, preFetchedTursoMap = null) {
@@ -44500,10 +45207,12 @@ shadowRoot.innerHTML = `
 
     const missingInIdb = uniqueIds.filter(id => !everyNoiseCache.has(id));
     if (missingInIdb.length > 0) {
-      const tursoEnResults = preFetchedTursoMap || await getArtistEveryNoiseFromTurso(missingInIdb);
+      const canUsePre = Boolean(preFetchedTursoMap?._flags?.includeEveryNoise && preFetchedTursoMap?._queriedIds);
+      const idsForTurso = canUsePre ? missingInIdb.filter(id => !preFetchedTursoMap._queriedIds.has(id)) : missingInIdb;
+      const fetchedTurso = idsForTurso.length > 0 ? await getArtistEveryNoiseFromTurso(idsForTurso) : null;
       const idbEntriesFromTurso = [];
       missingInIdb.forEach(id => {
-        const val = tursoEnResults.get(id);
+        const val = (canUsePre && preFetchedTursoMap._queriedIds.has(id)) ? preFetchedTursoMap.get(id) : fetchedTurso?.get(id);
         if (val && Array.isArray(val.genres)) {
           everyNoiseCache.set(id, val.genres);
           idbEntriesFromTurso.push({ key: id, val: val.genres });
@@ -44625,9 +45334,11 @@ shadowRoot.innerHTML = `
     const missingAfterIdb = uniqueEntries.filter(e => !lastfmArtistTagsCache.has(e.name));
     const withArtistId = missingAfterIdb.filter(e => e.id);
     if (withArtistId.length > 0) {
-      const tursoArtistResults = preFetchedTursoMap || await getArtistGenresFromTurso(withArtistId.map(e => e.id), { includeEveryNoise: false, includeLastfm: true });
+      const canUsePre = Boolean(preFetchedTursoMap?._flags?.includeLastfm && preFetchedTursoMap?._queriedIds);
+      const idsForTurso = canUsePre ? withArtistId.filter(e => !preFetchedTursoMap._queriedIds.has(e.id)).map(e => e.id) : withArtistId.map(e => e.id);
+      const fetchedTurso = idsForTurso.length > 0 ? await getArtistGenresFromTurso(idsForTurso, { includeEveryNoise: false, includeLastfm: true }) : null;
       withArtistId.forEach(entry => {
-        const val = tursoArtistResults.get(entry.id);
+        const val = (canUsePre && preFetchedTursoMap._queriedIds.has(entry.id)) ? preFetchedTursoMap.get(entry.id) : fetchedTurso?.get(entry.id);
         if (val && Array.isArray(val.lastfm_genres)) {
           const tags = synthesizeLastfmSplitTags(val.lastfm_genres);
           lastfmArtistTagsCache.set(entry.name, tags);
@@ -44723,8 +45434,7 @@ shadowRoot.innerHTML = `
     if (requestedSources) {
       reqSources = { ...requestedSources };
     } else {
-      const savedSettings = JSON.parse(localStorage.getItem(STORAGE_KEY_GENRE_FILTER_SOURCES) || '{"spotify_track":true,"lastfm_track":false,"lastfm_artist":false,"deezer":false,"everynoise_artist":true}');
-      reqSources = { ...savedSettings };
+      reqSources = getGenreFilterSources();
       if (!SPOTIFY_TRACK_GENRES_WORKING) {
         reqSources.spotify_artist = true;
         reqSources.lastfm_track = true;
@@ -44735,7 +45445,7 @@ shadowRoot.innerHTML = `
     }
     reqSources.apple_music = reqSources.deezer;
 
-    const needsExternal = reqSources.lastfm_track || reqSources.lastfm_artist || reqSources.deezer || reqSources.apple_music || reqSources.spotify_artist;
+    const needsExternal = reqSources.lastfm_track || reqSources.deezer || reqSources.apple_music;
     const needsTurso = needsExternal;
 
     const updateProgress = (msg) => {
@@ -44776,6 +45486,27 @@ shadowRoot.innerHTML = `
       return ids;
     };
 
+    const trackInfoList = tracks.map(t => {
+      const isLocal = Spicetify.URI.isLocal(t.uri);
+      const artistIds = isLocal ? [] : getTrackArtistIds(t);
+      const primaryArtistName = (t.artistName || t.artists?.[0]?.name || t.track?.artists?.[0]?.name || '').trim();
+      const namesLower = new Set();
+      if (primaryArtistName && primaryArtistName !== 'Unknown Artist') namesLower.add(primaryArtistName.toLowerCase());
+      const rawArtists = t.artists?.length ? t.artists : (t.track?.artists?.length ? t.track.artists : []);
+      rawArtists.forEach(a => {
+        const n = a?.name?.trim()?.toLowerCase();
+        if (n && n !== 'unknown artist') namesLower.add(n);
+      });
+      if (t.allArtists) {
+        t.allArtists.split(', ').forEach(n => {
+          const trimmed = n.trim().toLowerCase();
+          if (trimmed && trimmed !== 'unknown artist') namesLower.add(trimmed);
+        });
+      }
+      const trackId = isLocal ? null : (t.trackId || (t.uri?.startsWith('spotify:track:') ? t.uri.split(':')[2] : null));
+      return { isLocal, artistIds, primaryArtistId: artistIds[0] || null, primaryArtistName, artistNamesLower: Array.from(namesLower), trackId };
+    });
+
     const flattenAudioFeatures = (data) => {
       if (data && data.audio_features) {
         Object.assign(data, data.audio_features);
@@ -44787,11 +45518,13 @@ shadowRoot.innerHTML = `
 
     const branchWeights = {
       en: reqSources.everynoise_artist ? 25 : 0,
+      spArtist: reqSources.spotify_artist ? 15 : 0,
+      lfmArtist: reqSources.lastfm_artist ? 25 : 0,
       native: reqSources.spotify_track ? 35 : 0,
       ext: (needsTurso || needsExternal) ? 40 : 0
     };
-    const totalBranchWeight = (branchWeights.en + branchWeights.native + branchWeights.ext) || 1;
-    const branchProgress = { en: 0, native: 0, ext: 0 };
+    const totalBranchWeight = (branchWeights.en + branchWeights.spArtist + branchWeights.lfmArtist + branchWeights.native + branchWeights.ext) || 1;
+    const branchProgress = { en: 0, spArtist: 0, lfmArtist: 0, native: 0, ext: 0 };
     const activeBranches = Object.keys(branchWeights).filter(k => branchWeights[k] > 0);
     let lastReportedText = "";
     let soloStartTime = null;
@@ -44801,24 +45534,30 @@ shadowRoot.innerHTML = `
 
     const getSlowSourceLabel = (branchKey) => {
       if (branchKey === 'en') return "EveryNoise";
+      if (branchKey === 'spArtist') return "Spotify Artist";
+      if (branchKey === 'lfmArtist') return "Last.fm Artist";
       if (branchKey === 'native') return "Spotify Track";
       if (branchKey === 'ext') {
         if (reqSources.deezer || reqSources.apple_music) return "Deezer";
-        if (reqSources.lastfm_track || reqSources.lastfm_artist) return "Last.fm";
-        if (reqSources.spotify_artist) return "Spotify Artist";
+        if (reqSources.lastfm_track) return "Last.fm";
         return "External";
       }
       return "";
     };
 
+    const calcOverall = () => (
+      (branchProgress.en * branchWeights.en) +
+      (branchProgress.spArtist * branchWeights.spArtist) +
+      (branchProgress.lfmArtist * branchWeights.lfmArtist) +
+      (branchProgress.native * branchWeights.native) +
+      (branchProgress.ext * branchWeights.ext)
+    ) / totalBranchWeight;
+
     const notifyProgress = (branch, pct) => {
       branchProgress[branch] = Math.max(0, Math.min(100, pct));
       if (isCheckingTurso) return;
 
-      const overall = ((branchProgress.en * branchWeights.en) +
-                       (branchProgress.native * branchWeights.native) +
-                       (branchProgress.ext * branchWeights.ext)) / totalBranchWeight;
-      const rounded = Math.floor(overall);
+      const rounded = Math.floor(calcOverall());
       if (rounded > 0 && rounded < 100) {
         const unfinished = activeBranches.filter(k => branchProgress[k] < 100);
         let prefix = "";
@@ -44829,9 +45568,7 @@ shadowRoot.innerHTML = `
             soloTimer = setTimeout(() => {
               const currentUnfinished = activeBranches.filter(k => branchProgress[k] < 100);
               if (currentUnfinished.length === 1) {
-                const updatedOverall = Math.floor(((branchProgress.en * branchWeights.en) +
-                                                   (branchProgress.native * branchWeights.native) +
-                                                   (branchProgress.ext * branchWeights.ext)) / totalBranchWeight);
+                const updatedOverall = Math.floor(calcOverall());
                 if (updatedOverall > 0 && updatedOverall < 100) {
                   const delayedText = `${getSlowSourceLabel(currentUnfinished[0])} ${updatedOverall}%`;
                   lastReportedText = delayedText;
@@ -44860,121 +45597,89 @@ shadowRoot.innerHTML = `
 
     updateProgress("Checking...");
 
-    const runEveryNoiseBranch = async () => {
-      if (!reqSources.everynoise_artist) {
+    const runArtistBranches = async () => {
+      if (!reqSources.everynoise_artist && !reqSources.spotify_artist && !reqSources.lastfm_artist) {
         notifyProgress('en', 100);
-        return new Map();
+        notifyProgress('spArtist', 100);
+        notifyProgress('lfmArtist', 100);
+        return;
       }
 
       try {
-        const allPlaylistArtistIds = new Set();
-        tracks.forEach(t => {
-          getTrackArtistIds(t).forEach(id => allPlaylistArtistIds.add(id));
-        });
-
-        const missingInMem = Array.from(allPlaylistArtistIds).filter(id => !everyNoiseCache.has(id));
-        if (missingInMem.length > 0) {
-          const cachedIdb = await idb.getMany('everyNoiseArtistTags', missingInMem, CACHE_EXPIRE_EVERYNOISE);
-          cachedIdb.forEach((val, key) => {
-            if (val !== null && val !== undefined) {
-              everyNoiseCache.set(key, val);
+        const allPlaylistArtistIdsSet = new Set();
+        const primaryArtistEntryMap = new Map();
+        for (let i = 0; i < trackInfoList.length; i++) {
+          const info = trackInfoList[i];
+          if (info.isLocal) continue;
+          if (reqSources.everynoise_artist || reqSources.spotify_artist) {
+            info.artistIds.forEach(id => allPlaylistArtistIdsSet.add(id));
+          }
+          if (reqSources.lastfm_artist && info.primaryArtistName && info.primaryArtistName !== 'Unknown Artist' && info.primaryArtistName !== 'Various Artists') {
+            const cur = primaryArtistEntryMap.get(info.primaryArtistName);
+            if (!cur) {
+              primaryArtistEntryMap.set(info.primaryArtistName, { name: info.primaryArtistName, id: info.primaryArtistId, sampleTrackId: info.trackId });
+            } else {
+              if (!cur.id && info.primaryArtistId) cur.id = info.primaryArtistId;
+              if (!cur.sampleTrackId && info.trackId) cur.sampleTrackId = info.trackId;
             }
-          });
-        }
-
-        const inFlight = Array.from(allPlaylistArtistIds).filter(id => !everyNoiseCache.has(id) && pendingEveryNoiseFetches.has(id));
-        if (inFlight.length > 0) {
-          await Promise.allSettled(inFlight.map(id => pendingEveryNoiseFetches.get(id)));
-        }
-
-        const missingInIdb = Array.from(allPlaylistArtistIds).filter(id => !everyNoiseCache.has(id));
-        if (missingInIdb.length > 0) {
-          const tursoEnResults = await getArtistEveryNoiseFromTurso(missingInIdb);
-          const idbEntriesFromTurso = [];
-          tursoEnResults.forEach((val, id) => {
-            const genres = val.genres || [];
-            everyNoiseCache.set(id, genres);
-            idbEntriesFromTurso.push({ key: id, val: genres });
-          });
-          if (idbEntriesFromTurso.length > 0 && idb.setMany) {
-            await idb.setMany('everyNoiseArtistTags', idbEntriesFromTurso);
           }
         }
+        const allPlaylistArtistIds = Array.from(allPlaylistArtistIdsSet);
+        const primaryArtistEntries = Array.from(primaryArtistEntryMap.values());
 
-        const missingEverywhere = Array.from(allPlaylistArtistIds).filter(id => !everyNoiseCache.has(id));
-        if (missingEverywhere.length > 0) {
-          const artistsToSaveTurso = [];
-          const idbEntriesFromGw = [];
-          const chunks = [];
-          for (let i = 0; i < missingEverywhere.length; i += 50) {
-            chunks.push(missingEverywhere.slice(i, i + 50));
-          }
-
-          let processedCount = 0;
-          let chunkIndex = 0;
-          const CONCURRENCY = Math.min(6, chunks.length);
-
-          const processChunk = async (batch) => {
-            const sortedBatch = [...batch].sort();
-            const idsString = sortedBatch.join(',');
-            let data = null;
-
-            for (let attempt = 0; attempt < 2; attempt++) {
-              try {
-                const res = await fetch(`${EVERYNOISE_GATEWAY_URL}${idsString}`, { signal: AbortSignal.timeout(16000) });
-                if (res.ok) {
-                  data = await res.json();
-                  break;
-                }
-              } catch (_) {
-                if (attempt === 0) await new Promise(r => setTimeout(r, 250));
+        let preFetchedArtistTurso = null;
+        const enabledArtistCount = (reqSources.everynoise_artist ? 1 : 0) + (reqSources.spotify_artist ? 1 : 0) + (reqSources.lastfm_artist ? 1 : 0);
+        if (enabledArtistCount >= 2 && (allPlaylistArtistIds.length > 0 || primaryArtistEntries.length > 0)) {
+          await Promise.all([
+            (reqSources.everynoise_artist && allPlaylistArtistIds.length > 0) ? (async () => {
+              const missingMem = allPlaylistArtistIds.filter(id => !everyNoiseCache.has(id));
+              if (missingMem.length > 0) {
+                const cached = await idb.getMany('everyNoiseArtistTags', missingMem, CACHE_EXPIRE_EVERYNOISE);
+                cached.forEach((val, key) => { if (val !== null && val !== undefined) everyNoiseCache.set(key, val); });
               }
-            }
-
-            sortedBatch.forEach(artistId => {
-              if (data !== null) {
-                const rawGenres = (sortedBatch.length === 1 && Array.isArray(data)) ? data : ((typeof data === 'object' && !Array.isArray(data) && data[artistId]) || []);
-                everyNoiseCache.set(artistId, rawGenres);
-                idbEntriesFromGw.push({ key: artistId, val: rawGenres });
-                artistsToSaveTurso.push({ artist_id: artistId, genres: rawGenres });
-              } else {
-                everyNoiseCache.set(artistId, []);
+            })() : Promise.resolve(),
+            (reqSources.spotify_artist && allPlaylistArtistIds.length > 0) ? (async () => {
+              const missingMem = allPlaylistArtistIds.filter(id => !artistGenreCache.has(id));
+              if (missingMem.length > 0) {
+                const cached = await idb.getMany('artistGenres', missingMem, CACHE_EXPIRE_GENRES);
+                cached.forEach((val, key) => { if (Array.isArray(val)) artistGenreCache.set(key, val); });
               }
-            });
-
-            processedCount += sortedBatch.length;
-            notifyProgress('en', Math.round((processedCount / missingEverywhere.length) * 100));
-          };
-
-          const worker = async () => {
-            while (chunkIndex < chunks.length) {
-              const batch = chunks[chunkIndex++];
-              const batchPromise = processChunk(batch);
-              batch.forEach(id => pendingEveryNoiseFetches.set(id, batchPromise));
-              try {
-                await batchPromise;
-              } finally {
-                batch.forEach(id => pendingEveryNoiseFetches.delete(id));
+            })() : Promise.resolve(),
+            (reqSources.lastfm_artist && primaryArtistEntries.length > 0) ? (async () => {
+              const missingMem = primaryArtistEntries.filter(e => !lastfmArtistTagsCache.has(e.name));
+              if (missingMem.length > 0) {
+                const cached = await idb.getMany('lastfmArtistTags', missingMem.map(e => e.name), CACHE_EXPIRE_GENRES);
+                cached.forEach((val, key) => { if (val !== null && val !== undefined) lastfmArtistTagsCache.set(key, val); });
               }
-            }
-          };
-
-          await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
-
-          if (idbEntriesFromGw.length > 0 && idb.setMany) {
-            await idb.setMany('everyNoiseArtistTags', idbEntriesFromGw);
-          }
-
-          if (artistsToSaveTurso.length > 0) {
-            saveArtistEveryNoiseToTurso(artistsToSaveTurso).catch(() => {});
+            })() : Promise.resolve()
+          ]);
+          const missingEnIds = reqSources.everynoise_artist ? allPlaylistArtistIds.filter(id => !everyNoiseCache.has(id) && !pendingEveryNoiseFetches.has(id)) : [];
+          const missingSpIds = reqSources.spotify_artist ? allPlaylistArtistIds.filter(id => !artistGenreCache.has(id) && !pendingSpotifyArtistFetches.has(id)) : [];
+          const missingLfmIds = reqSources.lastfm_artist ? primaryArtistEntries.filter(e => e.id && !lastfmArtistTagsCache.has(e.name) && !pendingLfmArtistFetches.has(e.name.toLowerCase())).map(e => e.id) : [];
+          const nonEmptyCount = (missingEnIds.length > 0 ? 1 : 0) + (missingSpIds.length > 0 ? 1 : 0) + (missingLfmIds.length > 0 ? 1 : 0);
+          if (nonEmptyCount >= 2) {
+            preFetchedArtistTurso = await getArtistGenresFromTurso(
+              [...new Set([...missingEnIds, ...missingSpIds, ...missingLfmIds])],
+              { includeEveryNoise: missingEnIds.length > 0, includeLastfm: missingLfmIds.length > 0, includeSpotify: missingSpIds.length > 0 }
+            );
           }
         }
 
-        notifyProgress('en', 100);
-        return everyNoiseCache;
+        await Promise.all([
+          reqSources.everynoise_artist
+            ? fetchEveryNoiseArtistGenres(allPlaylistArtistIds, (p) => notifyProgress('en', p), preFetchedArtistTurso).catch(() => {}).finally(() => notifyProgress('en', 100))
+            : (notifyProgress('en', 100), Promise.resolve()),
+          reqSources.spotify_artist
+            ? fetchSpotifyArtistGenresFromCache(allPlaylistArtistIds, preFetchedArtistTurso).catch(() => {}).finally(() => notifyProgress('spArtist', 100))
+            : (notifyProgress('spArtist', 100), Promise.resolve()),
+          reqSources.lastfm_artist
+            ? fetchLastfmArtistGenres(primaryArtistEntries, (p) => notifyProgress('lfmArtist', p), preFetchedArtistTurso).catch(() => {}).finally(() => notifyProgress('lfmArtist', 100))
+            : (notifyProgress('lfmArtist', 100), Promise.resolve())
+        ]);
       } catch (err) {
         notifyProgress('en', 100);
-        return everyNoiseCache;
+        notifyProgress('spArtist', 100);
+        notifyProgress('lfmArtist', 100);
       }
     };
 
@@ -45083,15 +45788,13 @@ shadowRoot.innerHTML = `
         const isDataStale = (cached) => {
           if (!cached) return true;
           if (reqSources.lastfm_track && !cached.lastfm_track_genres?.length && !cached._lfm_track_checked) return true;
-          if (reqSources.lastfm_artist && !cached.lastfm_artist_genres?.length && !cached._lfm_artist_checked) return true;
           if (reqSources.deezer && !cached.deezer_genres?.length && !cached._deezer_checked) return true;
-          if (reqSources.spotify_artist && !cached.spotify_artist_genres?.length && !cached._sp_artist_checked) return true;
           return needsExternal ? isStaleByAge(cached) : false;
         };
 
         trackUris.forEach(uri => {
           const cached = sessionGenreCache.get(uri);
-          if (cached) {
+          if (cached && cached._turso_checked) {
             if (!isDataStale(cached)) finalGenresMap.set(uri, cached);
             else missingUris.push(uri);
           } else {
@@ -45105,6 +45808,7 @@ shadowRoot.innerHTML = `
             cachedGenresByUri = await getGenresFromTurso(urisNotInSession, 'ids');
             cachedGenresByUri.forEach(val => {
               hydrateCachedGenreRecord(val);
+              val._turso_checked = true;
               val._lfm_track_checked = true;
               val._lfm_artist_checked = true;
               val._deezer_checked = true;
@@ -45123,7 +45827,6 @@ shadowRoot.innerHTML = `
             missingUris.push(uri);
           } else {
             finalGenresMap.set(uri, cached);
-            sessionGenreCache.set(uri, cached);
           }
         });
 
@@ -45164,8 +45867,9 @@ shadowRoot.innerHTML = `
         const isrcsNotInSession = [];
 
         isrcsToCheck.forEach(isrc => {
-          if (sessionGenreCache.has(isrc)) {
-            cachedGenresByIsrc.set(isrc, sessionGenreCache.get(isrc));
+          const cachedByIsrc = sessionGenreCache.get(isrc);
+          if (cachedByIsrc && cachedByIsrc._turso_checked) {
+            cachedGenresByIsrc.set(isrc, cachedByIsrc);
           } else {
             isrcsNotInSession.push(isrc);
           }
@@ -45176,6 +45880,7 @@ shadowRoot.innerHTML = `
           tursoResults.forEach((val, key) => {
             const flattenedVal = flattenAudioFeatures(val);
             hydrateCachedGenreRecord(flattenedVal);
+            flattenedVal._turso_checked = true;
             flattenedVal._lfm_track_checked = true;
             flattenedVal._lfm_artist_checked = true;
             flattenedVal._deezer_checked = true;
@@ -45194,7 +45899,6 @@ shadowRoot.innerHTML = `
             const cached = cachedGenresByIsrc.get(isrc);
             if (!isDataStale(cached)) {
               finalGenresMap.set(uri, cached);
-              sessionGenreCache.set(uri, cached);
               return;
             }
           }
@@ -45205,7 +45909,7 @@ shadowRoot.innerHTML = `
           if (Spicetify.URI.isLocal(trackUri)) {
             return {
               success: true, isrc: null, canSave: false,
-              data: { spotify_artist_genres: [], lastfm_track_genres: [], lastfm_artist_genres: [], deezer_genres: [], apple_music_genres: [], release_date: null, _lfm_track_checked: reqSources.lastfm_track, _lfm_artist_checked: reqSources.lastfm_artist, _deezer_checked: reqSources.deezer, _sp_artist_checked: reqSources.spotify_artist }
+              data: { spotify_artist_genres: [], lastfm_track_genres: [], lastfm_artist_genres: [], deezer_genres: [], apple_music_genres: [], release_date: null, _turso_checked: true, _lfm_track_checked: reqSources.lastfm_track, _lfm_artist_checked: reqSources.lastfm_artist, _deezer_checked: reqSources.deezer, _sp_artist_checked: reqSources.spotify_artist }
             };
           }
           const trackId = trackUri.split(':')[2];
@@ -45215,69 +45919,24 @@ shadowRoot.innerHTML = `
           if (!trackDetails || trackDetails.error || !trackDetails?.artists?.length) {
             return {
               success: true, isrc: null, canSave: false,
-              data: { spotify_artist_genres: [], lastfm_track_genres: [], lastfm_artist_genres: [], deezer_genres: [], apple_music_genres: [], release_date: null, _lfm_track_checked: reqSources.lastfm_track, _lfm_artist_checked: reqSources.lastfm_artist, _deezer_checked: reqSources.deezer, _sp_artist_checked: reqSources.spotify_artist }
+              data: { spotify_artist_genres: [], lastfm_track_genres: [], lastfm_artist_genres: [], deezer_genres: [], apple_music_genres: [], release_date: null, _turso_checked: true, _lfm_track_checked: reqSources.lastfm_track, _lfm_artist_checked: reqSources.lastfm_artist, _deezer_checked: reqSources.deezer, _sp_artist_checked: reqSources.spotify_artist }
             };
           }
 
           const isrc = trackDetails.external_ids?.isrc || null;
-          const artistIds = [...new Set(trackDetails.artists.map(a => a.uri ? a.uri.split(':')[2] : (a.id || null)).filter(Boolean))];
-          const spotifyGenres = new Set(existingData?.spotify_artist_genres || []);
-          const artistIdsToFetch = [];
-          const needsSpotifyArtist = reqSources.spotify_artist && !existingData?._sp_artist_checked;
-
-          for (const id of artistIds) {
-            if (artistGenreCache.has(id)) {
-              artistGenreCache.get(id).forEach(g => spotifyGenres.add(g));
-            } else {
-              const dbCached = await idb.get('artistGenres', id, CACHE_EXPIRE_GENRES);
-              if (dbCached) {
-                artistGenreCache.set(id, dbCached);
-                dbCached.forEach(g => spotifyGenres.add(g));
-              } else if (needsSpotifyArtist) {
-                artistIdsToFetch.push(id);
-              }
-            }
-          }
-
-          if (needsSpotifyArtist && DEVELOPER_HAS_SPOTIFY_PREMIUM && artistIdsToFetch.length > 0) {
-            for (let i = 0; i < artistIdsToFetch.length; i += 50) {
-              const batch = artistIdsToFetch.slice(i, i + 50);
-              try {
-                const token = await get_S_Client_Token();
-                if (!token) throw new Error('No token');
-                const res = await fetch(`https://api.spotify.com/v1/artists?ids=${batch.join(',')}&locale=en`, {
-                  headers: { 'Authorization': `Bearer ${token}`, 'Accept-Language': 'en,en-US;q=0.9' }
-                });
-                if (res.ok) {
-                  const artistData = await res.json();
-                  artistData?.artists?.forEach(artist => {
-                    if (!artist) return;
-                    const genres = (artist.genres || []).map(g => g.toLowerCase()).filter(g => !containsYear(g) && !/^\d+$/.test(g));
-                    artistGenreCache.set(artist.id, genres);
-                    idb.set('artistGenres', artist.id, genres);
-                    genres.forEach(g => spotifyGenres.add(g));
-                  });
-                }
-              } catch (e) {
-                isCompleteSuccess = false;
-              }
-            }
-          }
+          const spotifyGenres = existingData?.spotify_artist_genres || [];
 
           let lfmTrackGenres = existingData?.lastfm_track_genres || [];
-          let lfmArtistGenres = existingData?.lastfm_artist_genres || [];
+          const lfmArtistGenres = existingData?.lastfm_artist_genres || [];
           const needsLfmTrack = reqSources.lastfm_track && !existingData?._lfm_track_checked;
-          const needsLfmArtist = reqSources.lastfm_artist && !existingData?._lfm_artist_checked;
 
-          if (needsLfmTrack || needsLfmArtist) {
-            const lastfmGenresData = await getLastfmGenres(trackDetails.artists[0].name, trackDetails.name, !needsLfmArtist, !needsLfmTrack);
+          if (needsLfmTrack) {
+            const lastfmGenresData = await getLastfmGenres(trackDetails.artists[0].name, trackDetails.name, true, false);
             if (lastfmGenresData === null) {
               isCompleteSuccess = false;
             } else {
               const artistNames = trackDetails.artists.map(a => a.name.toLowerCase());
-              const filterGenres = (genres) => genres.filter(g => !containsYear(g) && !artistNames.some(name => g.includes(name)));
-              if (needsLfmTrack) lfmTrackGenres = filterGenres(lastfmGenresData.track_genres);
-              if (needsLfmArtist) lfmArtistGenres = filterGenres(lastfmGenresData.artist_genres);
+              lfmTrackGenres = lastfmGenresData.track_genres.filter(g => !containsYear(g) && !artistNames.some(name => g.includes(name)));
             }
           }
 
@@ -45310,12 +45969,13 @@ shadowRoot.innerHTML = `
             canSave: isCompleteSuccess,
             data: {
               isrc,
-              spotify_artist_genres: Array.from(spotifyGenres),
+              spotify_artist_genres: Array.isArray(spotifyGenres) ? spotifyGenres : [],
               lastfm_track_genres: lfmTrackGenres,
               lastfm_artist_genres: lfmArtistGenres,
               deezer_genres,
               apple_music_genres,
               release_date: releaseDateInDays,
+              _turso_checked: true,
               _lfm_track_checked: reqSources.lastfm_track || existingData?._lfm_track_checked || false,
               _lfm_artist_checked: reqSources.lastfm_artist || existingData?._lfm_artist_checked || false,
               _deezer_checked: reqSources.deezer || existingData?._deezer_checked || false,
@@ -45325,85 +45985,22 @@ shadowRoot.innerHTML = `
         };
 
         if (tracksNeedingExternalFetch.length > 0 && needsExternal) {
-          const uniqueArtistIdsForCache = new Set();
-          const uniqueLfmArtistNames = new Set();
-
-          tracksNeedingExternalFetch.forEach(item => {
-            const trk = item.originalTrack;
-            if (trk?.artistUris) {
-              trk.artistUris.forEach(uri => {
-                const aId = uri ? uri.split(':')[2] : null;
-                if (aId) uniqueArtistIdsForCache.add(aId);
-              });
-            }
-            const lfmName = trk?.artistName || trk?.artists?.[0]?.name;
-            if (lfmName) uniqueLfmArtistNames.add(lfmName);
-          });
-
-          const artistIdsArr = Array.from(uniqueArtistIdsForCache);
-          if (artistIdsArr.length > 0) {
-            const spIds = artistIdsArr.filter(id => !artistGenreCache.has(id));
-            if (spIds.length > 0) {
-              const cached = await idb.getMany('artistGenres', spIds, CACHE_EXPIRE_GENRES);
-              cached.forEach((val, key) => artistGenreCache.set(key, val));
-            }
-          }
-
-          if (reqSources.lastfm_artist || reqSources.lastfm_track) {
-            const lfmArr = Array.from(uniqueLfmArtistNames);
-            const lfmMissing = lfmArr.filter(name => !lastfmArtistTagsCache.has(name));
-            if (lfmMissing.length > 0) {
-              const cached = await idb.getMany('lastfmArtistTags', lfmMissing, CACHE_EXPIRE_GENRES);
-              cached.forEach((val, key) => {
-                if (val !== null && val !== undefined) lastfmArtistTagsCache.set(key, val);
-              });
-            }
-            if (reqSources.lastfm_artist) {
-              const primaryIdByName = new Map();
-              tracksNeedingExternalFetch.forEach(item => {
-                const trk = item.originalTrack;
-                const name = trk?.artistName || trk?.artists?.[0]?.name;
-                const aId = trk?.artistUris?.[0]?.split(':')[2] || trk?.artists?.[0]?.id || trk?.artists?.[0]?.uri?.split(':')[2];
-                if (name && aId && !lastfmArtistTagsCache.has(name) && !primaryIdByName.has(name)) {
-                  primaryIdByName.set(name, aId);
-                }
-              });
-              if (primaryIdByName.size > 0) {
-                const tursoLfm = await getArtistGenresFromTurso(Array.from(primaryIdByName.values()), { includeEveryNoise: false, includeLastfm: true });
-                const idbWarm = [];
-                primaryIdByName.forEach((aId, name) => {
-                  const val = tursoLfm.get(aId);
-                  if (val && Array.isArray(val.lastfm_genres)) {
-                    const tags = synthesizeLastfmSplitTags(val.lastfm_genres);
-                    lastfmArtistTagsCache.set(name, tags);
-                    idbWarm.push({ key: name, val: tags });
-                  }
-                });
-                if (idbWarm.length > 0 && idb.setMany) {
-                  await idb.setMany('lastfmArtistTags', idbWarm);
-                }
-              }
-            }
-          }
-
           const totalToFetch = tracksNeedingExternalFetch.length;
           let fetchedCount = 0;
           const sharedQueue = [...tracksNeedingExternalFetch];
 
+          const toSaveArr = (arr, checked) => (Array.isArray(arr) && (checked || arr.length > 0)) ? arr : null;
+
           const processItemResult = async (item, gatewayUrl = null) => {
-            const existingData = sessionGenreCache.get(item.uri) || cachedGenresByIsrc.get(item.isrc) || null;
+            const existingData = cachedGenresByUri.get(item.uri) || cachedGenresByIsrc.get(item.isrc) || (sessionGenreCache.get(item.uri)?._turso_checked ? sessionGenreCache.get(item.uri) : null);
             let wasStale = false;
             const origLfmTrack = existingData?._lfm_track_checked;
-            const origLfmArtist = existingData?._lfm_artist_checked;
             const origDeezer = existingData?._deezer_checked;
-            const origSpArtist = existingData?._sp_artist_checked;
 
             if (existingData && isStaleByAge(existingData)) {
               wasStale = true;
               existingData._lfm_track_checked = false;
-              existingData._lfm_artist_checked = false;
               existingData._deezer_checked = false;
-              existingData._sp_artist_checked = false;
             }
 
             let synthDetails = item.details;
@@ -45436,17 +46033,20 @@ shadowRoot.innerHTML = `
             let tursoNeedsUpdate = needsTurso;
             if (tursoNeedsUpdate && existingData && !wasStale) {
               const fLfmT = reqSources.lastfm_track && !origLfmTrack;
-              const fLfmA = reqSources.lastfm_artist && !origLfmArtist;
               const fDeezer = reqSources.deezer && !origDeezer;
-              const fSpA = reqSources.spotify_artist && !origSpArtist;
-              if (!fLfmT && !fLfmA && !fDeezer && !fSpA) tursoNeedsUpdate = false;
+              if (!fLfmT && !fDeezer) tursoNeedsUpdate = false;
             }
 
             if (tursoNeedsUpdate && result.canSave !== false) {
               itemsToSaveMap.set(item.uri, {
                 track_uri: item.uri,
                 isrc: item.isrc,
-                ...result.data
+                spotify_artist_genres: toSaveArr(result.data.spotify_artist_genres, false),
+                lastfm_track_genres: toSaveArr(result.data.lastfm_track_genres, reqSources.lastfm_track),
+                lastfm_artist_genres: toSaveArr(result.data.lastfm_artist_genres, false),
+                deezer_genres: toSaveArr(result.data.deezer_genres, reqSources.deezer),
+                apple_music_genres: toSaveArr(result.data.apple_music_genres, false),
+                release_date: result.data.release_date || null
               });
             }
           };
@@ -45541,25 +46141,6 @@ shadowRoot.innerHTML = `
             const workers = Array(Math.min(totalConcurrency, sharedQueue.length)).fill(null).map(() => worker());
             await Promise.all(workers);
           }
-        } else {
-          tracksNeedingExternalFetch.forEach(item => {
-            const existingData = sessionGenreCache.get(item.uri) || cachedGenresByIsrc.get(item.isrc) || null;
-            const dummyData = {
-              isrc: item.isrc,
-              spotify_artist_genres: existingData?.spotify_artist_genres || [],
-              lastfm_track_genres: existingData?.lastfm_track_genres || [],
-              lastfm_artist_genres: existingData?.lastfm_artist_genres || [],
-              deezer_genres: existingData?.deezer_genres || [],
-              apple_music_genres: existingData?.apple_music_genres || [],
-              release_date: existingData?.release_date || null,
-              _lfm_track_checked: reqSources.lastfm_track || existingData?._lfm_track_checked || false,
-              _lfm_artist_checked: reqSources.lastfm_artist || existingData?._lfm_artist_checked || false,
-              _deezer_checked: reqSources.deezer || existingData?._deezer_checked || false,
-              _sp_artist_checked: reqSources.spotify_artist || existingData?._sp_artist_checked || false
-            };
-            finalGenresMap.set(item.uri, dummyData);
-            itemsToSaveMap.set(item.uri, { track_uri: item.uri, isrc: item.isrc, ...dummyData });
-          });
         }
 
         notifyProgress('ext', 100);
@@ -45572,8 +46153,8 @@ shadowRoot.innerHTML = `
       }
     };
 
-    const [everyNoiseMap, nativeTrackMap, externalResult] = await Promise.all([
-      runEveryNoiseBranch(),
+    const [, nativeTrackMap, externalResult] = await Promise.all([
+      runArtistBranches(),
       runNativeTrackBranch(),
       runExternalPipelineBranch()
     ]);
@@ -45590,55 +46171,76 @@ shadowRoot.innerHTML = `
     const finalGenresMap = new Map();
     const trackGenreMap = new Map();
 
-    tracks.forEach(track => {
+    tracks.forEach((track, idx) => {
       const uri = track.uri;
-      const isLocal = Spicetify.URI.isLocal(uri);
+      const info = trackInfoList[idx];
+      const isLocal = info.isLocal;
 
-      const extData = externalResult.externalMap.get(uri) || sessionGenreCache.get(uri) || {};
-      hydrateCachedGenreRecord(extData);
+      const sessionPrev = sessionGenreCache.get(uri) || null;
+      const extData = externalResult.externalMap.get(uri) || sessionPrev || {};
 
-      let nativeGenres = isLocal ? [] : extData.spotify_track_genres;
-      let nativeScores = isLocal ? null : (extData._spotify_track_genre_scores || null);
+      let nativeGenres = isLocal ? [] : (extData.spotify_track_genres ?? sessionPrev?.spotify_track_genres);
+      let nativeScores = isLocal ? null : (extData._spotify_track_genre_scores || sessionPrev?._spotify_track_genre_scores || null);
       if (reqSources.spotify_track && !isLocal) {
-        nativeGenres = nativeTrackMap.get(uri) || extData.spotify_track_genres || [];
-        nativeScores = nativeTrackMap._scoresMap?.get(uri) || extData._spotify_track_genre_scores || null;
+        nativeGenres = nativeTrackMap.get(uri) || extData.spotify_track_genres || sessionPrev?.spotify_track_genres || [];
+        nativeScores = nativeTrackMap._scoresMap?.get(uri) || extData._spotify_track_genre_scores || sessionPrev?._spotify_track_genre_scores || null;
       }
 
-      let enGenres = extData.everynoise_artist_genres || [];
+      const trackArtistIds = !isLocal && (reqSources.everynoise_artist || reqSources.spotify_artist) ? info.artistIds : [];
+
+      let enGenres = isLocal ? [] : (extData.everynoise_artist_genres || sessionPrev?.everynoise_artist_genres || []);
       if (reqSources.everynoise_artist && !isLocal) {
         const enSet = new Set();
-        getTrackArtistIds(track).forEach(id => {
-          const fromCache = everyNoiseMap.get(id) || everyNoiseCache.get(id);
-          if (fromCache && Array.isArray(fromCache)) {
-            fromCache.forEach(g => enSet.add(g));
-          }
+        trackArtistIds.forEach(id => {
+          const fromCache = everyNoiseCache.get(id);
+          if (Array.isArray(fromCache)) fromCache.forEach(g => enSet.add(g));
         });
         enGenres = Array.from(enSet);
       }
 
-      let parsedReleaseDate = extData.release_date || null;
+      let spArtistGenres = isLocal ? [] : (extData.spotify_artist_genres || sessionPrev?.spotify_artist_genres || []);
+      if (reqSources.spotify_artist && !isLocal) {
+        const spSet = new Set();
+        trackArtistIds.forEach(id => {
+          const fromCache = artistGenreCache.get(id);
+          if (Array.isArray(fromCache)) fromCache.forEach(g => spSet.add(g));
+        });
+        spArtistGenres = Array.from(spSet);
+      }
+
+      let lfmArtistGenres = isLocal ? [] : (extData.lastfm_artist_genres || sessionPrev?.lastfm_artist_genres || []);
+      if (reqSources.lastfm_artist && !isLocal) {
+        const cachedLfmArtist = info.primaryArtistName ? lastfmArtistTagsCache.get(info.primaryArtistName) : null;
+        if (Array.isArray(cachedLfmArtist)) {
+          lfmArtistGenres = cachedLfmArtist.filter(g => !containsYear(g) && !info.artistNamesLower.some(n => g.includes(n)));
+        }
+      }
+
+      let parsedReleaseDate = extData.release_date || sessionPrev?.release_date || null;
       if (!parsedReleaseDate && track.releaseDate) {
         const ms = new Date(track.releaseDate).getTime();
         if (!isNaN(ms)) parsedReleaseDate = Math.floor(ms / 86400000);
       }
 
       const trackRecord = {
-        isrc: extData.isrc || track.track?.external_ids?.isrc || track.external_ids?.isrc || null,
-        spotify_artist_genres: extData.spotify_artist_genres || [],
-        lastfm_track_genres: extData.lastfm_track_genres || [],
-        lastfm_artist_genres: extData.lastfm_artist_genres || [],
-        deezer_genres: extData.deezer_genres || [],
-        apple_music_genres: extData.apple_music_genres || [],
+        isrc: extData.isrc || sessionPrev?.isrc || track.track?.external_ids?.isrc || track.external_ids?.isrc || null,
+        spotify_artist_genres: spArtistGenres,
+        lastfm_track_genres: extData.lastfm_track_genres || sessionPrev?.lastfm_track_genres || [],
+        lastfm_artist_genres: lfmArtistGenres,
+        deezer_genres: extData.deezer_genres || sessionPrev?.deezer_genres || [],
+        apple_music_genres: extData.apple_music_genres || sessionPrev?.apple_music_genres || [],
         everynoise_artist_genres: enGenres,
         spotify_track_genres: nativeGenres,
         _spotify_track_genre_scores: nativeScores,
         release_date: parsedReleaseDate,
-        _lfm_track_checked: extData._lfm_track_checked || reqSources.lastfm_track || false,
-        _lfm_artist_checked: extData._lfm_artist_checked || reqSources.lastfm_artist || false,
-        _deezer_checked: extData._deezer_checked || reqSources.deezer || false,
-        _sp_artist_checked: extData._sp_artist_checked || reqSources.spotify_artist || false,
-        _everynoise_checked: reqSources.everynoise_artist || extData._everynoise_checked || false
+        _turso_checked: Boolean(extData._turso_checked || sessionPrev?._turso_checked),
+        _lfm_track_checked: extData._lfm_track_checked || sessionPrev?._lfm_track_checked || reqSources.lastfm_track || false,
+        _lfm_artist_checked: extData._lfm_artist_checked || sessionPrev?._lfm_artist_checked || reqSources.lastfm_artist || false,
+        _deezer_checked: extData._deezer_checked || sessionPrev?._deezer_checked || reqSources.deezer || false,
+        _sp_artist_checked: extData._sp_artist_checked || sessionPrev?._sp_artist_checked || reqSources.spotify_artist || false,
+        _everynoise_checked: reqSources.everynoise_artist || extData._everynoise_checked || sessionPrev?._everynoise_checked || false
       };
+      hydrateCachedGenreRecord(trackRecord);
 
       finalGenresMap.set(uri, trackRecord);
       sessionGenreCache.set(uri, trackRecord);
@@ -49885,7 +50487,7 @@ shadowRoot.innerHTML = `
                 onSettingsClick: (event) => {
                     event.stopPropagation();
                     closeAllMenus();
-                    const currentSources = JSON.parse(localStorage.getItem(STORAGE_KEY_GENRE_FILTER_SOURCES) || '{"spotify_track":true,"lastfm_track":false,"lastfm_artist":false,"deezer":false,"everynoise_artist":true}');
+                    const currentSources = getGenreFilterSources();
                     showGenreFilterSettingsModal(currentSources, (newSources) => {
                         localStorage.setItem(STORAGE_KEY_GENRE_FILTER_SOURCES, JSON.stringify(newSources));
                         showNotification("Genre Filter sources updated.");
@@ -52273,6 +52875,7 @@ shadowRoot.innerHTML = `
       saveButtonText: "Done",
       toggleOptions: [
         { id: "spotify_track", label: "Spotify (Track Genres)", checked: !!currentConfig.spotify_track },
+        { id: "spotify_artist", label: "Spotify (Artist Tags)", checked: !!currentConfig.spotify_artist },
         { id: "everynoise_artist", label: "Every Noise (Artist Tags)", checked: !!currentConfig.everynoise_artist },
         { id: "lastfm_artist", label: "Last.fm (Artist Tags)", checked: !!currentConfig.lastfm_artist }
       ],
@@ -52287,7 +52890,7 @@ shadowRoot.innerHTML = `
         disableWhenAllFalse: ["everynoise_artist", "lastfm_artist"]
       },
       onSave: (results, saveBtn, closeModal) => {
-        if (!results.spotify_track && !results.everynoise_artist && !results.lastfm_artist) {
+        if (!results.spotify_track && !results.spotify_artist && !results.everynoise_artist && !results.lastfm_artist) {
           showNotification("Please keep at least one genre source enabled.", true);
           return;
         }
@@ -52342,7 +52945,7 @@ shadowRoot.innerHTML = `
     }).filter(Boolean);
     const spotifyTrackUris = tracks.map(t => t.uri).filter(uri => uri && uri.startsWith('spotify:track:'));
 
-    const DEFAULT_ANALYSIS_GENRE_CONFIG = { spotify_track: true, everynoise_artist: true, lastfm_artist: true, artist_limit: 0 };
+    const DEFAULT_ANALYSIS_GENRE_CONFIG = { spotify_track: true, spotify_artist: true, everynoise_artist: true, lastfm_artist: true, artist_limit: 0 };
     let analysisGenreConfig = { ...DEFAULT_ANALYSIS_GENRE_CONFIG };
     try {
         const storedCfg = localStorage.getItem(STORAGE_KEY_ANALYSIS_GENRE_SOURCES);
@@ -52351,11 +52954,12 @@ shadowRoot.innerHTML = `
             if (parsed && typeof parsed === 'object') {
                 analysisGenreConfig = {
                     spotify_track: parsed.spotify_track !== undefined ? !!parsed.spotify_track : true,
+                    spotify_artist: parsed.spotify_artist !== undefined ? !!parsed.spotify_artist : true,
                     everynoise_artist: parsed.everynoise_artist !== undefined ? !!parsed.everynoise_artist : true,
                     lastfm_artist: parsed.lastfm_artist !== undefined ? !!parsed.lastfm_artist : true,
                     artist_limit: Number.isFinite(Number(parsed.artist_limit)) && Number(parsed.artist_limit) > 0 ? Math.floor(Number(parsed.artist_limit)) : 0
                 };
-                if (!analysisGenreConfig.spotify_track && !analysisGenreConfig.everynoise_artist && !analysisGenreConfig.lastfm_artist) {
+                if (!analysisGenreConfig.spotify_track && !analysisGenreConfig.spotify_artist && !analysisGenreConfig.everynoise_artist && !analysisGenreConfig.lastfm_artist) {
                     analysisGenreConfig.spotify_track = true;
                 }
             }
@@ -52410,6 +53014,7 @@ shadowRoot.innerHTML = `
 
     let nativeGenresMap = new Map();
     let spotifyTrackFetched = false;
+    let spotifyArtistFetched = false;
     let everyNoiseFetched = false;
     let lastfmArtistFetched = false;
     let skippedByLimit = { everynoise_artist: false, lastfm_artist: false };
@@ -52421,10 +53026,12 @@ shadowRoot.innerHTML = `
         skippedByLimit = { everynoise_artist: false, lastfm_artist: false };
 
         if (targetConfig.spotify_track && spotifyTrackUris.length === 0) spotifyTrackFetched = true;
+        if (targetConfig.spotify_artist && allPlaylistArtistIds.length === 0) spotifyArtistFetched = true;
         if (targetConfig.everynoise_artist && allPlaylistArtistIds.length === 0) everyNoiseFetched = true;
         if (targetConfig.lastfm_artist && primaryArtistEntries.length === 0) lastfmArtistFetched = true;
 
         let wantSpotify = !!targetConfig.spotify_track && !spotifyTrackFetched;
+        let wantSpArtist = !!targetConfig.spotify_artist && !spotifyArtistFetched;
         let wantEn = !!targetConfig.everynoise_artist && !everyNoiseFetched;
         let wantLfm = !!targetConfig.lastfm_artist && !lastfmArtistFetched;
 
@@ -52460,42 +53067,56 @@ shadowRoot.innerHTML = `
             ]);
         }
 
-        const activeCount = (wantSpotify ? 1 : 0) + (wantEn ? 1 : 0) + (wantLfm ? 1 : 0);
+        const activeCount = (wantSpotify ? 1 : 0) + (wantSpArtist ? 1 : 0) + (wantEn ? 1 : 0) + (wantLfm ? 1 : 0);
         if (activeCount === 0) {
             onProgress?.(100);
             return;
         }
 
         let pSp = wantSpotify ? 0 : 100;
+        let pSpArtist = wantSpArtist ? 0 : 100;
         let pEn = wantEn ? 0 : 100;
         let pLfm = wantLfm ? 0 : 100;
         const report = () => {
-            const sum = (wantSpotify ? pSp : 0) + (wantEn ? pEn : 0) + (wantLfm ? pLfm : 0);
+            const sum = (wantSpotify ? pSp : 0) + (wantSpArtist ? pSpArtist : 0) + (wantEn ? pEn : 0) + (wantLfm ? pLfm : 0);
             onProgress?.(Math.min(100, Math.round(sum / activeCount)));
         };
 
         let preFetchedTursoMap = null;
-        if (wantEn && wantLfm) {
+        const artistSourcesWanted = (wantEn ? 1 : 0) + (wantLfm ? 1 : 0) + (wantSpArtist ? 1 : 0);
+        if (artistSourcesWanted >= 2) {
             await Promise.all([
-                (async () => {
+                wantEn ? (async () => {
                     const missingMem = allPlaylistArtistIds.filter(id => !everyNoiseCache.has(id));
                     if (missingMem.length > 0) {
                         const cached = await idb.getMany('everyNoiseArtistTags', missingMem, CACHE_EXPIRE_EVERYNOISE);
                         cached.forEach((val, key) => { if (val !== null && val !== undefined) everyNoiseCache.set(key, val); });
                     }
-                })(),
-                (async () => {
+                })() : Promise.resolve(),
+                wantLfm ? (async () => {
                     const missingMem = primaryArtistEntries.filter(e => !lastfmArtistTagsCache.has(e.name));
                     if (missingMem.length > 0) {
                         const cached = await idb.getMany('lastfmArtistTags', missingMem.map(e => e.name), CACHE_EXPIRE_GENRES);
                         cached.forEach((val, key) => { if (val !== null && val !== undefined) lastfmArtistTagsCache.set(key, val); });
                     }
-                })()
+                })() : Promise.resolve(),
+                wantSpArtist ? (async () => {
+                    const missingMem = allPlaylistArtistIds.filter(id => !artistGenreCache.has(id));
+                    if (missingMem.length > 0) {
+                        const cached = await idb.getMany('artistGenres', missingMem, CACHE_EXPIRE_GENRES);
+                        cached.forEach((val, key) => { if (Array.isArray(val)) artistGenreCache.set(key, val); });
+                    }
+                })() : Promise.resolve()
             ]);
-            const missingEnIds = allPlaylistArtistIds.filter(id => !everyNoiseCache.has(id));
-            const missingLfmIds = primaryArtistEntries.filter(e => !lastfmArtistTagsCache.has(e.name) && e.id).map(e => e.id);
-            if (missingEnIds.length > 0 && missingLfmIds.length > 0) {
-                preFetchedTursoMap = await getArtistGenresFromTurso([...new Set([...missingEnIds, ...missingLfmIds])], { includeEveryNoise: true, includeLastfm: true });
+            const missingEnIds = wantEn ? allPlaylistArtistIds.filter(id => !everyNoiseCache.has(id)) : [];
+            const missingLfmIds = wantLfm ? primaryArtistEntries.filter(e => !lastfmArtistTagsCache.has(e.name) && e.id).map(e => e.id) : [];
+            const missingSpIds = wantSpArtist ? allPlaylistArtistIds.filter(id => !artistGenreCache.has(id)) : [];
+            const nonEmptyCount = (missingEnIds.length > 0 ? 1 : 0) + (missingLfmIds.length > 0 ? 1 : 0) + (missingSpIds.length > 0 ? 1 : 0);
+            if (nonEmptyCount >= 2) {
+                preFetchedTursoMap = await getArtistGenresFromTurso(
+                    [...new Set([...missingEnIds, ...missingLfmIds, ...missingSpIds])],
+                    { includeEveryNoise: missingEnIds.length > 0, includeLastfm: missingLfmIds.length > 0, includeSpotify: missingSpIds.length > 0 }
+                );
             }
         }
 
@@ -52505,6 +53126,14 @@ shadowRoot.innerHTML = `
                 nativeGenresMap = await fetchNativeSpotifyTrackGenresBatch(spotifyTrackUris);
                 spotifyTrackFetched = true;
                 pSp = 100;
+                report();
+            })());
+        }
+        if (wantSpArtist) {
+            tasks.push((async () => {
+                await fetchSpotifyArtistGenresFromCache(allPlaylistArtistIds, preFetchedTursoMap);
+                spotifyArtistFetched = true;
+                pSpArtist = 100;
                 report();
             })());
         }
@@ -52590,6 +53219,7 @@ shadowRoot.innerHTML = `
           Object.keys(decadeStats).forEach(d => { decadeStats[d].genres = {}; });
 
           const useSpotify = !!analysisGenreConfig.spotify_track && spotifyTrackFetched;
+          const useSpArtist = !!analysisGenreConfig.spotify_artist && spotifyArtistFetched;
           const useEn = !!analysisGenreConfig.everynoise_artist && everyNoiseFetched && !skippedByLimit.everynoise_artist;
           const useLfm = !!analysisGenreConfig.lastfm_artist && lastfmArtistFetched && !skippedByLimit.lastfm_artist;
 
@@ -52606,6 +53236,20 @@ shadowRoot.innerHTML = `
                       const norm = normalizeGenre(raw);
                       if (!norm || isCountryOnly(norm) || isPureMoodDescriptorForFilter(norm)) continue;
                       trackGenres.add(norm);
+                  }
+              }
+
+              if (useSpArtist && rec.artistIds.length > 0) {
+                  for (const aId of rec.artistIds) {
+                      const spTags = artistGenreCache.get(aId);
+                      if (!Array.isArray(spTags) || spTags.length === 0) continue;
+                      for (const rawTag of spTags) {
+                          const raw = (typeof rawTag === 'string' ? rawTag : (rawTag?.name || '')).toLowerCase().trim();
+                          if (!raw || /^\d+$/.test(raw) || isCountryOnly(raw)) continue;
+                          const norm = normalizeGenre(raw);
+                          if (!norm || isCountryOnly(norm) || isPureMoodDescriptorForFilter(norm)) continue;
+                          trackGenres.add(norm);
+                      }
                   }
               }
 
@@ -54710,9 +55354,10 @@ shadowRoot.innerHTML = `
           if (isFetchingAnalysisGenres || isAnalysisModalClosed) return;
           analysisGenreConfig = nextConfig;
           const needsSpotify = !!analysisGenreConfig.spotify_track && !spotifyTrackFetched && spotifyTrackUris.length > 0;
+          const needsSpArtist = !!analysisGenreConfig.spotify_artist && !spotifyArtistFetched && allPlaylistArtistIds.length > 0;
           const needsEn = !!analysisGenreConfig.everynoise_artist && !everyNoiseFetched && allPlaylistArtistIds.length > 0;
           const needsLfm = !!analysisGenreConfig.lastfm_artist && !lastfmArtistFetched && primaryArtistEntries.length > 0;
-          const needsFetch = needsSpotify || needsEn || needsLfm;
+          const needsFetch = needsSpotify || needsSpArtist || needsEn || needsLfm;
 
           if (!needsFetch) {
               skippedByLimit = { everynoise_artist: false, lastfm_artist: false };
@@ -70215,7 +70860,7 @@ shadowRoot.innerHTML = `
 
   async function runPlaylistExtraColPrefetch(uri, colSig, colTypes, hasLfmUser, warmupData, isStale) {
       const FAST_MAX = 10000;
-      const SLOW_MAX = 400;
+      const SLOW_MAX = 200;
       const { totalTracks, trackIds, lfmEntries, existingMetaMap } = warmupData;
 
       const needPC = colTypes.has('playCount');
@@ -70314,7 +70959,7 @@ shadowRoot.innerHTML = `
 
       if (missFullAudio.length) {
           tasks.push((async () => {
-              const CHUNK = 50;
+              const CHUNK = 100;
               for (let i = 0; i < missFullAudio.length && !isStale(); i += CHUNK) {
                   const batch = missFullAudio.slice(i, i + CHUNK).filter(id => !extraColInFlight.aiStats.has(id) && getExtraColMem('aiStats', id, CACHE_EXPIRE_AI_DATA) === undefined);
                   if (!batch.length) continue;
@@ -70332,7 +70977,7 @@ shadowRoot.innerHTML = `
               if (L_F_M_Key_Pool.length === 0) await fetchLastFmKeys();
               if (isStale()) return;
               const validKeys = Math.max(1, L_F_M_Key_Pool.length - revokedLfmKeys.size);
-              const conc = Math.min(8, Math.max(3, validKeys));
+              const conc = Math.min(100, Math.max(5, validKeys * 3));
               const globalToSave = [];
               const personalToSave = [];
               const flushLfmIdb = () => {
@@ -70358,7 +71003,7 @@ shadowRoot.innerHTML = `
                               setExtraColMem('personalScrobbles', entry.key, r.personalScrobbles);
                               if (!entry.isLocal) personalToSave.push({ key: entry.key, val: { count: r.personalScrobbles, pendingUpdate: false } });
                           }
-                          if (globalToSave.length >= 25 || personalToSave.length >= 25) {
+                          if (globalToSave.length >= 50 || personalToSave.length >= 50) {
                               flushLfmIdb();
                               if (!isStale()) repaintUnprocessedPlaylistRows();
                           }
@@ -70376,7 +71021,7 @@ shadowRoot.innerHTML = `
               if (L_F_M_Key_Pool.length === 0) await fetchLastFmKeys();
               if (isStale()) return;
               const validKeys = Math.max(1, L_F_M_Key_Pool.length - revokedLfmKeys.size);
-              const conc = Math.min(6, Math.max(2, validKeys));
+              const conc = Math.min(20, Math.max(5, validKeys * 2));
               let idx = 0;
               const worker = async () => {
                   while (idx < missLfmLast.length && !isStale()) {
